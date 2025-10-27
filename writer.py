@@ -4,8 +4,75 @@ Ensures PokerTracker compatibility with 9 critical validations
 """
 
 import re
-from typing import List
-from models import NameMapping, ValidationResult
+from typing import List, Dict
+from collections import defaultdict
+from models import NameMapping, ValidationResult, ParsedHand
+
+
+def extract_table_name(raw_text: str) -> str:
+    """
+    Extract table name from hand history raw text
+    
+    Format: Table 'TableName' 6-max Seat #1 is the button
+    
+    Returns:
+        Table name or 'Unknown' if not found
+    """
+    match = re.search(r"Table '([^']+)'", raw_text)
+    if match:
+        return match.group(1)
+    return "Unknown"
+
+
+def group_hands_by_table(hands: List[ParsedHand]) -> Dict[str, List[ParsedHand]]:
+    """
+    Group hands by table name
+    
+    Args:
+        hands: List of ParsedHand objects
+        
+    Returns:
+        Dictionary mapping table_name -> list of hands
+    """
+    tables = defaultdict(list)
+    
+    for hand in hands:
+        table_name = extract_table_name(hand.raw_text)
+        tables[table_name].append(hand)
+    
+    return dict(tables)
+
+
+def generate_txt_files_by_table(
+    hands: List[ParsedHand],
+    mappings: List[NameMapping]
+) -> Dict[str, str]:
+    """
+    Generate separate TXT files for each table
+    
+    Args:
+        hands: List of matched hands
+        mappings: Name mappings to apply
+        
+    Returns:
+        Dictionary mapping table_name -> final txt content
+    """
+    # Group hands by table
+    tables = group_hands_by_table(hands)
+    
+    result = {}
+    for table_name, table_hands in tables.items():
+        # Combine raw texts for this table
+        original_txt = '\n\n'.join([hand.raw_text for hand in table_hands])
+        
+        # Apply name mappings
+        final_txt = generate_final_txt(original_txt, mappings)
+        
+        # Clean table name for filename (remove invalid chars)
+        safe_table_name = re.sub(r'[^\w\-_\.]', '_', table_name)
+        result[safe_table_name] = final_txt
+    
+    return result
 
 
 def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:

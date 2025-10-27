@@ -4,6 +4,7 @@ FastAPI application entry point
 
 import os
 import asyncio
+import zipfile
 from dataclasses import asdict
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -18,7 +19,7 @@ from database import init_db, create_job, get_job, get_all_jobs, update_job_stat
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
-from writer import generate_final_txt, validate_output_format
+from writer import generate_txt_files_by_table, validate_output_format
 from models import NameMapping
 
 app = FastAPI(
@@ -369,19 +370,42 @@ def run_processing_pipeline(job_id: int):
         print(f"[JOB {job_id}] Generated {len(name_mappings)} name mappings")
         
         matched_hands = [hand for hand in all_hands if hand.hand_id in matched_hand_ids]
-        all_original_txt = '\n\n'.join([hand.raw_text for hand in matched_hands])
         
-        final_txt = generate_final_txt(all_original_txt, name_mappings)
+        # Generate separate TXT files by table
+        txt_files_by_table = generate_txt_files_by_table(matched_hands, name_mappings)
         
-        validation = validate_output_format(all_original_txt, final_txt)
-        if not validation.valid:
-            print(f"[JOB {job_id}] ⚠️  Validation warnings: {validation.errors}")
+        print(f"[JOB {job_id}] Generated {len(txt_files_by_table)} table files")
         
+        # Create output directory
         job_output_path = OUTPUTS_PATH / str(job_id)
         job_output_path.mkdir(exist_ok=True)
         
-        output_txt_path = job_output_path / "resolved_hands.txt"
-        output_txt_path.write_text(final_txt, encoding='utf-8')
+        # Validate all files and write them
+        validation_errors_all = []
+        validation_warnings_all = []
+        
+        for table_name, final_txt in txt_files_by_table.items():
+            # Get original txt for this table to validate
+            table_hands_raw = [h.raw_text for h in matched_hands if table_name in h.raw_text or 'Unknown' in table_name]
+            original_txt = '\n\n'.join(table_hands_raw)
+            
+            validation = validate_output_format(original_txt, final_txt)
+            if not validation.valid:
+                validation_errors_all.extend(validation.errors)
+            validation_warnings_all.extend(validation.warnings)
+            
+            # Write individual TXT file
+            txt_path = job_output_path / f"{table_name}_resolved.txt"
+            txt_path.write_text(final_txt, encoding='utf-8')
+            print(f"[JOB {job_id}] ✓ Wrote {table_name}_resolved.txt")
+        
+        # Create ZIP file with all TXT files
+        zip_path = job_output_path / "resolved_hands.zip"
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for txt_file in job_output_path.glob("*_resolved.txt"):
+                zipf.write(txt_file, txt_file.name)
+        
+        print(f"[JOB {job_id}] ✓ Created ZIP with {len(txt_files_by_table)} files")
         
         # Get screenshot results for stats
         screenshot_results = get_screenshot_results(job_id)
@@ -392,7 +416,7 @@ def run_processing_pipeline(job_id: int):
         
         # Extract unmapped players from validation warnings
         unmapped_players = []
-        for warning in validation.warnings:
+        for warning in validation_warnings_all:
             if 'unmapped anonymous IDs' in warning:
                 # Extract IDs from warning message
                 parts = warning.split(':')
@@ -401,20 +425,25 @@ def run_processing_pipeline(job_id: int):
                     unmapped_players = [id.strip() for id in ids_part.split(',')]
                 break
         
+        # Get list of table names processed
+        tables_processed = list(txt_files_by_table.keys())
+        
         stats = {
             'total_hands': len(all_hands),
             'matched_hands': len(matched_hands),
             'mappings_count': len(name_mappings),
             'high_confidence_matches': sum(1 for m in matches if m.confidence >= 80),
-            'validation_passed': validation.valid,
-            'validation_errors': validation.errors,
-            'validation_warnings': validation.warnings,
+            'validation_passed': len(validation_errors_all) == 0,
+            'validation_errors': validation_errors_all,
+            'validation_warnings': validation_warnings_all,
             'screenshots_total': len(screenshot_files),
             'screenshots_success': screenshots_by_status.get('success', 0),
             'screenshots_warning': screenshots_by_status.get('warning', 0),
             'screenshots_error': screenshots_by_status.get('error', 0),
             'unmapped_players': unmapped_players,
-            'unmapped_players_count': len(unmapped_players)
+            'unmapped_players_count': len(unmapped_players),
+            'tables_processed': tables_processed,
+            'tables_count': len(tables_processed)
         }
         
         mappings_dict = [
@@ -427,7 +456,7 @@ def run_processing_pipeline(job_id: int):
             for m in name_mappings
         ]
         
-        save_result(job_id, str(output_txt_path), mappings_dict, stats)
+        save_result(job_id, str(zip_path), mappings_dict, stats)
         
         # Update job statistics and processing time
         update_job_stats(
