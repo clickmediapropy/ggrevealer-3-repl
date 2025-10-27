@@ -4,6 +4,8 @@ let txtFiles = [];
 let screenshotFiles = [];
 let currentJobId = null;
 let statusCheckInterval = null;
+let timerInterval = null;
+let startTime = null;
 
 const txtDropzone = document.getElementById('txt-dropzone');
 const txtInput = document.getElementById('txt-input');
@@ -160,6 +162,7 @@ uploadBtn.addEventListener('click', async () => {
         }
 
         showProcessing();
+        startTimer();
         startStatusPolling();
 
     } catch (error) {
@@ -169,6 +172,42 @@ uploadBtn.addEventListener('click', async () => {
         uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
     }
 });
+
+function startTimer() {
+    startTime = Date.now();
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function updateTimer(elapsedSeconds = null) {
+    if (elapsedSeconds === null && !startTime) return;
+    
+    const elapsed = elapsedSeconds !== null ? Math.floor(elapsedSeconds) : Math.floor((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    
+    const timerElement = document.getElementById('timer');
+    if (timerElement) {
+        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return '0s';
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    }
+    return `${secs}s`;
+}
 
 function startStatusPolling() {
     statusCheckInterval = setInterval(checkStatus, 2000);
@@ -189,13 +228,16 @@ async function checkStatus() {
         }
 
         const job = await response.json();
-        statusText.textContent = getStatusMessage(job.status);
+        
+        updateProcessingUI(job);
 
         if (job.status === 'completed') {
             stopStatusPolling();
+            stopTimer();
             showResults(job);
         } else if (job.status === 'failed') {
             stopStatusPolling();
+            stopTimer();
             showError(job.error_message || 'Processing failed');
         }
     } catch (error) {
@@ -203,14 +245,90 @@ async function checkStatus() {
     }
 }
 
-function getStatusMessage(status) {
-    const messages = {
-        'pending': 'En cola...',
-        'processing': 'Procesando archivos...',
-        'completed': 'Completado',
-        'failed': 'Error en procesamiento'
-    };
-    return messages[status] || 'Desconocido';
+function updateProcessingUI(job) {
+    const stats = job.statistics || {};
+    const isCompleted = job.status === 'completed';
+    
+    if (job.elapsed_time_seconds !== null && job.elapsed_time_seconds !== undefined) {
+        stopTimer();
+        updateTimer(job.elapsed_time_seconds);
+    }
+    
+    const phases = [
+        { name: 'Parsing', icon: 'bi-file-text', done: isCompleted || stats.hands_parsed > 0 },
+        { name: 'OCR', icon: 'bi-eye', done: isCompleted || stats.matched_hands > 0 },
+        { name: 'Matching', icon: 'bi-link-45deg', done: isCompleted || stats.matched_hands > 0 },
+        { name: 'Writing', icon: 'bi-pencil', done: isCompleted || stats.name_mappings > 0 }
+    ];
+
+    const phasesHTML = phases.map(phase => {
+        const statusClass = phase.done ? 'phase-done' : 'phase-processing';
+        const icon = phase.done ? 'bi-check-circle-fill' : 'bi-arrow-repeat spinning';
+        return `
+            <div class="phase-item ${statusClass}">
+                <i class="bi ${icon}"></i>
+                <span>${phase.name}</span>
+            </div>
+        `;
+    }).join('');
+    
+    const statsHTML = `
+        <div class="processing-stats">
+            <div class="processing-stat-item">
+                <i class="bi bi-file-text"></i>
+                <span>${stats.txt_files || 0} archivos TXT</span>
+            </div>
+            <div class="processing-stat-item">
+                <i class="bi bi-image"></i>
+                <span>${stats.screenshots || 0} screenshots</span>
+            </div>
+            ${stats.hands_parsed > 0 ? `
+                <div class="processing-stat-item success">
+                    <i class="bi bi-check-circle"></i>
+                    <span>${stats.hands_parsed} manos parseadas</span>
+                </div>
+            ` : ''}
+            ${stats.matched_hands > 0 ? `
+                <div class="processing-stat-item success">
+                    <i class="bi bi-check-circle"></i>
+                    <span>${stats.matched_hands} manos matched</span>
+                </div>
+            ` : ''}
+            ${stats.name_mappings > 0 ? `
+                <div class="processing-stat-item success">
+                    <i class="bi bi-check-circle"></i>
+                    <span>${stats.name_mappings} nombres resueltos</span>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    const processingStatus = document.getElementById('processing-status');
+    
+    let timerElement = document.getElementById('timer');
+    if (!timerElement) {
+        processingStatus.innerHTML = `
+            <div class="timer-display">
+                <i class="bi bi-clock"></i> 
+                <span id="timer">0:00</span>
+            </div>
+            <h5 class="mb-3">Procesando Job #${job.id}</h5>
+            <p class="text-muted mb-3">Pipeline de procesamiento</p>
+            <div class="phases-container mb-4">
+                ${phasesHTML}
+            </div>
+            ${statsHTML}
+        `;
+    } else {
+        const phasesContainer = processingStatus.querySelector('.phases-container');
+        if (phasesContainer) {
+            phasesContainer.innerHTML = phasesHTML;
+        }
+        const statsContainer = processingStatus.querySelector('.processing-stats');
+        if (statsContainer) {
+            statsContainer.outerHTML = statsHTML;
+        }
+    }
 }
 
 function showProcessing() {
@@ -224,7 +342,10 @@ function showResults(job) {
     processingSection.classList.add('d-none');
     resultsSection.classList.remove('d-none');
 
-    const stats = job.result?.stats || {};
+    const stats = job.statistics || {};
+    const detailedStats = job.detailed_stats || {};
+    const processingTime = stats.processing_time ? formatDuration(stats.processing_time) : 'N/A';
+
     resultsStats.innerHTML = `
         <div class="stats-grid">
             <div class="stat-card">
@@ -232,12 +353,16 @@ function showResults(job) {
                 <div class="stat-label">Manos Matched</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${stats.mappings_count || 0}</div>
+                <div class="stat-value">${stats.name_mappings || 0}</div>
                 <div class="stat-label">Nombres Resueltos</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${stats.high_confidence_matches || 0}</div>
+                <div class="stat-value">${detailedStats.high_confidence_matches || 0}</div>
                 <div class="stat-label">Alta Confianza (≥80%)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${processingTime}</div>
+                <div class="stat-label">Tiempo de Proceso</div>
             </div>
         </div>
     `;
@@ -261,6 +386,7 @@ function resetToWelcome() {
     txtFiles = [];
     screenshotFiles = [];
     currentJobId = null;
+    startTime = null;
     renderTxtFiles();
     renderScreenshotFiles();
     updateUploadButton();
@@ -300,29 +426,102 @@ function renderJobs(jobs) {
 
     jobs.forEach(job => {
         const div = document.createElement('div');
-        div.className = 'job-item';
+        div.className = 'job-card';
+        div.id = `job-${job.id}`;
 
-        const statusClass = `badge-${job.status}`;
+        const statusClass = `status-badge-${job.status}`;
         const createdDate = new Date(job.created_at).toLocaleString('es-ES');
+        const processingTime = job.processing_time_seconds ? formatDuration(job.processing_time_seconds) : 'N/A';
+
+        const statusIcon = {
+            'completed': 'bi-check-circle-fill text-success',
+            'processing': 'bi-arrow-repeat text-primary spinning',
+            'failed': 'bi-x-circle-fill text-danger',
+            'pending': 'bi-clock-fill text-warning'
+        }[job.status] || 'bi-question-circle-fill';
 
         div.innerHTML = `
-            <div class="job-header">
-                <div class="job-id">Job #${job.id}</div>
-                <span class="badge-status ${statusClass}">${job.status}</span>
+            <div class="job-card-header" onclick="toggleJobCard(${job.id})">
+                <div class="job-card-left">
+                    <span class="job-id">Job #${job.id}</span>
+                    <span class="${statusClass}">
+                        <i class="bi ${statusIcon}"></i> ${job.status}
+                    </span>
+                </div>
+                <div class="job-card-right">
+                    ${job.status === 'completed' ? `
+                        <button class="btn btn-sm btn-success me-2" onclick="event.stopPropagation(); downloadResult(${job.id})">
+                            <i class="bi bi-download"></i> Descargar
+                        </button>
+                    ` : ''}
+                    <i class="bi bi-chevron-down toggle-icon"></i>
+                </div>
             </div>
-            <div class="job-details">
-                <p class="mb-1"><small><i class="bi bi-calendar"></i> ${createdDate}</small></p>
-                <p class="mb-2"><small><i class="bi bi-file-text"></i> ${job.txt_files_count} TXT | <i class="bi bi-image"></i> ${job.screenshot_files_count} Screenshots</small></p>
+            <div class="job-card-body" id="job-body-${job.id}" style="display: none;">
+                <div class="job-details-grid">
+                    <div class="detail-item">
+                        <i class="bi bi-calendar"></i>
+                        <span>${createdDate}</span>
+                    </div>
+                    <div class="detail-item">
+                        <i class="bi bi-clock"></i>
+                        <span>${processingTime}</span>
+                    </div>
+                    <div class="detail-item">
+                        <i class="bi bi-file-text"></i>
+                        <span>${job.txt_files_count} archivos TXT</span>
+                    </div>
+                    <div class="detail-item">
+                        <i class="bi bi-image"></i>
+                        <span>${job.screenshot_files_count} screenshots</span>
+                    </div>
+                </div>
                 ${job.status === 'completed' ? `
-                    <button class="btn btn-sm btn-success" onclick="downloadResult(${job.id})">
-                        <i class="bi bi-download"></i> Descargar
-                    </button>
+                    <div class="job-stats-grid mt-3">
+                        <div class="job-stat">
+                            <div class="job-stat-value">${job.hands_parsed || 0}</div>
+                            <div class="job-stat-label">Manos Parseadas</div>
+                        </div>
+                        <div class="job-stat">
+                            <div class="job-stat-value">${job.matched_hands || 0}</div>
+                            <div class="job-stat-label">Manos Matched</div>
+                        </div>
+                        <div class="job-stat">
+                            <div class="job-stat-value">${job.name_mappings_count || 0}</div>
+                            <div class="job-stat-label">Nombres Resueltos</div>
+                        </div>
+                        <div class="job-stat">
+                            <div class="job-stat-value">${job.screenshot_files_count > 0 ? Math.round((job.matched_hands / job.screenshot_files_count) * 100) : 0}%</div>
+                            <div class="job-stat-label">Tasa de Éxito OCR</div>
+                        </div>
+                    </div>
+                ` : ''}
+                ${job.error_message ? `
+                    <div class="alert alert-danger mt-3 mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> ${job.error_message}
+                    </div>
                 ` : ''}
             </div>
         `;
 
         jobsList.appendChild(div);
     });
+}
+
+function toggleJobCard(jobId) {
+    const body = document.getElementById(`job-body-${jobId}`);
+    const card = document.getElementById(`job-${jobId}`);
+    const icon = card.querySelector('.toggle-icon');
+    
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        icon.classList.remove('bi-chevron-down');
+        icon.classList.add('bi-chevron-up');
+    } else {
+        body.style.display = 'none';
+        icon.classList.remove('bi-chevron-up');
+        icon.classList.add('bi-chevron-down');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

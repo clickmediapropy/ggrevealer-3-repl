@@ -132,7 +132,24 @@ Tests parser, writer, and checks GEMINI_API_KEY configuration.
 4. **Hero Protection**: "Hero" is NEVER replaced (PokerTracker requirement)
 
 ## Recent Changes (October 27, 2025)
-- Initial MVP implementation complete
+
+### Visual Interface Improvements
+- **Real-time timer**: Shows elapsed time during processing, persists across page refreshes using backend elapsed_time_seconds
+- **Progressive phase indicators**: Visual pipeline (Parsing → OCR → Matching → Writing) with animated transitions
+- **Expandable job history cards**: Click to toggle detailed statistics including:
+  - Processing time
+  - Manos parseadas, matched, and nombres resueltos
+  - OCR success rate
+  - Timestamps and file counts
+- **Dynamic statistics**: Stats appear progressively during processing with smooth animations
+- **Modern CSS**: Gradients, slide-in animations, spinning icons, and smooth transitions
+
+### Backend Enhancements
+- **Extended database schema**: Added started_at, processing_time_seconds, matched_hands, name_mappings_count, hands_parsed to jobs table
+- **Time tracking**: mark_job_started() and update_job_stats() functions for accurate timing
+- **Enhanced API**: /api/status endpoint now returns elapsed_time_seconds for real-time updates and detailed statistics
+
+### Initial MVP
 - All core modules implemented and tested
 - Frontend with drag-and-drop upload working
 - Background processing pipeline functional
