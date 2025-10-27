@@ -282,6 +282,12 @@ function updateProcessingUI(job) {
                 <i class="bi bi-image"></i>
                 <span>${stats.screenshots || 0} screenshots</span>
             </div>
+            ${stats.ocr_total > 0 && stats.ocr_processed < stats.ocr_total ? `
+                <div class="processing-stat-item processing">
+                    <i class="bi bi-arrow-repeat spinning"></i>
+                    <span>OCR: ${stats.ocr_processed}/${stats.ocr_total} procesados</span>
+                </div>
+            ` : ''}
             ${stats.hands_parsed > 0 ? `
                 <div class="processing-stat-item success">
                     <i class="bi bi-check-circle"></i>

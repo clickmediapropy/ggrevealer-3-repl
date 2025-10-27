@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     processing_time_seconds REAL,
     matched_hands INTEGER DEFAULT 0,
     name_mappings_count INTEGER DEFAULT 0,
-    hands_parsed INTEGER DEFAULT 0
+    hands_parsed INTEGER DEFAULT 0,
+    ocr_processed_count INTEGER DEFAULT 0,
+    ocr_total_count INTEGER DEFAULT 0
 );
 
 -- Files table
@@ -95,6 +97,10 @@ def init_db():
             migrations.append("ALTER TABLE jobs ADD COLUMN name_mappings_count INTEGER DEFAULT 0")
         if 'hands_parsed' not in columns:
             migrations.append("ALTER TABLE jobs ADD COLUMN hands_parsed INTEGER DEFAULT 0")
+        if 'ocr_processed_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr_processed_count INTEGER DEFAULT 0")
+        if 'ocr_total_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr_total_count INTEGER DEFAULT 0")
         
         for migration in migrations:
             conn.execute(migration)
@@ -179,6 +185,24 @@ def update_job_file_counts(job_id: int, txt_count: int, screenshot_count: int):
         conn.execute(
             "UPDATE jobs SET txt_files_count = ?, screenshot_files_count = ? WHERE id = ?",
             (txt_count, screenshot_count, job_id)
+        )
+
+
+def set_ocr_total_count(job_id: int, total: int):
+    """Set total count of OCR screenshots to process"""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE jobs SET ocr_total_count = ?, ocr_processed_count = 0 WHERE id = ?",
+            (total, job_id)
+        )
+
+
+def increment_ocr_processed_count(job_id: int):
+    """Increment OCR processed count by 1"""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE jobs SET ocr_processed_count = ocr_processed_count + 1 WHERE id = ?",
+            (job_id,)
         )
 
 

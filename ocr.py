@@ -5,41 +5,45 @@ Optimized for PokerCraft screenshot analysis
 
 import os
 import json
+import asyncio
 from pathlib import Path
 from typing import Optional
 import google.generativeai as genai
 from models import ScreenshotAnalysis, PlayerStack
 
 
-def ocr_screenshot(image_path: str, screenshot_id: str) -> ScreenshotAnalysis:
+async def ocr_screenshot(image_path: str, screenshot_id: str, semaphore: Optional[asyncio.Semaphore] = None) -> ScreenshotAnalysis:
     """
     Analyze a poker screenshot using Gemini Vision
     
     Args:
         image_path: Path to the screenshot image
         screenshot_id: Unique identifier for this screenshot
+        semaphore: Optional semaphore to limit concurrent requests
         
     Returns:
         ScreenshotAnalysis with extracted data
     """
     
-    # Configure Gemini API
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key or api_key == 'your_gemini_api_key_here':
-        print(f"⚠️  GEMINI_API_KEY not configured - returning mock data for {screenshot_id}")
-        return _mock_ocr_result(screenshot_id)
-    
-    genai.configure(api_key=api_key)
-    
-    try:
-        # Upload image
-        uploaded_file = genai.upload_file(image_path)
+    # Use semaphore if provided to limit concurrent requests
+    async def _process():
+        # Configure Gemini API
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key or api_key == 'your_gemini_api_key_here':
+            print(f"⚠️  GEMINI_API_KEY not configured - returning mock data for {screenshot_id}")
+            return _mock_ocr_result(screenshot_id)
         
-        # Create model (Gemini 2.5 Flash - optimal for vision tasks)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        genai.configure(api_key=api_key)
         
-        # Optimized 78-line prompt for poker screenshot OCR
-        prompt = """You are a specialized OCR system for poker hand screenshots from PokerCraft.
+        try:
+            # Upload image (async)
+            uploaded_file = await asyncio.to_thread(genai.upload_file, image_path)
+            
+            # Create model (Gemini 2.5 Flash - optimal for vision tasks)
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            
+            # Optimized 78-line prompt for poker screenshot OCR
+            prompt = """You are a specialized OCR system for poker hand screenshots from PokerCraft.
 
 CRITICAL INSTRUCTIONS:
 1. Extract ALL visible player names EXACTLY as shown (case-sensitive)
@@ -102,62 +106,69 @@ Always return valid JSON.
 
 Analyze this poker screenshot and extract all data:"""
 
-        # Generate response
-        response = model.generate_content([prompt, uploaded_file])
-        
-        # Parse JSON response
-        try:
-            # Extract JSON from response
-            response_text = response.text.strip()
+            # Generate response (async)
+            response = await asyncio.to_thread(model.generate_content, [prompt, uploaded_file])
             
-            # Remove markdown code blocks if present
-            if response_text.startswith('```'):
-                response_text = response_text.split('```')[1]
-                if response_text.startswith('json'):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-            
-            data = json.loads(response_text)
-            
-            # Build PlayerStack objects
-            player_stacks = []
-            for ps_data in data.get('all_player_stacks', []):
-                player_stacks.append(PlayerStack(
-                    player_name=ps_data['player_name'],
-                    stack=float(ps_data['stack']),
-                    position=int(ps_data['position'])
-                ))
-            
-            return ScreenshotAnalysis(
-                screenshot_id=screenshot_id,
-                table_name=data.get('table_name'),
-                player_names=data.get('player_names', []),
-                hero_name=data.get('hero_name'),
-                hero_position=data.get('hero_position'),
-                hero_stack=data.get('hero_stack'),
-                hero_cards=data.get('hero_cards'),
-                board_cards=data.get('board_cards', {}),
-                all_player_stacks=player_stacks,
-                confidence=data.get('confidence', 0),
-                warnings=data.get('warnings', [])
-            )
-            
-        except json.JSONDecodeError as e:
-            print(f"❌ Failed to parse Gemini JSON response: {e}")
-            print(f"Raw response: {response.text[:500]}")
+            # Parse JSON response
+            try:
+                # Extract JSON from response
+                response_text = response.text.strip()
+                
+                # Remove markdown code blocks if present
+                if response_text.startswith('```'):
+                    response_text = response_text.split('```')[1]
+                    if response_text.startswith('json'):
+                        response_text = response_text[4:]
+                    response_text = response_text.strip()
+                
+                data = json.loads(response_text)
+                
+                # Build PlayerStack objects
+                player_stacks = []
+                for ps_data in data.get('all_player_stacks', []):
+                    player_stacks.append(PlayerStack(
+                        player_name=ps_data['player_name'],
+                        stack=float(ps_data['stack']),
+                        position=int(ps_data['position'])
+                    ))
+                
+                return ScreenshotAnalysis(
+                    screenshot_id=screenshot_id,
+                    table_name=data.get('table_name'),
+                    player_names=data.get('player_names', []),
+                    hero_name=data.get('hero_name'),
+                    hero_position=data.get('hero_position'),
+                    hero_stack=data.get('hero_stack'),
+                    hero_cards=data.get('hero_cards'),
+                    board_cards=data.get('board_cards', {}),
+                    all_player_stacks=player_stacks,
+                    confidence=data.get('confidence', 0),
+                    warnings=data.get('warnings', [])
+                )
+                
+            except json.JSONDecodeError as e:
+                print(f"❌ Failed to parse Gemini JSON response: {e}")
+                print(f"Raw response: {response.text[:500]}")
+                return ScreenshotAnalysis(
+                    screenshot_id=screenshot_id,
+                    confidence=0,
+                    warnings=[f"JSON parse error: {str(e)}"]
+                )
+    
+        except Exception as e:
+            print(f"❌ OCR error for {screenshot_id}: {e}")
             return ScreenshotAnalysis(
                 screenshot_id=screenshot_id,
                 confidence=0,
-                warnings=[f"JSON parse error: {str(e)}"]
+                warnings=[f"OCR error: {str(e)}"]
             )
     
-    except Exception as e:
-        print(f"❌ OCR error for {screenshot_id}: {e}")
-        return ScreenshotAnalysis(
-            screenshot_id=screenshot_id,
-            confidence=0,
-            warnings=[f"OCR error: {str(e)}"]
-        )
+    # Execute with or without semaphore
+    if semaphore:
+        async with semaphore:
+            return await _process()
+    else:
+        return await _process()
 
 
 def _mock_ocr_result(screenshot_id: str) -> ScreenshotAnalysis:

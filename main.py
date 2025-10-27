@@ -3,6 +3,7 @@ FastAPI application entry point
 """
 
 import os
+import asyncio
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,7 @@ from pathlib import Path
 from typing import List
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
@@ -146,7 +147,9 @@ async def get_job_status(job_id: int):
             'hands_parsed': job.get('hands_parsed', 0),
             'matched_hands': job.get('matched_hands', 0),
             'name_mappings': job.get('name_mappings_count', 0),
-            'processing_time': job.get('processing_time_seconds')
+            'processing_time': job.get('processing_time_seconds'),
+            'ocr_processed': job.get('ocr_processed_count', 0),
+            'ocr_total': job.get('ocr_total_count', 0)
         }
     }
     
@@ -242,13 +245,30 @@ def run_processing_pipeline(job_id: int):
         screenshot_files = get_job_files(job_id, 'screenshot')
         print(f"[JOB {job_id}] Found {len(screenshot_files)} screenshots")
         
-        ocr_results = []
-        for screenshot_file in screenshot_files:
-            result = ocr_screenshot(
+        # Set total count for progress tracking
+        set_ocr_total_count(job_id, len(screenshot_files))
+        
+        # Process screenshots in parallel with semaphore to limit concurrency
+        semaphore = asyncio.Semaphore(10)  # Max 10 concurrent requests
+        
+        async def process_single_screenshot(screenshot_file):
+            """Process one screenshot and update progress"""
+            result = await ocr_screenshot(
                 screenshot_file['file_path'],
-                screenshot_file['filename']
+                screenshot_file['filename'],
+                semaphore
             )
-            ocr_results.append(result)
+            increment_ocr_processed_count(job_id)
+            return result
+        
+        async def process_all_screenshots():
+            tasks = [
+                process_single_screenshot(screenshot_file)
+                for screenshot_file in screenshot_files
+            ]
+            return await asyncio.gather(*tasks)
+        
+        ocr_results = asyncio.run(process_all_screenshots())
         
         print(f"[JOB {job_id}] OCR completed: {len(ocr_results)} screenshots analyzed")
         
