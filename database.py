@@ -24,7 +24,12 @@ CREATE TABLE IF NOT EXISTS jobs (
     txt_files_count INTEGER DEFAULT 0,
     screenshot_files_count INTEGER DEFAULT 0,
     error_message TEXT,
-    completed_at TEXT
+    started_at TEXT,
+    completed_at TEXT,
+    processing_time_seconds REAL,
+    matched_hands INTEGER DEFAULT 0,
+    name_mappings_count INTEGER DEFAULT 0,
+    hands_parsed INTEGER DEFAULT 0
 );
 
 -- Files table
@@ -74,6 +79,26 @@ def init_db():
     """Initialize database with schema"""
     with get_db() as conn:
         conn.executescript(SCHEMA)
+        
+        # Migration: Add new columns if they don't exist
+        cursor = conn.execute("PRAGMA table_info(jobs)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        migrations = []
+        if 'started_at' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN started_at TEXT")
+        if 'processing_time_seconds' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN processing_time_seconds REAL")
+        if 'matched_hands' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN matched_hands INTEGER DEFAULT 0")
+        if 'name_mappings_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN name_mappings_count INTEGER DEFAULT 0")
+        if 'hands_parsed' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN hands_parsed INTEGER DEFAULT 0")
+        
+        for migration in migrations:
+            conn.execute(migration)
+            
     print("✅ Database initialized")
 
 
@@ -114,6 +139,37 @@ def update_job_status(job_id: int, status: str, error_message: Optional[str] = N
         conn.execute(
             "UPDATE jobs SET status = ?, error_message = ?, completed_at = ? WHERE id = ?",
             (status, error_message, completed_at, job_id)
+        )
+
+
+def mark_job_started(job_id: int):
+    """Mark job as started with timestamp"""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE jobs SET started_at = ?, status = ? WHERE id = ?",
+            (datetime.utcnow().isoformat(), 'processing', job_id)
+        )
+
+
+def update_job_stats(job_id: int, matched_hands: int, name_mappings_count: int, hands_parsed: int):
+    """Update job statistics after processing"""
+    with get_db() as conn:
+        # Get started_at to calculate processing time
+        row = conn.execute("SELECT started_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        processing_time = None
+        if row and row['started_at']:
+            started = datetime.fromisoformat(row['started_at'])
+            completed = datetime.utcnow()
+            processing_time = (completed - started).total_seconds()
+        
+        conn.execute(
+            """UPDATE jobs 
+               SET matched_hands = ?, 
+                   name_mappings_count = ?, 
+                   hands_parsed = ?,
+                   processing_time_seconds = ?
+               WHERE id = ?""",
+            (matched_hands, name_mappings_count, hands_parsed, processing_time, job_id)
         )
 
 

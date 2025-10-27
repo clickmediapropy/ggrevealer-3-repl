@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
@@ -123,20 +123,46 @@ async def process_job(job_id: int, background_tasks: BackgroundTasks):
 
 @app.get("/api/status/{job_id}")
 async def get_job_status(job_id: int):
-    """Get current status of a job"""
+    """Get current status of a job with detailed statistics"""
+    from datetime import datetime
+    
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    # Calculate elapsed time if processing
+    elapsed_time = None
+    if job['status'] == 'processing' and job.get('started_at'):
+        started = datetime.fromisoformat(job['started_at'])
+        elapsed_time = (datetime.utcnow() - started).total_seconds()
+    
+    # Build enhanced response
+    response = {
+        **job,
+        'elapsed_time_seconds': elapsed_time,
+        'statistics': {
+            'txt_files': job.get('txt_files_count', 0),
+            'screenshots': job.get('screenshot_files_count', 0),
+            'hands_parsed': job.get('hands_parsed', 0),
+            'matched_hands': job.get('matched_hands', 0),
+            'name_mappings': job.get('name_mappings_count', 0),
+            'processing_time': job.get('processing_time_seconds')
+        }
+    }
+    
+    # Add detailed result stats if completed
     if job['status'] == 'completed':
         result = get_result(job_id)
-        if result:
-            job['result'] = {
-                'stats': result.get('stats'),
-                'mappings_count': len(result.get('mappings', []))
-            }
+        if result and result.get('stats'):
+            response['detailed_stats'] = result['stats']
+            
+            # Calculate OCR success rate
+            screenshots = job.get('screenshot_files_count', 0)
+            matches = job.get('matched_hands', 0)
+            if screenshots > 0:
+                response['statistics']['ocr_success_rate'] = round((matches / screenshots) * 100, 1)
     
-    return job
+    return response
 
 
 @app.get("/api/download/{job_id}")
@@ -195,6 +221,9 @@ def run_processing_pipeline(job_id: int):
     """Execute the full processing pipeline for a job"""
     try:
         print(f"[JOB {job_id}] Starting processing...")
+        
+        # Mark job as started with timestamp
+        mark_job_started(job_id)
         
         txt_files = get_job_files(job_id, 'txt')
         print(f"[JOB {job_id}] Found {len(txt_files)} TXT files")
@@ -284,6 +313,15 @@ def run_processing_pipeline(job_id: int):
         ]
         
         save_result(job_id, str(output_txt_path), mappings_dict, stats)
+        
+        # Update job statistics and processing time
+        update_job_stats(
+            job_id,
+            matched_hands=len(matched_hands),
+            name_mappings_count=len(name_mappings),
+            hands_parsed=len(all_hands)
+        )
+        
         update_job_status(job_id, 'completed')
         
         print(f"[JOB {job_id}] ✅ Processing completed successfully")
