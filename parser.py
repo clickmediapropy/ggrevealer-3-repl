@@ -16,7 +16,7 @@ class GGPokerParser:
     def parse_file(content: str) -> List[ParsedHand]:
         """Parse multiple hands from a TXT file"""
         hands = []
-        hand_texts = re.split(r'\n\s*\n\s*\n', content.strip())
+        hand_texts = re.split(r'\n\s*\n+', content.strip())
         
         for hand_text in hand_texts:
             if hand_text.strip():
@@ -43,11 +43,26 @@ class GGPokerParser:
             timestamp = datetime.strptime(timestamp_match.group(1), '%Y/%m/%d %H:%M:%S')
             
             # Extract game type and stakes
-            game_match = re.search(r"Poker Hand #\S+: (.*?) \((.*?)\)", text)
-            if not game_match:
-                return None
-            game_type = game_match.group(1)
-            stakes = game_match.group(2)
+            # Try cash game format first: "Game Type ($stakes)"
+            game_match = re.search(r"Poker Hand #\S+: (.*?) \((\$[\d.]+/\$[\d.]+)\)", text)
+            if game_match:
+                game_type = game_match.group(1)
+                stakes = game_match.group(2)
+            else:
+                # Try tournament format: "Tournament #XX, ... Game Type - LevelX(blinds)"
+                game_match = re.search(r"Poker Hand #\S+: (.*?) - (Level\d+)\(([\d/]+)\)", text)
+                if game_match:
+                    game_type = game_match.group(1)
+                    stakes = f"{game_match.group(2)}({game_match.group(3)})"
+                else:
+                    # Fallback: extract everything after colon until timestamp
+                    first_line = text.split('\n')[0]
+                    game_info = re.search(r"Poker Hand #\S+: (.*?) - \d{4}/", first_line)
+                    if game_info:
+                        game_type = game_info.group(1)
+                        stakes = "unknown"
+                    else:
+                        return None
             
             # Detect table format
             table_format = '6-max'
