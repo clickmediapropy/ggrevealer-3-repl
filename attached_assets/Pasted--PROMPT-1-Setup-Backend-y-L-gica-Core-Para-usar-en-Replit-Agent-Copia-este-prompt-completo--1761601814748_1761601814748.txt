@@ -1,0 +1,396 @@
+# PROMPT 1: Setup Backend y Lógica Core
+
+**Para usar en Replit Agent** - Copia este prompt completo y pégalo en un nuevo Repl de Python.
+
+---
+
+## Objetivo
+
+Crear la estructura base de GGRevealer con toda la lógica de procesamiento:
+- Parser de archivos TXT de GGPoker
+- OCR con Google Gemini Vision API
+- Algoritmo de matching de hands con screenshots
+- Generador de output TXT con nombres reales
+
+## Instrucciones
+
+### 1. Crear estructura de archivos
+
+Crea los siguientes archivos en la raíz del proyecto:
+
+```
+ggrevealer/
+├── models.py
+├── parser.py
+├── ocr.py
+├── matcher.py
+├── writer.py
+├── requirements.txt
+├── .env.example
+└── test_cli.py
+```
+
+---
+
+### 2. Archivo: `models.py`
+
+```python
+"""
+Type definitions for GGRevealer
+Dataclasses for parsed hands, OCR results, matches, and mappings
+"""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional, List, Dict, Literal
+
+
+# ============================================================================
+# PARSER TYPES
+# ============================================================================
+
+Position = Literal['BTN', 'SB', 'BB', 'UTG', 'MP', 'CO', 'UTG+1', 'UTG+2']
+Street = Literal['PREFLOP', 'FLOP', 'TURN', 'RIVER', 'SHOWDOWN']
+ActionType = Literal['folds', 'checks', 'calls', 'bets', 'raises', 'shows', 'collected', 'posts']
+
+
+@dataclass
+class Seat:
+    """Player seat information"""
+    seat_number: int
+    player_id: str
+    stack: float
+    position: Position
+
+
+@dataclass
+class BoardCards:
+    """Community cards on the board"""
+    flop: Optional[List[str]] = None
+    turn: Optional[str] = None
+    river: Optional[str] = None
+
+
+@dataclass
+class Action:
+    """Player action in a hand"""
+    street: Street
+    player: str
+    action: ActionType
+    amount: Optional[float] = None
+
+
+@dataclass
+class TournamentInfo:
+    """Tournament-specific information"""
+    tournament_id: Optional[str] = None
+    buy_in: Optional[str] = None
+    level: Optional[str] = None
+
+
+@dataclass
+class ParsedHand:
+    """Parsed poker hand from GGPoker TXT file"""
+    hand_id: str
+    timestamp: datetime
+    game_type: str
+    stakes: str
+    table_format: Literal['3-max', '6-max']
+    button_seat: int
+    seats: List[Seat]
+    board_cards: BoardCards
+    actions: List[Action]
+    raw_text: str
+    hero_cards: Optional[str] = None
+    tournament_info: Optional[TournamentInfo] = None
+
+
+# ============================================================================
+# OCR TYPES
+# ============================================================================
+
+@dataclass
+class PlayerStack:
+    """Player stack information from OCR"""
+    player_name: str
+    stack: float
+    position: int  # seat number
+
+
+@dataclass
+class ScreenshotAnalysis:
+    """OCR analysis result from a screenshot"""
+    screenshot_id: str
+    timestamp: Optional[str] = None
+    table_name: Optional[str] = None
+    player_names: List[str] = field(default_factory=list)
+    hero_name: Optional[str] = None
+    hero_position: Optional[int] = None
+    hero_stack: Optional[float] = None
+    hero_cards: Optional[str] = None
+    board_cards: Dict[str, Optional[str]] = field(default_factory=dict)
+    all_player_stacks: List[PlayerStack] = field(default_factory=list)
+    confidence: int = 0  # 0-100
+    warnings: List[str] = field(default_factory=list)
+
+
+# ============================================================================
+# MATCHER TYPES
+# ============================================================================
+
+@dataclass
+class HandMatch:
+    """Match between a parsed hand and a screenshot"""
+    hand_id: str
+    screenshot_id: str
+    confidence: float  # 0-100
+    score_breakdown: Dict[str, float]
+    auto_mapping: Optional[Dict[str, str]] = None  # anonymized ID -> real name
+
+
+# ============================================================================
+# WRITER TYPES
+# ============================================================================
+
+@dataclass
+class NameMapping:
+    """Mapping from anonymized ID to real player name"""
+    anonymized_identifier: str
+    resolved_name: str
+    source: Literal['auto-match', 'manual', 'imported']
+    confidence: Optional[float] = None
+    locked: bool = False
+
+
+@dataclass
+class ValidationResult:
+    """Result of TXT format validation"""
+    valid: bool
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+```
+
+---
+
+### 3. Archivo: `parser.py`
+
+**IMPORTANTE:** Copia EXACTAMENTE el contenido del archivo `ggrevealer-python/parser.py` del proyecto actual. Este archivo contiene toda la lógica de parsing de archivos TXT de GGPoker con regex patterns, validaciones y manejo de timezones.
+
+El parser debe:
+- Extraer hand ID, timestamp, stakes, game type
+- Parsear seats con posiciones y stacks
+- Extraer hero cards y board cards
+- Parsear acciones por street
+- Detectar manos de torneo vs cash
+- Validar formato correcto
+
+**NO MODIFIQUES LA LÓGICA DEL PARSER** - Ya está testeado y funciona correctamente.
+
+---
+
+### 4. Archivo: `ocr.py`
+
+**IMPORTANTE:** Copia EXACTAMENTE el contenido del archivo `ggrevealer-python/ocr.py` del proyecto actual.
+
+Este archivo contiene:
+- Integración con Google Gemini 2.0 Flash Vision API
+- **Prompt de 78 líneas optimizado** para OCR de screenshots de PokerCraft
+- Lógica de parsing de respuesta JSON de Gemini
+- Manejo de errores y fallback graceful
+
+**CRITICAL:** El prompt de Gemini incluye reglas específicas de:
+- Desambiguación de caracteres (O vs 0, I vs 1)
+- Detección de Hero position
+- Formato exacto de cartas (Rank + Suit)
+- Validación de nombres de jugadores
+
+**NO MODIFIQUES EL PROMPT DE GEMINI** - Está optimizado para precisión máxima.
+
+---
+
+### 5. Archivo: `matcher.py`
+
+**IMPORTANTE:** Copia EXACTAMENTE el contenido del archivo `ggrevealer-python/matcher.py` del proyecto actual.
+
+Este archivo implementa:
+- **Scoring algorithm (100 puntos totales)**:
+  - Timestamp: 20pts (±5min = 20pts, ±10min = 10pts)
+  - Hero cards: 40pts (match exacto)
+  - Hero position: 15pts
+  - Board cards: 30pts (flop 10 + turn 10 + river 10)
+  - Stack size: 5pts (±20%)
+  - Player names: 10pts (2pts por player)
+- **Direct hand ID matching** (100% confidence si filename contiene hand ID)
+- **Fuzzy matching** con Levenshtein distance para typos
+- **Auto mapping** por seat position (no por nombre)
+
+**NO MODIFIQUES LA LÓGICA DE SCORING** - Está calibrada para 80%+ accuracy.
+
+---
+
+### 6. Archivo: `writer.py`
+
+**IMPORTANTE:** Copia EXACTAMENTE el contenido del archivo `ggrevealer-python/writer.py` del proyecto actual.
+
+Este archivo implementa:
+- **7 regex patterns para reemplazo** en orden específico:
+  1. Seat lines
+  2. Action lines
+  3. Dealt to (no cards)
+  4. Dealt to (with cards)
+  5. Collected from pot
+  6. Shows cards
+  7. Summary lines
+  8. Uncalled bet returned
+- **HERO PROTECTION** (NUNCA reemplaza "Hero" - requerido por PokerTracker)
+- **9 validaciones críticas** para compatibilidad PokerTracker:
+  1. Hero preservation
+  2. Line count match
+  3. Hand ID unchanged
+  4. Timestamp unchanged
+  5. No unexpected currency symbols
+  6. Summary section preserved
+  7. Table info unchanged
+  8. Seat count match
+  9. Chip format preserved
+
+**NO MODIFIQUES LAS VALIDACIONES** - Son críticas para PokerTracker.
+
+---
+
+### 7. Archivo: `requirements.txt`
+
+```txt
+google-generativeai>=0.8.0
+python-dotenv>=1.0.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+aiosqlite>=0.19.0
+```
+
+---
+
+### 8. Archivo: `.env.example`
+
+```env
+# Google Gemini API Key
+# Get your API key from: https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+---
+
+### 9. Archivo: `test_cli.py`
+
+Este archivo es para probar que toda la lógica funciona antes de crear la API.
+
+```python
+#!/usr/bin/env python3
+"""
+Test CLI to verify core logic works
+"""
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+from parser import GGPokerParser
+from ocr import ocr_screenshot
+from matcher import find_best_matches
+from writer import generate_final_txt, validate_output_format
+from models import NameMapping
+
+print("✅ GGRevealer Core Logic - Test Suite")
+print("=" * 60)
+
+# Test 1: Parser
+print("\n[TEST 1] Parser...")
+sample_txt = """Poker Hand #SG12345: Hold'em No Limit ($0.25/$0.50) - 2025/01/15 14:30:00 ET
+Table 'Test Table' 3-max Seat #1 is the button
+Seat 1: Hero ($100 in chips)
+Seat 2: Player123 ($50 in chips)
+Seat 3: AnotherPlayer ($75 in chips)
+Hero: posts small blind $0.25
+Player123: posts big blind $0.50
+*** HOLE CARDS ***
+Dealt to Hero [As Kh]
+Hero: raises $1.50 to $2
+Player123: folds
+AnotherPlayer: calls $2
+*** FLOP *** [Jd 9c 3s]
+Hero: bets $3
+AnotherPlayer: folds
+Hero collected $4.50 from pot
+*** SUMMARY ***
+Total pot $4.50 | Rake $0
+Seat 1: Hero (button) collected ($4.50)
+"""
+
+hand = GGPokerParser.parse_hand(sample_txt)
+if hand:
+    print(f"  ✅ Hand parsed: {hand.hand_id}")
+    print(f"     Timestamp: {hand.timestamp}")
+    print(f"     Seats: {len(hand.seats)}")
+    print(f"     Hero cards: {hand.hero_cards}")
+else:
+    print("  ❌ Parser failed")
+
+# Test 2: Gemini API
+print("\n[TEST 2] Gemini API Connection...")
+gemini_key = os.getenv('GEMINI_API_KEY')
+if gemini_key and gemini_key != 'your_gemini_api_key_here':
+    print(f"  ✅ API key configured")
+    print(f"     Key: {gemini_key[:10]}...")
+else:
+    print("  ⚠️  API key not configured - set GEMINI_API_KEY in .env")
+
+# Test 3: Writer validation
+print("\n[TEST 3] Writer validation...")
+mapping = NameMapping(
+    anonymized_identifier='Player123',
+    resolved_name='RealPlayer',
+    source='auto-match',
+    confidence=95.0
+)
+output = generate_final_txt(sample_txt, [mapping])
+validation = validate_output_format(sample_txt, output)
+
+if validation.valid:
+    print("  ✅ Validation passed")
+    if 'RealPlayer' in output:
+        print("  ✅ Name replacement works")
+    if 'Hero' in output:
+        print("  ✅ Hero protected (not replaced)")
+else:
+    print(f"  ❌ Validation failed: {validation.errors}")
+
+print("\n" + "=" * 60)
+print("✅ Core logic tests complete!")
+print("\nNext steps:")
+print("1. Set GEMINI_API_KEY in .env")
+print("2. Run: python test_cli.py")
+print("3. If all tests pass, continue to PROMPT_2_API.md")
+```
+
+---
+
+## Instrucciones para Replit Agent
+
+1. **Crea todos los archivos listados arriba** exactamente como están
+2. **Para parser.py, ocr.py, matcher.py, writer.py**: Usa el código del proyecto actual en `ggrevealer-python/` - **NO LO MODIFIQUES**
+3. **Instala dependencias**: Ejecuta `pip install -r requirements.txt`
+4. **Crea archivo `.env`**: Copia `.env.example` a `.env`
+5. **Ejecuta test**: `python test_cli.py` para verificar que todo funciona
+
+## Validación
+
+Al finalizar, debes tener:
+- ✅ Todos los archivos creados
+- ✅ `pip install -r requirements.txt` ejecutado sin errores
+- ✅ `python test_cli.py` muestra "✅ Core logic tests complete!"
+- ✅ Parser puede parsear TXT de ejemplo
+- ✅ Writer puede reemplazar nombres y validar formato
+- ✅ GEMINI_API_KEY configurado en .env
+
+**Una vez que todo esté funcionando, continúa con PROMPT_2_API.md**

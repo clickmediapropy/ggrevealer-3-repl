@@ -1,0 +1,822 @@
+# PROMPT 3: Frontend con Bootstrap 5
+
+**Para usar en Replit Agent** - Usa este prompt DESPUÉS de completar PROMPT_2_API.md
+
+---
+
+## Objetivo
+
+Crear un frontend simple y funcional con Bootstrap 5 que permita:
+- Upload de archivos TXT y screenshots con drag & drop
+- Iniciar procesamiento y ver progreso
+- Descargar resultados cuando estén listos
+- Ver historial de jobs anteriores
+
+## Estructura de archivos a crear
+
+```
+ggrevealer/
+├── static/
+│   ├── css/
+│   │   └── styles.css
+│   └── js/
+│       └── app.js
+└── templates/
+    └── index.html
+```
+
+---
+
+## 1. Modificar `main.py` para servir HTML
+
+**IMPORTANTE:** Agrega estas líneas al principio de `main.py` (después de los imports):
+
+```python
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Templates
+templates = Jinja2Templates(directory="templates")
+```
+
+Y agrega este endpoint DESPUÉS de `@app.get("/")`:
+
+```python
+@app.get("/app")
+async def serve_app(request: Request):
+    """Serve the main application page"""
+    return templates.TemplateResponse("index.html", {"request": request})
+```
+
+---
+
+## 2. Archivo: `templates/index.html`
+
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGRevealer - Poker Hand De-anonymizer</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-puzzle"></i> GGRevealer
+            </a>
+            <span class="navbar-text">
+                Poker Hand De-anonymizer
+            </span>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container my-5">
+        <!-- Welcome Section -->
+        <div id="welcome-section" class="row">
+            <div class="col-12 text-center mb-4">
+                <h1>GGRevealer</h1>
+                <p class="lead">Desanonimiza tus hand histories de GGPoker usando screenshots de PokerCraft</p>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-file-text"></i> Archivos TXT
+                    </div>
+                    <div class="card-body">
+                        <div id="txt-dropzone" class="dropzone">
+                            <i class="bi bi-cloud-upload fs-1"></i>
+                            <p>Arrastra archivos TXT aquí</p>
+                            <p class="text-muted small">o haz click para seleccionar</p>
+                            <input type="file" id="txt-input" accept=".txt" multiple hidden>
+                        </div>
+                        <div id="txt-files-list" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-image"></i> Screenshots
+                    </div>
+                    <div class="card-body">
+                        <div id="screenshot-dropzone" class="dropzone">
+                            <i class="bi bi-cloud-upload fs-1"></i>
+                            <p>Arrastra screenshots aquí</p>
+                            <p class="text-muted small">o haz click para seleccionar</p>
+                            <input type="file" id="screenshot-input" accept=".png,.jpg,.jpeg" multiple hidden>
+                        </div>
+                        <div id="screenshot-files-list" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Process Button -->
+            <div class="col-12 text-center mb-4">
+                <button id="upload-btn" class="btn btn-primary btn-lg" disabled>
+                    <i class="bi bi-upload"></i> Subir y Procesar
+                </button>
+            </div>
+        </div>
+
+        <!-- Processing Section (hidden initially) -->
+        <div id="processing-section" class="row d-none">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-hourglass-split"></i> Procesando...
+                    </div>
+                    <div class="card-body">
+                        <div id="processing-status">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border text-primary me-3" role="status"></div>
+                                <div>
+                                    <h5 class="mb-0">Procesando archivos</h5>
+                                    <p class="text-muted mb-0" id="status-text">Iniciando...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section (hidden initially) -->
+        <div id="results-section" class="row d-none">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-check-circle"></i> Procesamiento Completado
+                    </div>
+                    <div class="card-body">
+                        <div id="results-stats" class="mb-3"></div>
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button id="download-btn" class="btn btn-success btn-lg">
+                                <i class="bi bi-download"></i> Descargar TXT Resuelto
+                            </button>
+                            <button id="new-job-btn" class="btn btn-secondary">
+                                <i class="bi bi-plus-circle"></i> Nuevo Job
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Section (hidden initially) -->
+        <div id="error-section" class="row d-none">
+            <div class="col-12">
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <i class="bi bi-exclamation-triangle"></i> Error
+                    </div>
+                    <div class="card-body">
+                        <p id="error-message"></p>
+                        <button id="retry-btn" class="btn btn-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Reintentar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job History -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <h3>Historial de Jobs</h3>
+                <div id="jobs-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+```
+
+---
+
+## 3. Archivo: `static/css/styles.css`
+
+```css
+/* Custom styles for GGRevealer */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.5rem;
+}
+
+.dropzone {
+    border: 3px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #fff;
+}
+
+.dropzone:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.dropzone.active {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.file-item i {
+    margin-right: 8px;
+}
+
+.file-item .remove-btn {
+    cursor: pointer;
+    color: #dc3545;
+}
+
+.file-item .remove-btn:hover {
+    color: #bb2d3b;
+}
+
+.card {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.job-item {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #fff;
+}
+
+.job-item .job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.job-item .job-id {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.badge-status {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.badge-pending {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.badge-processing {
+    background-color: #0dcaf0;
+    color: #000;
+}
+
+.badge-completed {
+    background-color: #198754;
+    color: #fff;
+}
+
+.badge-failed {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.stat-card {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.stat-card .stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+```
+
+---
+
+## 4. Archivo: `static/js/app.js`
+
+```javascript
+// GGRevealer Frontend Application
+
+// API Base URL
+const API_BASE = window.location.origin;
+
+// State
+let txtFiles = [];
+let screenshotFiles = [];
+let currentJobId = null;
+let statusCheckInterval = null;
+
+// Elements
+const txtDropzone = document.getElementById('txt-dropzone');
+const txtInput = document.getElementById('txt-input');
+const txtFilesList = document.getElementById('txt-files-list');
+
+const screenshotDropzone = document.getElementById('screenshot-dropzone');
+const screenshotInput = document.getElementById('screenshot-input');
+const screenshotFilesList = document.getElementById('screenshot-files-list');
+
+const uploadBtn = document.getElementById('upload-btn');
+
+const welcomeSection = document.getElementById('welcome-section');
+const processingSection = document.getElementById('processing-section');
+const resultsSection = document.getElementById('results-section');
+const errorSection = document.getElementById('error-section');
+
+const statusText = document.getElementById('status-text');
+const resultsStats = document.getElementById('results-stats');
+const downloadBtn = document.getElementById('download-btn');
+const newJobBtn = document.getElementById('new-job-btn');
+const retryBtn = document.getElementById('retry-btn');
+const errorMessage = document.getElementById('error-message');
+const jobsList = document.getElementById('jobs-list');
+
+// ============================================================================
+// DRAG & DROP - TXT FILES
+// ============================================================================
+
+txtDropzone.addEventListener('click', () => txtInput.click());
+
+txtDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    txtDropzone.classList.add('active');
+});
+
+txtDropzone.addEventListener('dragleave', () => {
+    txtDropzone.classList.remove('active');
+});
+
+txtDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    txtDropzone.classList.remove('active');
+    handleTxtFiles(e.dataTransfer.files);
+});
+
+txtInput.addEventListener('change', (e) => {
+    handleTxtFiles(e.target.files);
+});
+
+function handleTxtFiles(files) {
+    for (let file of files) {
+        if (file.name.endsWith('.txt')) {
+            txtFiles.push(file);
+        }
+    }
+    renderTxtFiles();
+    updateUploadButton();
+}
+
+function renderTxtFiles() {
+    txtFilesList.innerHTML = '';
+    txtFiles.forEach((file, index) => {
+        const div = document.createElement('div');
+        div.className = 'file-item';
+        div.innerHTML = `
+            <span><i class="bi bi-file-text"></i> ${file.name}</span>
+            <i class="bi bi-x-circle remove-btn" data-index="${index}"></i>
+        `;
+        div.querySelector('.remove-btn').addEventListener('click', () => {
+            txtFiles.splice(index, 1);
+            renderTxtFiles();
+            updateUploadButton();
+        });
+        txtFilesList.appendChild(div);
+    });
+}
+
+// ============================================================================
+// DRAG & DROP - SCREENSHOTS
+// ============================================================================
+
+screenshotDropzone.addEventListener('click', () => screenshotInput.click());
+
+screenshotDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    screenshotDropzone.classList.add('active');
+});
+
+screenshotDropzone.addEventListener('dragleave', () => {
+    screenshotDropzone.classList.remove('active');
+});
+
+screenshotDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    screenshotDropzone.classList.remove('active');
+    handleScreenshotFiles(e.dataTransfer.files);
+});
+
+screenshotInput.addEventListener('change', (e) => {
+    handleScreenshotFiles(e.target.files);
+});
+
+function handleScreenshotFiles(files) {
+    for (let file of files) {
+        if (file.name.match(/\.(png|jpg|jpeg)$/i)) {
+            screenshotFiles.push(file);
+        }
+    }
+    renderScreenshotFiles();
+    updateUploadButton();
+}
+
+function renderScreenshotFiles() {
+    screenshotFilesList.innerHTML = '';
+    screenshotFiles.forEach((file, index) => {
+        const div = document.createElement('div');
+        div.className = 'file-item';
+        div.innerHTML = `
+            <span><i class="bi bi-image"></i> ${file.name}</span>
+            <i class="bi bi-x-circle remove-btn" data-index="${index}"></i>
+        `;
+        div.querySelector('.remove-btn').addEventListener('click', () => {
+            screenshotFiles.splice(index, 1);
+            renderScreenshotFiles();
+            updateUploadButton();
+        });
+        screenshotFilesList.appendChild(div);
+    });
+}
+
+// ============================================================================
+// UPLOAD & PROCESS
+// ============================================================================
+
+function updateUploadButton() {
+    uploadBtn.disabled = txtFiles.length === 0 || screenshotFiles.length === 0;
+}
+
+uploadBtn.addEventListener('click', async () => {
+    // Disable button
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Subiendo...';
+
+    // Create FormData
+    const formData = new FormData();
+    txtFiles.forEach(file => formData.append('txt_files', file));
+    screenshotFiles.forEach(file => formData.append('screenshots', file));
+
+    try {
+        // Upload files
+        const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!uploadResponse.ok) {
+            throw new Error('Upload failed');
+        }
+
+        const uploadData = await uploadResponse.json();
+        currentJobId = uploadData.job_id;
+
+        console.log('Files uploaded, job ID:', currentJobId);
+
+        // Start processing
+        const processResponse = await fetch(`${API_BASE}/api/process/${currentJobId}`, {
+            method: 'POST'
+        });
+
+        if (!processResponse.ok) {
+            throw new Error('Failed to start processing');
+        }
+
+        // Show processing section
+        showProcessing();
+
+        // Start polling for status
+        startStatusPolling();
+
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error al subir archivos: ' + error.message);
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
+    }
+});
+
+// ============================================================================
+// STATUS POLLING
+// ============================================================================
+
+function startStatusPolling() {
+    statusCheckInterval = setInterval(checkStatus, 2000); // Check every 2 seconds
+}
+
+function stopStatusPolling() {
+    if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+        statusCheckInterval = null;
+    }
+}
+
+async function checkStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/api/status/${currentJobId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch status');
+        }
+
+        const job = await response.json();
+        console.log('Job status:', job.status);
+
+        statusText.textContent = getStatusMessage(job.status);
+
+        if (job.status === 'completed') {
+            stopStatusPolling();
+            showResults(job);
+        } else if (job.status === 'failed') {
+            stopStatusPolling();
+            showError(job.error_message || 'Processing failed');
+        }
+    } catch (error) {
+        console.error('Error checking status:', error);
+    }
+}
+
+function getStatusMessage(status) {
+    const messages = {
+        'pending': 'En cola...',
+        'processing': 'Procesando archivos...',
+        'completed': 'Completado',
+        'failed': 'Error en procesamiento'
+    };
+    return messages[status] || 'Desconocido';
+}
+
+// ============================================================================
+// UI STATE MANAGEMENT
+// ============================================================================
+
+function showProcessing() {
+    welcomeSection.classList.add('d-none');
+    processingSection.classList.remove('d-none');
+    resultsSection.classList.add('d-none');
+    errorSection.classList.add('d-none');
+}
+
+function showResults(job) {
+    processingSection.classList.add('d-none');
+    resultsSection.classList.remove('d-none');
+
+    // Display stats
+    const stats = job.result?.stats || {};
+    resultsStats.innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">${stats.matched_hands || 0}</div>
+                <div class="stat-label">Manos Matched</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.mappings_count || 0}</div>
+                <div class="stat-label">Nombres Resueltos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.high_confidence_matches || 0}</div>
+                <div class="stat-label">Alta Confianza (≥80%)</div>
+            </div>
+        </div>
+    `;
+
+    // Setup download button
+    downloadBtn.onclick = () => downloadResult(currentJobId);
+
+    // Reload jobs list
+    loadJobs();
+}
+
+function showError(message) {
+    processingSection.classList.add('d-none');
+    errorSection.classList.remove('d-none');
+    errorMessage.textContent = message;
+}
+
+function resetToWelcome() {
+    welcomeSection.classList.remove('d-none');
+    processingSection.classList.add('d-none');
+    resultsSection.classList.add('d-none');
+    errorSection.classList.add('d-none');
+
+    txtFiles = [];
+    screenshotFiles = [];
+    currentJobId = null;
+    renderTxtFiles();
+    renderScreenshotFiles();
+    updateUploadButton();
+    uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
+
+    loadJobs();
+}
+
+newJobBtn.addEventListener('click', resetToWelcome);
+retryBtn.addEventListener('click', resetToWelcome);
+
+// ============================================================================
+// DOWNLOAD
+// ============================================================================
+
+async function downloadResult(jobId) {
+    window.location.href = `${API_BASE}/api/download/${jobId}`;
+}
+
+// ============================================================================
+// JOB HISTORY
+// ============================================================================
+
+async function loadJobs() {
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch jobs');
+        }
+
+        const data = await response.json();
+        renderJobs(data.jobs);
+    } catch (error) {
+        console.error('Error loading jobs:', error);
+    }
+}
+
+function renderJobs(jobs) {
+    jobsList.innerHTML = '';
+
+    if (jobs.length === 0) {
+        jobsList.innerHTML = '<p class="text-muted">No hay jobs anteriores</p>';
+        return;
+    }
+
+    jobs.forEach(job => {
+        const div = document.createElement('div');
+        div.className = 'job-item';
+
+        const statusClass = `badge-${job.status}`;
+        const createdDate = new Date(job.created_at).toLocaleString('es-ES');
+
+        div.innerHTML = `
+            <div class="job-header">
+                <div class="job-id">Job #${job.id}</div>
+                <span class="badge-status ${statusClass}">${job.status}</span>
+            </div>
+            <div class="job-details">
+                <p class="mb-1"><small><i class="bi bi-calendar"></i> ${createdDate}</small></p>
+                <p class="mb-2"><small><i class="bi bi-file-text"></i> ${job.txt_files_count} TXT | <i class="bi bi-image"></i> ${job.screenshot_files_count} Screenshots</small></p>
+                ${job.status === 'completed' ? `
+                    <button class="btn btn-sm btn-success" onclick="downloadResult(${job.id})">
+                        <i class="bi bi-download"></i> Descargar
+                    </button>
+                ` : ''}
+            </div>
+        `;
+
+        jobsList.appendChild(div);
+    });
+}
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadJobs();
+});
+```
+
+---
+
+## Instrucciones para Replit Agent
+
+1. **Crea los archivos listados arriba**:
+   - `templates/index.html`
+   - `static/css/styles.css`
+   - `static/js/app.js`
+
+2. **Modifica `main.py`**: Agrega las líneas indicadas al principio para servir archivos estáticos y templates
+
+3. **Crea directorios necesarios**:
+   ```bash
+   mkdir -p templates
+   mkdir -p static/css
+   mkdir -p static/js
+   ```
+
+4. **Verifica dependencias**: Asegúrate de que `jinja2` esté en `requirements.txt` (FastAPI lo instala automáticamente)
+
+5. **Reinicia la app**: `python main.py`
+
+6. **Abre el frontend**: Navega a `http://localhost:8000/app`
+
+## Testing del Frontend
+
+1. **Abre la app**: `http://localhost:8000/app`
+2. **Upload de archivos**:
+   - Arrastra archivos TXT a la zona izquierda
+   - Arrastra screenshots a la zona derecha
+   - Verifica que los archivos aparecen en las listas
+3. **Procesamiento**:
+   - Click en "Subir y Procesar"
+   - Verifica que aparece la sección de procesamiento
+   - Espera a que termine (el estado se actualiza automáticamente cada 2 segundos)
+4. **Resultados**:
+   - Verifica que aparecen las estadísticas
+   - Click en "Descargar TXT Resuelto"
+   - Verifica que el archivo se descarga correctamente
+5. **Historial**:
+   - Verifica que el job aparece en el historial al final de la página
+   - Refresh la página y verifica que el historial persiste (SQLite)
+
+## Validación
+
+Al finalizar, debes tener:
+- ✅ Frontend accesible en `http://localhost:8000/app`
+- ✅ Drag & drop funciona para TXT y screenshots
+- ✅ Upload de archivos funciona
+- ✅ Procesamiento se inicia correctamente
+- ✅ Status se actualiza en tiempo real
+- ✅ Resultados se muestran cuando processing completa
+- ✅ Download funciona correctamente
+- ✅ Historial de jobs se muestra y actualiza
+- ✅ UI responsive (funciona en mobile)
+- ✅ Botón "Nuevo Job" reinicia el flujo
+
+**¡Aplicación completa y funcional!** 🎉
+
+---
+
+## Próximos Pasos (Opcionales)
+
+Si quieres mejorar la app:
+- Agregar autenticación con usuarios
+- Implementar paginación en historial
+- Agregar preview de archivos antes de upload
+- Mostrar logs en tiempo real durante processing
+- Agregar manual review interface para casos de baja confianza
+- Deploy a Replit con dominio público

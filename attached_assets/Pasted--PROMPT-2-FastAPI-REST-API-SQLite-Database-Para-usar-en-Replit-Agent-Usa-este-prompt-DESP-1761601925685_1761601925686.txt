@@ -1,0 +1,643 @@
+# PROMPT 2: FastAPI REST API + SQLite Database
+
+**Para usar en Replit Agent** - Usa este prompt DESPUÉS de completar PROMPT_1_BACKEND.md
+
+---
+
+## Objetivo
+
+Crear una API REST completa con FastAPI que exponga toda la funcionalidad de GGRevealer:
+- Upload de archivos TXT y screenshots
+- Procesamiento asíncrono con tracking de estado
+- Almacenamiento en SQLite de jobs y resultados
+- Download de archivos procesados
+- Historial de jobs
+
+## Estructura de archivos a crear
+
+```
+ggrevealer/
+├── main.py              (FastAPI app)
+├── database.py          (SQLite setup + models)
+├── api/
+│   ├── __init__.py
+│   ├── upload.py        (Upload endpoints)
+│   ├── process.py       (Processing endpoints)
+│   ├── jobs.py          (Jobs management)
+│   └── download.py      (Download endpoints)
+├── storage/             (File storage - create if not exists)
+│   ├── uploads/         (Uploaded files)
+│   └── outputs/         (Generated files)
+└── ggrevealer.db        (SQLite database - auto-created)
+```
+
+---
+
+## 1. Archivo: `database.py`
+
+```python
+"""
+SQLite database setup and models
+"""
+
+import sqlite3
+import json
+from datetime import datetime
+from typing import Optional, List, Dict
+from contextlib import contextmanager
+
+DATABASE_PATH = "ggrevealer.db"
+
+
+# ============================================================================
+# DATABASE SCHEMA
+# ============================================================================
+
+SCHEMA = """
+-- Jobs table
+CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL,  -- 'pending', 'processing', 'completed', 'failed'
+    txt_files_count INTEGER DEFAULT 0,
+    screenshot_files_count INTEGER DEFAULT 0,
+    error_message TEXT,
+    completed_at TEXT
+);
+
+-- Files table
+CREATE TABLE IF NOT EXISTS files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    file_type TEXT NOT NULL,  -- 'txt' or 'screenshot'
+    file_path TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
+
+-- Results table
+CREATE TABLE IF NOT EXISTS results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL UNIQUE,
+    output_txt_path TEXT,
+    mappings_json TEXT,  -- JSON array of NameMapping objects
+    stats_json TEXT,     -- JSON object with statistics
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
+"""
+
+
+# ============================================================================
+# DATABASE FUNCTIONS
+# ============================================================================
+
+@contextmanager
+def get_db():
+    """Get database connection with context manager"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def init_db():
+    """Initialize database with schema"""
+    with get_db() as conn:
+        conn.executescript(SCHEMA)
+    print("✅ Database initialized")
+
+
+# ============================================================================
+# JOB OPERATIONS
+# ============================================================================
+
+def create_job() -> int:
+    """Create a new job and return job ID"""
+    with get_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO jobs (created_at, status) VALUES (?, ?)",
+            (datetime.utcnow().isoformat(), 'pending')
+        )
+        return cursor.lastrowid
+
+
+def get_job(job_id: int) -> Optional[Dict]:
+    """Get job by ID"""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if row:
+            return dict(row)
+    return None
+
+
+def get_all_jobs() -> List[Dict]:
+    """Get all jobs ordered by created_at desc"""
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM jobs ORDER BY created_at DESC").fetchall()
+        return [dict(row) for row in rows]
+
+
+def update_job_status(job_id: int, status: str, error_message: Optional[str] = None):
+    """Update job status"""
+    completed_at = datetime.utcnow().isoformat() if status == 'completed' else None
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE jobs SET status = ?, error_message = ?, completed_at = ? WHERE id = ?",
+            (status, error_message, completed_at, job_id)
+        )
+
+
+def update_job_file_counts(job_id: int, txt_count: int, screenshot_count: int):
+    """Update file counts for a job"""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE jobs SET txt_files_count = ?, screenshot_files_count = ? WHERE id = ?",
+            (txt_count, screenshot_count, job_id)
+        )
+
+
+def delete_job(job_id: int):
+    """Delete job and all related data"""
+    with get_db() as conn:
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+
+
+# ============================================================================
+# FILE OPERATIONS
+# ============================================================================
+
+def add_file(job_id: int, filename: str, file_type: str, file_path: str):
+    """Add a file to the database"""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO files (job_id, filename, file_type, file_path, uploaded_at) VALUES (?, ?, ?, ?, ?)",
+            (job_id, filename, file_type, file_path, datetime.utcnow().isoformat())
+        )
+
+
+def get_job_files(job_id: int, file_type: Optional[str] = None) -> List[Dict]:
+    """Get all files for a job, optionally filtered by type"""
+    with get_db() as conn:
+        if file_type:
+            rows = conn.execute(
+                "SELECT * FROM files WHERE job_id = ? AND file_type = ?",
+                (job_id, file_type)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM files WHERE job_id = ?",
+                (job_id,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+
+# ============================================================================
+# RESULT OPERATIONS
+# ============================================================================
+
+def save_result(job_id: int, output_txt_path: str, mappings: List[Dict], stats: Dict):
+    """Save processing result"""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO results (job_id, output_txt_path, mappings_json, stats_json, created_at) VALUES (?, ?, ?, ?, ?)",
+            (job_id, output_txt_path, json.dumps(mappings), json.dumps(stats), datetime.utcnow().isoformat())
+        )
+
+
+def get_result(job_id: int) -> Optional[Dict]:
+    """Get result for a job"""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM results WHERE job_id = ?", (job_id,)).fetchone()
+        if row:
+            result = dict(row)
+            # Parse JSON fields
+            if result.get('mappings_json'):
+                result['mappings'] = json.loads(result['mappings_json'])
+            if result.get('stats_json'):
+                result['stats'] = json.loads(result['stats_json'])
+            return result
+    return None
+```
+
+---
+
+## 2. Archivo: `main.py`
+
+```python
+"""
+FastAPI application entry point
+"""
+
+import os
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+from typing import List
+import shutil
+
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job
+from parser import GGPokerParser
+from ocr import ocr_screenshot
+from matcher import find_best_matches
+from writer import generate_final_txt, validate_output_format
+from models import NameMapping
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="GGRevealer API",
+    description="De-anonymize GGPoker hand histories using screenshot OCR",
+    version="1.0.0"
+)
+
+# CORS middleware (allow all origins for simplicity)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create storage directories
+STORAGE_PATH = Path("storage")
+UPLOADS_PATH = STORAGE_PATH / "uploads"
+OUTPUTS_PATH = STORAGE_PATH / "outputs"
+
+UPLOADS_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUTS_PATH.mkdir(parents=True, exist_ok=True)
+
+
+# ============================================================================
+# STARTUP
+# ============================================================================
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    init_db()
+    print("✅ FastAPI app started")
+
+
+# ============================================================================
+# ENDPOINTS
+# ============================================================================
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"status": "ok", "message": "GGRevealer API is running"}
+
+
+@app.post("/api/upload")
+async def upload_files(
+    txt_files: List[UploadFile] = File(...),
+    screenshots: List[UploadFile] = File(...)
+):
+    """
+    Upload TXT files and screenshots for a new job
+
+    Returns: {"job_id": int, "txt_files_count": int, "screenshot_files_count": int}
+    """
+    # Create new job
+    job_id = create_job()
+
+    # Create job upload directory
+    job_upload_path = UPLOADS_PATH / str(job_id)
+    job_upload_path.mkdir(exist_ok=True)
+
+    txt_path = job_upload_path / "txt"
+    screenshots_path = job_upload_path / "screenshots"
+    txt_path.mkdir(exist_ok=True)
+    screenshots_path.mkdir(exist_ok=True)
+
+    # Save TXT files
+    for txt_file in txt_files:
+        file_path = txt_path / txt_file.filename
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(txt_file.file, f)
+        add_file(job_id, txt_file.filename, "txt", str(file_path))
+
+    # Save screenshots
+    for screenshot in screenshots:
+        file_path = screenshots_path / screenshot.filename
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(screenshot.file, f)
+        add_file(job_id, screenshot.filename, "screenshot", str(file_path))
+
+    # Update file counts
+    update_job_file_counts(job_id, len(txt_files), len(screenshots))
+
+    return {
+        "job_id": job_id,
+        "txt_files_count": len(txt_files),
+        "screenshot_files_count": len(screenshots)
+    }
+
+
+@app.post("/api/process/{job_id}")
+async def process_job(job_id: int, background_tasks: BackgroundTasks):
+    """
+    Start processing a job in the background
+
+    Returns: {"job_id": int, "status": "processing"}
+    """
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job['status'] == 'processing':
+        raise HTTPException(status_code=400, detail="Job is already processing")
+
+    # Run processing in background
+    background_tasks.add_task(run_processing_pipeline, job_id)
+
+    # Update status immediately
+    update_job_status(job_id, 'processing')
+
+    return {"job_id": job_id, "status": "processing"}
+
+
+@app.get("/api/status/{job_id}")
+async def get_job_status(job_id: int):
+    """
+    Get current status of a job
+
+    Returns: Job object with status, file counts, error message if failed
+    """
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # If completed, include result stats
+    if job['status'] == 'completed':
+        result = get_result(job_id)
+        if result:
+            job['result'] = {
+                'stats': result.get('stats'),
+                'mappings_count': len(result.get('mappings', []))
+            }
+
+    return job
+
+
+@app.get("/api/download/{job_id}")
+async def download_output(job_id: int):
+    """
+    Download the processed TXT file for a job
+
+    Returns: File download (resolved_hands.txt)
+    """
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job['status'] != 'completed':
+        raise HTTPException(status_code=400, detail="Job is not completed yet")
+
+    result = get_result(job_id)
+    if not result or not result.get('output_txt_path'):
+        raise HTTPException(status_code=404, detail="Output file not found")
+
+    output_path = Path(result['output_txt_path'])
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Output file not found on disk")
+
+    return FileResponse(
+        path=output_path,
+        filename=f"resolved_hands_{job_id}.txt",
+        media_type="text/plain"
+    )
+
+
+@app.get("/api/jobs")
+async def list_jobs():
+    """
+    Get list of all jobs
+
+    Returns: List of job objects ordered by created_at desc
+    """
+    jobs = get_all_jobs()
+    return {"jobs": jobs}
+
+
+@app.delete("/api/job/{job_id}")
+async def delete_job_endpoint(job_id: int):
+    """
+    Delete a job and all its files
+
+    Returns: {"message": "Job deleted"}
+    """
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Delete files from disk
+    job_upload_path = UPLOADS_PATH / str(job_id)
+    if job_upload_path.exists():
+        shutil.rmtree(job_upload_path)
+
+    job_output_path = OUTPUTS_PATH / str(job_id)
+    if job_output_path.exists():
+        shutil.rmtree(job_output_path)
+
+    # Delete from database
+    delete_job(job_id)
+
+    return {"message": "Job deleted"}
+
+
+# ============================================================================
+# BACKGROUND PROCESSING
+# ============================================================================
+
+def run_processing_pipeline(job_id: int):
+    """
+    Execute the full processing pipeline for a job
+    This runs in the background
+    """
+    try:
+        print(f"[JOB {job_id}] Starting processing...")
+
+        # Get TXT files
+        txt_files = get_job_files(job_id, 'txt')
+        print(f"[JOB {job_id}] Found {len(txt_files)} TXT files")
+
+        # Parse TXT files
+        all_hands = []
+        for txt_file in txt_files:
+            content = Path(txt_file['file_path']).read_text(encoding='utf-8')
+            hands = GGPokerParser.parse_file(content)
+            all_hands.extend(hands)
+
+        print(f"[JOB {job_id}] Parsed {len(all_hands)} hands")
+
+        if len(all_hands) == 0:
+            raise Exception("No hands could be parsed")
+
+        # Get screenshot files
+        screenshot_files = get_job_files(job_id, 'screenshot')
+        print(f"[JOB {job_id}] Found {len(screenshot_files)} screenshots")
+
+        # OCR screenshots
+        ocr_results = []
+        for screenshot_file in screenshot_files:
+            result = ocr_screenshot(
+                screenshot_file['file_path'],
+                screenshot_file['filename']
+            )
+            ocr_results.append(result)
+
+        print(f"[JOB {job_id}] OCR completed: {len(ocr_results)} screenshots analyzed")
+
+        if len(ocr_results) == 0:
+            raise Exception("No screenshots could be analyzed")
+
+        # Match hands with screenshots
+        matches = find_best_matches(all_hands, ocr_results, confidence_threshold=50)
+        print(f"[JOB {job_id}] Found {len(matches)} matches")
+
+        # Build name mappings
+        name_mappings = []
+        matched_hand_ids = set()
+
+        for match in matches:
+            matched_hand_ids.add(match.hand_id)
+            if match.auto_mapping:
+                for anon_id, real_name in match.auto_mapping.items():
+                    existing = next((m for m in name_mappings if m.anonymized_identifier == anon_id), None)
+                    if not existing:
+                        name_mappings.append(NameMapping(
+                            anonymized_identifier=anon_id,
+                            resolved_name=real_name,
+                            source='auto-match',
+                            confidence=match.confidence,
+                            locked=False
+                        ))
+
+        print(f"[JOB {job_id}] Generated {len(name_mappings)} name mappings")
+
+        # Export only matched hands
+        matched_hands = [hand for hand in all_hands if hand.hand_id in matched_hand_ids]
+        all_original_txt = '\n\n'.join([hand.raw_text for hand in matched_hands])
+
+        # Generate final TXT
+        final_txt = generate_final_txt(all_original_txt, name_mappings)
+
+        # Validate output
+        validation = validate_output_format(all_original_txt, final_txt)
+        if not validation.valid:
+            print(f"[JOB {job_id}] ⚠️  Validation warnings: {validation.errors}")
+
+        # Save output to disk
+        job_output_path = OUTPUTS_PATH / str(job_id)
+        job_output_path.mkdir(exist_ok=True)
+
+        output_txt_path = job_output_path / "resolved_hands.txt"
+        output_txt_path.write_text(final_txt, encoding='utf-8')
+
+        # Save result to database
+        stats = {
+            'total_hands': len(all_hands),
+            'matched_hands': len(matched_hands),
+            'mappings_count': len(name_mappings),
+            'high_confidence_matches': sum(1 for m in matches if m.confidence >= 80),
+            'validation_passed': validation.valid,
+            'validation_errors': validation.errors,
+            'validation_warnings': validation.warnings
+        }
+
+        mappings_dict = [
+            {
+                'anonymized_identifier': m.anonymized_identifier,
+                'resolved_name': m.resolved_name,
+                'source': m.source,
+                'confidence': m.confidence
+            }
+            for m in name_mappings
+        ]
+
+        save_result(job_id, str(output_txt_path), mappings_dict, stats)
+
+        # Update job status
+        update_job_status(job_id, 'completed')
+
+        print(f"[JOB {job_id}] ✅ Processing completed successfully")
+
+    except Exception as error:
+        print(f"[JOB {job_id}] ❌ Processing failed: {error}")
+        update_job_status(job_id, 'failed', str(error))
+
+
+# ============================================================================
+# RUN SERVER
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+---
+
+## Instrucciones para Replit Agent
+
+1. **Crea los archivos listados arriba** (`database.py` y `main.py`)
+2. **Crea directorios de storage**: Ejecuta `mkdir -p storage/uploads storage/outputs`
+3. **Verifica que PROMPT_1 está completo**: Deben existir `parser.py`, `ocr.py`, `matcher.py`, `writer.py`, `models.py`
+4. **Instala dependencias adicionales**: Ya están en `requirements.txt` del PROMPT_1
+5. **Inicializa database**: Al arrancar la app, SQLite se auto-inicializa
+6. **Ejecuta la API**: `python main.py`
+
+## Testing de la API
+
+Usa estos comandos curl para probar:
+
+```bash
+# 1. Health check
+curl http://localhost:8000/
+
+# 2. Upload files (reemplaza con rutas reales)
+curl -X POST http://localhost:8000/api/upload \
+  -F "txt_files=@test_hand.txt" \
+  -F "screenshots=@test_screenshot.png"
+
+# Respuesta esperada: {"job_id": 1, "txt_files_count": 1, "screenshot_files_count": 1}
+
+# 3. Start processing
+curl -X POST http://localhost:8000/api/process/1
+
+# 4. Check status
+curl http://localhost:8000/api/status/1
+
+# 5. Download result (cuando status = completed)
+curl http://localhost:8000/api/download/1 -o resolved_hands.txt
+
+# 6. List all jobs
+curl http://localhost:8000/api/jobs
+
+# 7. Delete job
+curl -X DELETE http://localhost:8000/api/job/1
+```
+
+## Validación
+
+Al finalizar, debes tener:
+- ✅ FastAPI app corriendo en `http://localhost:8000`
+- ✅ Endpoint `/` retorna `{"status": "ok"}`
+- ✅ SQLite database `ggrevealer.db` creado
+- ✅ Directorios `storage/uploads` y `storage/outputs` creados
+- ✅ Upload de archivos funciona (POST /api/upload)
+- ✅ Processing corre en background (POST /api/process/{job_id})
+- ✅ Status tracking funciona (GET /api/status/{job_id})
+- ✅ Download funciona (GET /api/download/{job_id})
+
+**Una vez que la API esté funcionando, continúa con PROMPT_3_FRONTEND.md**
