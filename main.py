@@ -4,7 +4,7 @@ FastAPI application entry point
 
 import os
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -58,8 +58,8 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {"status": "ok", "message": "GGRevealer API is running"}
+    """Redirect to the app"""
+    return RedirectResponse(url="/app")
 
 
 @app.get("/app")
