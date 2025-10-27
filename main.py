@@ -4,6 +4,7 @@ FastAPI application entry point
 
 import os
 import asyncio
+from dataclasses import asdict
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -281,11 +282,12 @@ def run_processing_pipeline(job_id: int):
                 status = "success"
                 
                 # Save initial screenshot result (matches will be updated later)
+                # Convert ScreenshotAnalysis dataclass to dict for JSON serialization
                 save_screenshot_result(
                     job_id=job_id,
                     screenshot_filename=filename,
                     ocr_success=True,
-                    ocr_data=result,
+                    ocr_data=asdict(result),  # Convert dataclass to dict
                     matches_found=0,  # Will be updated after matching
                     status="pending_match"
                 )
