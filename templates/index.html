@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGRevealer - Poker Hand De-anonymizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-puzzle"></i> GGRevealer
+            </a>
+            <span class="navbar-text">
+                Poker Hand De-anonymizer
+            </span>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <div id="welcome-section" class="row">
+            <div class="col-12 text-center mb-4">
+                <h1>GGRevealer</h1>
+                <p class="lead">Desanonimiza tus hand histories de GGPoker usando screenshots de PokerCraft</p>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-file-text"></i> Archivos TXT
+                    </div>
+                    <div class="card-body">
+                        <div id="txt-dropzone" class="dropzone">
+                            <i class="bi bi-cloud-upload fs-1"></i>
+                            <p>Arrastra archivos TXT aquí</p>
+                            <p class="text-muted small">o haz click para seleccionar</p>
+                            <input type="file" id="txt-input" accept=".txt" multiple hidden>
+                        </div>
+                        <div id="txt-files-list" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-image"></i> Screenshots
+                    </div>
+                    <div class="card-body">
+                        <div id="screenshot-dropzone" class="dropzone">
+                            <i class="bi bi-cloud-upload fs-1"></i>
+                            <p>Arrastra screenshots aquí</p>
+                            <p class="text-muted small">o haz click para seleccionar</p>
+                            <input type="file" id="screenshot-input" accept=".png,.jpg,.jpeg" multiple hidden>
+                        </div>
+                        <div id="screenshot-files-list" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 text-center mb-4">
+                <button id="upload-btn" class="btn btn-primary btn-lg" disabled>
+                    <i class="bi bi-upload"></i> Subir y Procesar
+                </button>
+            </div>
+        </div>
+
+        <div id="processing-section" class="row d-none">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-hourglass-split"></i> Procesando...
+                    </div>
+                    <div class="card-body">
+                        <div id="processing-status">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border text-primary me-3" role="status"></div>
+                                <div>
+                                    <h5 class="mb-0">Procesando archivos</h5>
+                                    <p class="text-muted mb-0" id="status-text">Iniciando...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="results-section" class="row d-none">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-check-circle"></i> Procesamiento Completado
+                    </div>
+                    <div class="card-body">
+                        <div id="results-stats" class="mb-3"></div>
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button id="download-btn" class="btn btn-success btn-lg">
+                                <i class="bi bi-download"></i> Descargar TXT Resuelto
+                            </button>
+                            <button id="new-job-btn" class="btn btn-secondary">
+                                <i class="bi bi-plus-circle"></i> Nuevo Job
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="error-section" class="row d-none">
+            <div class="col-12">
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <i class="bi bi-exclamation-triangle"></i> Error
+                    </div>
+                    <div class="card-body">
+                        <p id="error-message"></p>
+                        <button id="retry-btn" class="btn btn-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Reintentar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-12">
+                <h3>Historial de Jobs</h3>
+                <div id="jobs-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
