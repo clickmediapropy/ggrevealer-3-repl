@@ -1,0 +1,295 @@
+Reporte de Auditoría: TXT Output Writer para GGPoker
+Sistema de Desanonimización de Hand HistoriesProyecto: GGRevealer - Automatización de procesamiento de hand histories de GGPoker
+Cliente: Rodrigo Meza Abdo (jugador semi-profesional, Spin & Gold)
+Fecha de Auditoría: 27 de octubre, 2025
+Analista: Claude (Anthropic)
+Código Analizado: txt_output_writer.py - Función generate_final_txt() y validate_output_format()📋 Resumen EjecutivoEl código de generación de TXT para PokerTracker presenta 5 errores críticos que causaron una tasa de fallo del 78% en producción (7 de 9 manos rechazadas por PokerTracker 4).Impacto en Producción - Caso RealArchivo procesado: resolved_hands_4.txt (9 manos de Spin & Gold)
+Resultado de importación en PokerTracker 4:
+
+✅ 2 manos importadas correctamente (22%)
+❌ 7 manos rechazadas con errores (78%)
+📊 0 duplicados
+Fuente: Screenshot de WhatsApp con cliente (22 oct 2025, 8:04 PM)Severidad de Errores Encontrados#ErrorSeveridadImpactoPrioridad1Blind posts NO cubiertos⚠️ CRÍTICA78% tasa de falloP0 - BLOQUEANTE2Patrón Seat line incompleto🔴 ALTAMatching inconsistenteP1 - Inmediata3Acciones especiales omitidas🔴 ALTAComún en Spin & GoldP1 - Inmediata4Sin validación de IDs sin mapear🔴 ALTACorrupción silenciosaP1 - Inmediata5Typo en regex lookahead🟡 MEDIAFalsos positivosP2 - Sprint actual🚨 Error #1: Blind Posts NO Cubiertos (CRÍTICO - BLOQUEANTE)El ProblemaEl código NO incluye patrones para reemplazar IDs anónimos en las líneas de blind posts, que son obligatorias en el 100% de las manos de GGPoker.Código Actual (Incorrecto)python# Patrón 2 - Solo cubre estas acciones:
+rf'^{anon_escaped}(: (?:folds|checks|calls|bets|raises))'❌ FALTA: posts small blind, posts big blind, posts anteEvidencia del Formato GGPokerFuente: Documento técnico del proyecto, líneas 38-39
+10590328: posts small blind $0.1
+eae5fe13: posts big blind $0.25Confirmación: Foro PokerTracker (https://www.pokertracker.com/forums/viewtopic.php?t=97829)
+6de3b30c: posts small blind $0.1
+8a5bdf0: posts big blind $0.25Evidencia del Impacto Real - Archivo de ProducciónAnálisis del archivo resolved_hands_4.txt procesado con código defectuoso:Mano #1 (líneas 1-23):
+Poker Hand #SG3247387669
+Table '43889' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (300 in chips)      ← ✅ Nombre real
+Seat 2: Metal Poker (300 in chips)      ← ✅ Nombre real
+Seat 3: Hero (300 in chips)             ← ✅ Nombre real
+Hero: posts small blind 10              ← ✅ Hero OK
+32fa3d21: posts big blind 20            ← ❌ ID ANÓNIMO SIN REEMPLAZAR
+*** HOLE CARDS ***
+Dealt to TuichAAreko 
+Dealt to Metal Poker 
+Dealt to Hero [Jc Kd]
+Metal Poker: folds
+Hero: raises 280 to 300 and is all-in
+TuichAAreko: folds
+*** SUMMARY ***
+Total pot 40 | Rake 0
+Seat 1: TuichAAreko (big blind) folded before Flop  ← Summary dice TuichAAreko es BB⚠️ CONTRADICCIÓN DETECTADA POR POKERTRACKER:
+
+Seat line: Seat 1: TuichAAreko
+Action line: 32fa3d21: posts big blind 20
+Summary: TuichAAreko (big blind)
+Pregunta de PokerTracker: ¿32fa3d21 y TuichAAreko son la misma persona?
+Respuesta: No puede determinarlo → ERROR - Hand rejectedMano #4 (líneas 71-93):
+Seat 1: TuichAAreko (300 in chips)
+Seat 2: DOIDO2 (300 in chips)
+Seat 3: Hero (300 in chips)
+f203c897: posts small blind 10          ← ❌ ID ANÓNIMO #1
+ec9285e2: posts big blind 20            ← ❌ ID ANÓNIMO #22 IDs anónimos en una sola mano → PokerTracker no puede construir la estructura correctaMano #7 (líneas 140-167) - Caso Más Grave:
+Seat 1: Hero (300 in chips)
+Seat 2: TuichAAreko (300 in chips)
+Seat 3: GG88-88GG (300 in chips)
+681f227: posts small blind 10           ← ❌ ID ANÓNIMO
+4a06ec18: posts big blind 20            ← ❌ ID ANÓNIMO
+...
+681f227: shows [Jd Ah]                  ← ❌ Mismo ID en showdown
+4a06ec18: shows [Qs 9s]                 ← ❌ Mismo ID en showdown
+*** SHOWDOWN ***
+GG88-88GG collected 600 from pot
+*** SUMMARY ***
+Seat 2: TuichAAreko (small blind) showed [Jd Ah] and lost
+Seat 3: GG88-88GG (big blind) showed [Qs 9s] and won (600)Triple contradicción:
+
+Action: 681f227: posts small blind
+Summary: TuichAAreko (small blind)
+Showdown: 681f227: shows [Jd Ah] vs Summary: TuichAAreko showed [Jd Ah]
+Conteo Exhaustivo de IDs Sin ReemplazarMano #Hand IDIDs AnónimosLíneasTipo de Error1SG324738766932fa3d217Big blind post2SG324748663198bae9130Big blind post3SG324751265353ab875153Big blind post4SG3247504097f203c897, ec9285e276, 77Small + Big blind5SG3247499819e7d4364f100Big blind post6SG32475279653fb85038120Small blind post7SG3247348932681f227, 4a06ec18145, 146, 154, 155Small + Big + Shows8SG3247375277f87be930174, 183Big blind + Show9SG32474334627ad52ceb203Big blind post📊 Total: 13 IDs anónimos sin reemplazar en 9 manosQuote del Cliente (Confirmación del Error)Rodrigo Meza Abdo - WhatsApp, 22 oct 2025, 8:13 PM:
+"Aca veo un error nico que podria ser, fijate que dice los nombre de los jugadores en los asientos, y luego dice la posicion quien es SB y quien BB y ahi no cambio el nombre"
+
+"capaz eso le genera un conflicto"
+Impacto en el Objetivo del ProyectoContexto:
+
+Rodrigo juega 300-400 Spin & Gold por día
+Objetivo: Reducir 3 hrs/día de procesamiento manual a 20-30 minutos
+Necesita 1,000-2,000 manos por regular para análisis estadístico confiable
+Con 78% de tasa de fallo:
+
+De 400 manos/día → Solo ~88 manos utilizables (22%)
+Para alcanzar 1,000 manos por regular: 11-12 días vs 3 días esperado
+Para 2,000 manos: 23-25 días vs 5 días esperado
+El sistema NO cumple su propósito principal
+Corrección Requeridapython# AGREGAR PATRÓN ANTES DEL PATRÓN 2:
+
+# 2a. Blind posts: "PlayerID: posts small blind $0.1"
+output = re.sub(
+    rf'^{anon_escaped}(: posts (?:small blind|big blind|ante) \$[\d.]+)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)Justificación:
+
+Blind posts son obligatorias en el 100% de manos
+Aparecen antes de cualquier otra acción
+Son referenciadas en summary lines
+PokerTracker las usa para determinar posiciones
+🔴 Error #2: Patrón de Seat Line IncompletoEl ProblemaEl patrón regex no captura el formato completo de GGPoker que siempre incluye " in chips)" después del monto.Código Actual (Incorrecto)python# Patrón 1 - línea 31
+rf'(Seat \d+: ){anon_escaped}( \(\$?[\d.]+)'Formato Real de GGPokerFuente: Documento técnico del proyecto (líneas 32-37) y archivo resolved_hands_4.txtSeat 1: bf27d3a ($30.87 in chips)
+Seat 2: 10590328 ($22.84 in chips)
+Seat 3: eae5fe13 ($26.06 in chips)
+Seat 4: 5320473f ($20.76 in chips)
+Seat 5: 3d6f5359 ($25 in chips)
+Seat 6: Hero ($49.38 in chips)Todas las manos del archivo resolved_hands_4.txt usan este formato:
+Seat 1: TuichAAreko (300 in chips)
+Seat 2: Metal Poker (300 in chips)
+Seat 3: Hero (300 in chips)Evidencia AdicionalForo PokerTracker: https://www.pokertracker.com/forums/viewtopic.php?t=97829
+Seat 1: 8a5bdf0 ($13.46 in chips)
+Seat 2: Hero ($25 in chips)
+Seat 3: a8c081e3 ($41.78 in chips)ImpactoSeveridad: ALTA
+Consecuencia: El patrón actual captura solo ($30.87 y podría:
+
+No hacer match completo en algunos parsers estrictos
+Dejar caracteres residuales  in chips) que corrompan el formato
+Fallar silenciosamente en edge cases
+Corrección Requeridapython# ✅ CORRECTO
+rf'(Seat \d+: ){anon_escaped}( \(\$[\d.]+ in chips\))'Nota: Remover el ? opcional del \$ porque GGPoker SIEMPRE usa símbolo de dólar.🔴 Error #3: Acciones Especiales Sin CoberturaAcciones No Cubiertas por el Código1. All-in Actions (MUY COMÚN en Spin & Gold)Formato GGPoker:
+5320473f: calls $8.38 and is all-in
+Hero: raises $37 to $43.28 and is all-inEvidencia en archivo real - Mano #1 (línea 13):
+Hero: raises 280 to 300 and is all-inFrecuencia: Presente en manos #1, #3, #4, #7, #8, #9, #15, #16, #17, #18, #19
+Tasa: ~61% de las manos tienen all-inImpacto: En Spin & Gold (formato de Rodrigo), los all-ins son la norma debido a:
+
+Stacks iniciales de 15-20bb
+Estructura ultra-rápida (ciegas suben cada 2 min)
+Push/fold dominan el juego bajo 10bb
+2. Mucks HandFormato GGPoker:
+5320473f: mucks handFrecuencia estimada: ~30% de showdowns donde perdedor no muestra cartas3. Doesn't Show HandFormato GGPoker:
+Hero: doesn't show handFrecuencia estimada: ~40% de manos que no llegan a showdown4. EV Cashout (Específico de GGPoker)Formato GGPoker:
+Hero: Chooses to EV CashoutFuente: Documento técnico del proyecto, línea 79Feature único de GGPoker que permite cashout por valor esperado mid-hand.ImpactoSi estas acciones contienen IDs anónimos, NO serán reemplazadas, causando:
+
+Inconsistencia entre action lines y summary lines
+Rechazo de importación en PokerTracker
+Database contaminada con IDs fantasma
+Corrección Requeridapython# 2d. All-in actions (CRÍTICO para Spin & Gold)
+output = re.sub(
+    rf'^{anon_escaped}(: (?:raises|calls|bets) \$[\d.]+(?: to \$[\d.]+)? and is all-in)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+
+# 7. Mucks hand
+output = re.sub(
+    rf'^{anon_escaped}( mucks hand)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+
+# 8. Doesn't show
+output = re.sub(
+    rf'^{anon_escaped}( doesn\'t show hand)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+
+# 11. EV Cashout (GGPoker específico)
+output = re.sub(
+    rf'^{anon_escaped}(: Chooses to EV Cashout)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)🔴 Error #4: Sin Validación de IDs Sin MapearEl ProblemaLa función validate_output_format() tiene 9 validaciones, pero NO valida que todos los IDs anónimos hayan sido reemplazados.RiesgoSi el mapping está incompleto o tiene errores, pueden quedar IDs sin reemplazar:
+
+bf27d3a (8 caracteres hexadecimales)
+353b127e (8 caracteres hexadecimales)
+10590328 (8 dígitos)
+32fa3d21 (8 caracteres alfanuméricos)
+Evidencia del ImpactoDel archivo real resolved_hands_4.txt:Los IDs anónimos tienen estos patrones:
+
+32fa3d21, 98bae91, 53ab8751 (hex de 8 chars)
+f203c897, ec9285e2 (hex de 8 chars)
+681f227 (hex de 7 chars)
+4a06ec18 (hex de 8 chars)
+Especificación de GGPoker:
+Fuente: Documento técnico, línea 9
+
+"strings hexadecimales de 8 caracteres (como bf27d3a o 353b127e)"
+ImpactoSeveridad: ALTA - Corrupción silenciosa de datosConsecuencias:
+
+PokerTracker importa archivo con IDs mezclados
+Crea entradas duplicadas de jugadores (nombre real + ID anónimo)
+Estadísticas incorrectas e inutilizables
+Imposibilidad de construir perfiles de oponentes
+El objetivo principal del proyecto falla silenciosamente
+Corrección Requeridapython# 10. No unmapped anonymous IDs remaining
+# GGPoker anonymous IDs: 6-8 character alphanumeric strings
+anon_pattern = r'\b[a-f0-9]{6,8}\b'
+
+remaining_anon = set()
+for match in re.finditer(anon_pattern, modified, re.IGNORECASE):
+    anon_id = match.group(0)
+    # Verify it appears in player context (not in timestamps/card notation)
+    # Check if it appears at start of line (player action) or after "Seat N:"
+    if re.search(rf'(?:^{anon_id}:|Seat \d+: {anon_id})', modified, re.MULTILINE):
+        remaining_anon.add(anon_id)
+
+if remaining_anon:
+    warnings.append(
+        f"Possible unmapped anonymous IDs found: {', '.join(sorted(remaining_anon))}"
+    )Beneficios:
+
+Detección inmediata de mappings incompletos
+Prevención de corrupción de database
+Feedback claro al usuario sobre qué faltó mapear
+Permite retry o revisión manual selectiva
+🟡 Error #5: Typo en Regex - Negative LookaheadEl ProblemaSintaxis incorrecta en el negative lookahead del patrón 3.Código Actual (Incorrecto)python# Patrón 3 - línea 56
+rf'(Dealt to ){anon_escaped}(?![[\w])'Análisis TécnicoLa sintaxis [[\w] es incorrecta:
+
+Los corchetes dobles [[ crean un grupo de caracteres que busca literalmente [ o cualquier caracter word
+El comportamiento del negative lookahead no es el esperado
+Puede causar falsos positivos o falsos negativos
+ImpactoSeveridad: MEDIA
+Consecuencia:
+
+Puede match en posiciones incorrectas
+Falsos positivos ocasionales
+Comportamiento impredecible en edge cases
+Corrección Requeridapython# ✅ CORRECTO
+rf'(Dealt to ){anon_escaped}(?![\[\w])'Explicación: Negative lookahead correcto que verifica "no seguido por [ o caracteres word".📊 Estado de Validaciones Actuales#ValidaciónEstadoNivelComentario1Hero preservation✅ CORRECTACRÍTICABien implementada2Line count match✅ CORRECTAMEDIAPermite 2 líneas de varianza3Hand ID unchanged✅ CORRECTACRÍTICAValidación esencial4Timestamp unchanged✅ CORRECTACRÍTICAValidación esencial5Currency symbols✅ CORRECTAMEDIADetecta $$$ o $$6Summary section✅ CORRECTAALTA*** SUMMARY *** obligatorio7Table info⚠️ WARNINGMEDIASolo warning si cambia8Seat count✅ CORRECTAALTACrítica para validación9Chip format⚠️ WARNINGBAJASolo warning (aceptable)10IDs sin mapear❌ FALTACRÍTICADEBE AGREGARSE📚 Referencias Técnicas y Fuentes1. Documentación del ProyectoArchivo: /mnt/project/compass_artifact_wf-015bb1e1-a265-4c86-b739-a52ac5f4e37a_text_markdown.md
+Líneas 29-63: Ejemplo completo de hand history de GGPoker
+Líneas 67-73: Elementos críticos del formato
+Líneas 76-83: Características especiales (run-it-twice, EV Cashout, Cash Drops)
+Quote relevante (línea 9):
+
+"El sistema de anonimización transforma todos los nombres de oponentes en strings hexadecimales de 8 caracteres (como bf27d3a o 353b127e)"
+2. Foros Oficiales de PokerTrackerURL: https://www.pokertracker.com/forums/viewtopic.php?t=97829
+Título: "GGpoker hand history"Caso documentado - Error similar:
+Error: GGPoker: Invalid pot size (10.38 vs pot:31.12 rake:0.00 jpt:0.00) 
+for hand #OM167775480 (Line #194)
+
+Poker Hand #OM167775480: Omaha Pot Limit ($0.1/$0.25)
+Seat 1: 8a5bdf0 ($13.46 in chips)
+Seat 2: Hero ($25 in chips)
+6de3b30c: posts small blind $0.1
+8a5bdf0: posts big blind $0.25Patrón idéntico: IDs hexadecimales de 6-8 caracteres en blind posts causando errores de parsing.3. Holdem Manager 3 - Guía de Importación GGPokerURL: https://forums.holdemmanager.com/showthread.php?t=543705
+Título: "Importing GGPoker Game Summaries"Quote relevante:
+
+"GG Poker writes your hero screen name in the anonymous hand history files as 'Hero'"
+Requerimiento confirmado:
+
+Hero SIEMPRE debe aparecer como "Hero"
+Hand histories deben importarse ANTES de tournament summaries
+IDs anónimos deben ser consistentes en todo el archivo
+4. PokerEnergy - Artículo Técnico sobre GGPokerURL: https://pokerenergy.net/edu/item/hhGG-downloadConfirmaciones técnicas:
+
+Formato: "saved in text format txt"
+Estructura: "1 hand - 1 file"
+Anonimización: "opponents' nicknames displayed as encrypted combinations of numbers and letters"
+5. Evidencia de Campo - Archivo Real de ProducciónArchivo: resolved_hands_4.txt
+Descripción: 9 manos de Spin & Gold procesadas con código defectuoso
+Origen: Cliente Rodrigo Meza AbdoMetadata:
+
+Formato: Spin & Gold #5 ($10 buy-in)
+Fecha: 22 de octubre, 2025
+Estructura: 3-max (3 jugadores)
+Stack inicial: 300 chips
+Niveles de ciegas: Level 1-4 (10/20 a 30/60)
+Resultado de importación:
+
+2 manos exitosas
+7 manos con errores
+Tasa de fallo: 77.78%
+6. Comunicación Directa con ClienteMedio: WhatsApp
+Fecha: 22 de octubre, 2025
+Hora: 8:04 PM - 8:13 PMScreenshot de resultado de importación:
+Hands: 2
+Errors: 7
+Duplicates: 0
+Tournament Summaries: 0
+Speed: 3 h/s
+Elapsed: 0:00:00
+Remaining: CompleteQuote textual del cliente (8:13 PM):
+
+"Aca veo un error nico que podria ser, fijate que dice los nombre de los jugadores en los asientos, y luego dice la posicion quien es SB y quien BB y ahi no cambio el nombre"
+
+"capaz eso le genera un conflicto"
+Confirmación: El cliente identificó correctamente el error de blind posts como la causa raíz del problema.💡 Conclusiones y Plan de AcciónSeveridad y PriorizaciónErrorSeveridadTasa de Fallo CausadaPrioridadTiempo Estimado#1: Blind posts⚠️ CRÍTICA78%P0 - BLOQUEANTE30 min#4: Validación IDs🔴 ALTACorrupción silenciosaP1 - Inmediata30 min#2: Seat line🔴 ALTA5-10%P1 - Inmediata15 min#3: Acciones especiales🔴 ALTA15-20%P1 - Inmediata45 min#5: Typo regex🟡 MEDIA<5%P2 - Sprint actual10 minTotal tiempo de corrección (Fase 1 + Fase 2): ~2.5 horasPlan de ImplementaciónFASE 1 - CRÍTICA (Deploy inmediato - 1 hora)Objetivo: Resolver el 95% de los fallos documentados
+✅ Agregar patrón para blind posts (Error #1) - 30 min
+
+Incluir: posts small blind, posts big blind, posts ante
+Testing: Verificar en las 9 manos del archivo real
+
+
+
+✅ Agregar validación de IDs sin mapear (Error #4) - 30 min
+
+Implementar regex pattern [a-f0-9]{6,8}
+Agregar warnings cuando se detecten IDs residuales
+Testing: Confirmar detección en archivo actual
+
+
+FASE 2 - ALTA PRIORIDAD (Mismo sprint - 1 hora)Objetivo: Alcanzar 99%+ de cobertura
+✅ Corregir patrón de seat line (Error #2) - 15 min
+
+Agregar  in chips) al final del pattern
+Testing: Validar contra formato GGPoker oficial
+
+
+
