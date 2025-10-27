@@ -334,12 +334,12 @@ def run_processing_pipeline(job_id: int):
         # Track matches per screenshot
         screenshot_match_count = {}
         for match in matches:
-            screenshot_name = match.ocr_result.get('screenshot_filename', 'unknown')
+            screenshot_name = match.screenshot_id  # Use screenshot_id from HandMatch
             screenshot_match_count[screenshot_name] = screenshot_match_count.get(screenshot_name, 0) + 1
         
         # Update screenshot results with match counts
         for ocr_result in ocr_results:
-            screenshot_name = ocr_result.get('screenshot_filename', 'unknown')
+            screenshot_name = ocr_result.screenshot_id  # Use screenshot_id from ScreenshotAnalysis dataclass
             match_count = screenshot_match_count.get(screenshot_name, 0)
             status = "success" if match_count > 0 else "warning"
             update_screenshot_result_matches(
