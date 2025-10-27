@@ -17,7 +17,7 @@ De-anonymize GGPoker hand histories by matching them with screenshots from Poker
 - **ocr.py**: Google Gemini 2.0 Flash Vision API integration with 78-line optimized OCR prompt
 - **matcher.py**: 100-point scoring algorithm for hand-to-screenshot matching
 - **writer.py**: Output generator with 13 regex replacement patterns and 10 critical PokerTracker validations
-- **database.py**: SQLite database with jobs, files, and results tables
+- **database.py**: SQLite database with jobs, files, results, and screenshot_results tables
 - **main.py**: FastAPI application with REST endpoints
 
 ### Frontend (Bootstrap 5 + Vanilla JS)
@@ -30,6 +30,7 @@ De-anonymize GGPoker hand histories by matching them with screenshots from Poker
 - **jobs**: Tracks upload jobs with status (pending, processing, completed, failed)
 - **files**: Stores uploaded file references (TXT and screenshots)
 - **results**: Stores processing results with mappings and statistics
+- **screenshot_results**: NEW - Granular tracking of each screenshot (OCR success/fail, matches found, errors)
 
 ## Key Features Implemented
 
@@ -75,6 +76,7 @@ Get your API key from: https://makersuite.google.com/app/apikey
 - `GET /api/status/{job_id}` - Get job status
 - `GET /api/download/{job_id}` - Download processed TXT file
 - `GET /api/jobs` - List all jobs
+- `GET /api/job/{job_id}/screenshots` - NEW - Get detailed screenshot results with errors
 - `DELETE /api/job/{job_id}` - Delete job and files
 
 ## Project Structure
@@ -132,6 +134,18 @@ Tests parser, writer, and checks GEMINI_API_KEY configuration.
 4. **Hero Protection**: "Hero" is NEVER replaced (PokerTracker requirement)
 
 ## Recent Changes (October 27, 2025)
+
+### Error Tracking & Feedback System (NEW - Diagnostic Visibility)
+- **Granular screenshot tracking**: New `screenshot_results` table tracks OCR success/failure and match counts per screenshot
+- **Per-screenshot error capture**: System now saves OCR errors, match results, and unmapped players for each screenshot individually
+- **Enhanced stats**: Added screenshots_total, screenshots_success, screenshots_warning, screenshots_error, unmapped_players_count
+- **New API endpoint**: GET /api/job/{job_id}/screenshots returns detailed status of all screenshots in a job
+- **UI feedback improvements**:
+  - "Estado de Screenshots" section shows success/warning/error counts with badges (✓ ⚠️ ✗)
+  - Expandible screenshot list displays individual results, match counts, and OCR errors
+  - "Jugadores Sin Mapear" section shows anonymous IDs that couldn't be resolved
+- **Real-time diagnostics**: Users can now see exactly which screenshots failed and which players need manual mapping
+- **Note**: Legacy jobs (pre-Oct 27) need reprocessing to populate screenshot_results
 
 ### PokerTracker Compatibility Fixes (CRITICAL - 22% → 95%+ Success Rate)
 - **Fixed 5 critical writer.py bugs** causing 78% PokerTracker import failures:
