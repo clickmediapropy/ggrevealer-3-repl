@@ -36,7 +36,7 @@ def ocr_screenshot(image_path: str, screenshot_id: str) -> ScreenshotAnalysis:
         uploaded_file = genai.upload_file(image_path)
         
         # Create model
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-image')
         
         # Optimized 78-line prompt for poker screenshot OCR
         prompt = """You are a specialized OCR system for poker hand screenshots from PokerCraft.
