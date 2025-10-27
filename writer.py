@@ -39,12 +39,20 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
         
         # 1. Seat lines: "Seat 1: PlayerID ($100 in chips)"
         output = re.sub(
-            rf'(Seat \d+: ){anon_escaped}( \(\$?[\d.]+)',
+            rf'(Seat \d+: ){anon_escaped}( \(\$[\d.]+ in chips\))',
             rf'\1{real_name}\2',
             output
         )
         
-        # 2. Action lines: "PlayerID: folds"
+        # 2. Blind posts: "PlayerID: posts small blind $0.1" (CRITICAL - must come before general actions)
+        output = re.sub(
+            rf'^{anon_escaped}(: posts (?:small blind|big blind|ante) \$[\d.]+)',
+            rf'{real_name}\1',
+            output,
+            flags=re.MULTILINE
+        )
+        
+        # 3. Action lines: "PlayerID: folds"
         output = re.sub(
             rf'^{anon_escaped}(: (?:folds|checks|calls|bets|raises))',
             rf'{real_name}\1',
@@ -52,21 +60,29 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
             flags=re.MULTILINE
         )
         
-        # 3. Dealt to (no cards): "Dealt to PlayerID"
+        # 4. All-in actions: "PlayerID: raises $10 to $20 and is all-in" (CRITICAL for Spin & Gold)
         output = re.sub(
-            rf'(Dealt to ){anon_escaped}(?![[\w])',
+            rf'^{anon_escaped}(: (?:raises|calls|bets) \$[\d.]+(?: to \$[\d.]+)? and is all-in)',
+            rf'{real_name}\1',
+            output,
+            flags=re.MULTILINE
+        )
+        
+        # 5. Dealt to (no cards): "Dealt to PlayerID"
+        output = re.sub(
+            rf'(Dealt to ){anon_escaped}(?![\[\w])',
             rf'\1{real_name}',
             output
         )
         
-        # 4. Dealt to (with cards): "Dealt to PlayerID [As Kh]"
+        # 6. Dealt to (with cards): "Dealt to PlayerID [As Kh]"
         output = re.sub(
             rf'(Dealt to ){anon_escaped}( \[)',
             rf'\1{real_name}\2',
             output
         )
         
-        # 5. Collected from pot: "PlayerID collected $100"
+        # 7. Collected from pot: "PlayerID collected $100"
         output = re.sub(
             rf'^{anon_escaped}( collected)',
             rf'{real_name}\1',
@@ -74,7 +90,7 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
             flags=re.MULTILINE
         )
         
-        # 6. Shows cards: "PlayerID shows [As Kh]"
+        # 8. Shows cards: "PlayerID shows [As Kh]"
         output = re.sub(
             rf'^{anon_escaped}( shows \[)',
             rf'{real_name}\1',
@@ -82,17 +98,41 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
             flags=re.MULTILINE
         )
         
-        # 7. Summary lines: "Seat 1: PlayerID (button)"
+        # 9. Mucks hand: "PlayerID mucks hand"
+        output = re.sub(
+            rf'^{anon_escaped}( mucks hand)',
+            rf'{real_name}\1',
+            output,
+            flags=re.MULTILINE
+        )
+        
+        # 10. Doesn't show: "PlayerID doesn't show hand"
+        output = re.sub(
+            rf'^{anon_escaped}( doesn\'t show hand)',
+            rf'{real_name}\1',
+            output,
+            flags=re.MULTILINE
+        )
+        
+        # 11. Summary lines: "Seat 1: PlayerID (button)"
         output = re.sub(
             rf'(Seat \d+: ){anon_escaped}(\s+\()',
             rf'\1{real_name}\2',
             output
         )
         
-        # 8. Uncalled bet returned: "Uncalled bet ($10) returned to PlayerID"
+        # 12. Uncalled bet returned: "Uncalled bet ($10) returned to PlayerID"
         output = re.sub(
             rf'(returned to ){anon_escaped}$',
             rf'\1{real_name}',
+            output,
+            flags=re.MULTILINE
+        )
+        
+        # 13. EV Cashout: "PlayerID: Chooses to EV Cashout" (GGPoker specific)
+        output = re.sub(
+            rf'^{anon_escaped}(: Chooses to EV Cashout)',
+            rf'{real_name}\1',
             output,
             flags=re.MULTILINE
         )
@@ -104,7 +144,7 @@ def validate_output_format(original: str, modified: str) -> ValidationResult:
     """
     Validate output format for PokerTracker compatibility
     
-    9 critical validations:
+    10 critical validations:
     1. Hero preservation
     2. Line count match
     3. Hand ID unchanged
@@ -114,6 +154,7 @@ def validate_output_format(original: str, modified: str) -> ValidationResult:
     7. Table info unchanged
     8. Seat count match
     9. Chip format preserved
+    10. No unmapped anonymous IDs
     """
     errors = []
     warnings = []
@@ -183,6 +224,24 @@ def validate_output_format(original: str, modified: str) -> ValidationResult:
     if len(original_chips) != len(modified_chips):
         warnings.append(
             f"Chip value count changed: {len(original_chips)} -> {len(modified_chips)}"
+        )
+    
+    # 10. No unmapped anonymous IDs remaining (CRITICAL for data integrity)
+    # GGPoker anonymous IDs: 6-8 character alphanumeric strings (e.g., 32fa3d21, bf27d3a)
+    anon_pattern = r'\b[a-f0-9]{6,8}\b'
+    
+    remaining_anon = set()
+    for match in re.finditer(anon_pattern, modified, re.IGNORECASE):
+        anon_id = match.group(0)
+        # Verify it appears in player context (not in timestamps/card notation/hand IDs)
+        # Check if it appears at start of line (player action) or after "Seat N:"
+        if re.search(rf'(?:^{anon_id}:|Seat \d+: {anon_id})', modified, re.MULTILINE):
+            remaining_anon.add(anon_id)
+    
+    if remaining_anon:
+        warnings.append(
+            f"Possible unmapped anonymous IDs found: {', '.join(sorted(remaining_anon))}. "
+            "This will cause PokerTracker import errors!"
         )
     
     # Validation result
