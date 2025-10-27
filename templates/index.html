@@ -91,12 +91,32 @@
 
         <div id="results-section" class="row d-none">
             <div class="col-12">
-                <div class="card border-success">
+                <div class="card border-success mb-3">
                     <div class="card-header bg-success text-white">
                         <i class="bi bi-check-circle"></i> Procesamiento Completado
                     </div>
                     <div class="card-body">
                         <div id="results-stats" class="mb-3"></div>
+                        
+                        <!-- Screenshot Status -->
+                        <div id="screenshots-status" class="alert alert-info d-none">
+                            <h6><i class="bi bi-images"></i> Estado de Screenshots</h6>
+                            <div id="screenshots-summary"></div>
+                            <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#screenshotsDetail">
+                                <i class="bi bi-list"></i> Ver Detalles
+                            </button>
+                            <div class="collapse mt-2" id="screenshotsDetail">
+                                <div id="screenshots-list"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Unmapped Players Warning -->
+                        <div id="unmapped-players-warning" class="alert alert-warning d-none">
+                            <h6><i class="bi bi-exclamation-triangle"></i> Jugadores Sin Mapear</h6>
+                            <p class="mb-2">Los siguientes jugadores no pudieron ser identificados:</p>
+                            <div id="unmapped-players-list"></div>
+                        </div>
+                        
                         <div class="d-grid gap-2 d-md-flex">
                             <button id="download-btn" class="btn btn-success btn-lg">
                                 <i class="bi bi-download"></i> Descargar TXT Resuelto

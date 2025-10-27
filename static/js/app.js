@@ -344,7 +344,7 @@ function showProcessing() {
     errorSection.classList.add('d-none');
 }
 
-function showResults(job) {
+async function showResults(job) {
     processingSection.classList.add('d-none');
     resultsSection.classList.remove('d-none');
 
@@ -373,8 +373,95 @@ function showResults(job) {
         </div>
     `;
 
+    // Load and display screenshot details
+    await loadScreenshotDetails(currentJobId, detailedStats);
+    
+    // Display unmapped players warning
+    displayUnmappedPlayers(detailedStats);
+
     downloadBtn.onclick = () => downloadResult(currentJobId);
     loadJobs();
+}
+
+async function loadScreenshotDetails(jobId, stats) {
+    try {
+        const response = await fetch(`${API_BASE}/api/job/${jobId}/screenshots`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        const screenshots = data.screenshots || [];
+        
+        if (screenshots.length === 0) return;
+        
+        const successCount = stats.screenshots_success || 0;
+        const warningCount = stats.screenshots_warning || 0;
+        const errorCount = stats.screenshots_error || 0;
+        const total = stats.screenshots_total || screenshots.length;
+        
+        // Show screenshot status section
+        document.getElementById('screenshots-status').classList.remove('d-none');
+        
+        // Summary
+        document.getElementById('screenshots-summary').innerHTML = `
+            <div class="d-flex gap-3">
+                <span><i class="bi bi-check-circle text-success"></i> ${successCount} Exitosos</span>
+                <span><i class="bi bi-exclamation-triangle text-warning"></i> ${warningCount} Advertencias</span>
+                <span><i class="bi bi-x-circle text-danger"></i> ${errorCount} Errores</span>
+                <span class="text-muted">Total: ${total}</span>
+            </div>
+        `;
+        
+        // Detailed list
+        const screenshotsList = screenshots.map(ss => {
+            const statusIcon = ss.status === 'success' ? 'check-circle text-success' :
+                              ss.status === 'warning' ? 'exclamation-triangle text-warning' :
+                              'x-circle text-danger';
+            const statusText = ss.status === 'success' ? 'Éxito' :
+                              ss.status === 'warning' ? 'Sin matches' :
+                              'Error OCR';
+            
+            return `
+                <div class="card mb-2">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-${statusIcon}"></i>
+                                <strong>${ss.screenshot_filename}</strong>
+                                <span class="badge bg-secondary ms-2">${ss.matches_found} matches</span>
+                            </div>
+                            <small class="text-muted">${statusText}</small>
+                        </div>
+                        ${ss.ocr_error ? `<div class="text-danger small mt-1">Error: ${ss.ocr_error}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        document.getElementById('screenshots-list').innerHTML = screenshotsList;
+        
+    } catch (error) {
+        console.error('Error loading screenshot details:', error);
+    }
+}
+
+function displayUnmappedPlayers(stats) {
+    const unmappedPlayers = stats.unmapped_players || [];
+    
+    if (unmappedPlayers.length === 0) {
+        document.getElementById('unmapped-players-warning').classList.add('d-none');
+        return;
+    }
+    
+    document.getElementById('unmapped-players-warning').classList.remove('d-none');
+    
+    const playersList = unmappedPlayers.slice(0, 20).map(playerId => 
+        `<span class="badge bg-warning text-dark me-2 mb-2">${playerId}</span>`
+    ).join('');
+    
+    const moreText = unmappedPlayers.length > 20 ? 
+        `<p class="text-muted small mb-0">... y ${unmappedPlayers.length - 20} más</p>` : '';
+    
+    document.getElementById('unmapped-players-list').innerHTML = playersList + moreText;
 }
 
 function showError(message) {

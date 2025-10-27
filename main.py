@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
@@ -200,6 +200,17 @@ async def list_jobs():
     return {"jobs": jobs}
 
 
+@app.get("/api/job/{job_id}/screenshots")
+async def get_job_screenshots(job_id: int):
+    """Get detailed screenshot results for a job"""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    screenshot_results = get_screenshot_results(job_id)
+    return {"screenshots": screenshot_results}
+
+
 @app.delete("/api/job/{job_id}")
 async def delete_job_endpoint(job_id: int):
     """Delete a job and all its files"""
@@ -252,14 +263,53 @@ def run_processing_pipeline(job_id: int):
         semaphore = asyncio.Semaphore(10)  # Max 10 concurrent requests
         
         async def process_single_screenshot(screenshot_file):
-            """Process one screenshot and update progress"""
-            result = await ocr_screenshot(
-                screenshot_file['file_path'],
-                screenshot_file['filename'],
-                semaphore
-            )
-            increment_ocr_processed_count(job_id)
-            return result
+            """Process one screenshot and update progress, save results"""
+            filename = screenshot_file['filename']
+            ocr_success = False
+            ocr_error = None
+            ocr_data = None
+            status = "error"
+            
+            try:
+                result = await ocr_screenshot(
+                    screenshot_file['file_path'],
+                    filename,
+                    semaphore
+                )
+                ocr_success = True
+                ocr_data = result
+                status = "success"
+                
+                # Save initial screenshot result (matches will be updated later)
+                save_screenshot_result(
+                    job_id=job_id,
+                    screenshot_filename=filename,
+                    ocr_success=True,
+                    ocr_data=result,
+                    matches_found=0,  # Will be updated after matching
+                    status="pending_match"
+                )
+                
+                increment_ocr_processed_count(job_id)
+                return result
+                
+            except Exception as e:
+                ocr_error = str(e)
+                status = "error"
+                
+                # Save failed screenshot result
+                save_screenshot_result(
+                    job_id=job_id,
+                    screenshot_filename=filename,
+                    ocr_success=False,
+                    ocr_error=ocr_error,
+                    matches_found=0,
+                    status="error"
+                )
+                
+                increment_ocr_processed_count(job_id)
+                print(f"[JOB {job_id}] ❌ OCR failed for {filename}: {ocr_error}")
+                return None
         
         async def process_all_screenshots():
             tasks = [
@@ -268,7 +318,8 @@ def run_processing_pipeline(job_id: int):
             ]
             return await asyncio.gather(*tasks)
         
-        ocr_results = asyncio.run(process_all_screenshots())
+        ocr_results_raw = asyncio.run(process_all_screenshots())
+        ocr_results = [r for r in ocr_results_raw if r is not None]
         
         print(f"[JOB {job_id}] OCR completed: {len(ocr_results)} screenshots analyzed")
         
@@ -277,6 +328,24 @@ def run_processing_pipeline(job_id: int):
         
         matches = find_best_matches(all_hands, ocr_results, confidence_threshold=50)
         print(f"[JOB {job_id}] Found {len(matches)} matches")
+        
+        # Track matches per screenshot
+        screenshot_match_count = {}
+        for match in matches:
+            screenshot_name = match.ocr_result.get('screenshot_filename', 'unknown')
+            screenshot_match_count[screenshot_name] = screenshot_match_count.get(screenshot_name, 0) + 1
+        
+        # Update screenshot results with match counts
+        for ocr_result in ocr_results:
+            screenshot_name = ocr_result.get('screenshot_filename', 'unknown')
+            match_count = screenshot_match_count.get(screenshot_name, 0)
+            status = "success" if match_count > 0 else "warning"
+            update_screenshot_result_matches(
+                job_id=job_id,
+                screenshot_filename=screenshot_name,
+                matches_found=match_count,
+                status=status
+            )
         
         name_mappings = []
         matched_hand_ids = set()
@@ -312,6 +381,24 @@ def run_processing_pipeline(job_id: int):
         output_txt_path = job_output_path / "resolved_hands.txt"
         output_txt_path.write_text(final_txt, encoding='utf-8')
         
+        # Get screenshot results for stats
+        screenshot_results = get_screenshot_results(job_id)
+        screenshots_by_status = {'success': 0, 'warning': 0, 'error': 0}
+        for sr in screenshot_results:
+            status = sr.get('status', 'error')
+            screenshots_by_status[status] = screenshots_by_status.get(status, 0) + 1
+        
+        # Extract unmapped players from validation warnings
+        unmapped_players = []
+        for warning in validation.warnings:
+            if 'unmapped anonymous IDs' in warning:
+                # Extract IDs from warning message
+                parts = warning.split(':')
+                if len(parts) > 1:
+                    ids_part = parts[1].split('.')[0]
+                    unmapped_players = [id.strip() for id in ids_part.split(',')]
+                break
+        
         stats = {
             'total_hands': len(all_hands),
             'matched_hands': len(matched_hands),
@@ -319,7 +406,13 @@ def run_processing_pipeline(job_id: int):
             'high_confidence_matches': sum(1 for m in matches if m.confidence >= 80),
             'validation_passed': validation.valid,
             'validation_errors': validation.errors,
-            'validation_warnings': validation.warnings
+            'validation_warnings': validation.warnings,
+            'screenshots_total': len(screenshot_files),
+            'screenshots_success': screenshots_by_status.get('success', 0),
+            'screenshots_warning': screenshots_by_status.get('warning', 0),
+            'screenshots_error': screenshots_by_status.get('error', 0),
+            'unmapped_players': unmapped_players,
+            'unmapped_players_count': len(unmapped_players)
         }
         
         mappings_dict = [

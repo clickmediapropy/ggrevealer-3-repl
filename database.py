@@ -55,6 +55,21 @@ CREATE TABLE IF NOT EXISTS results (
     created_at TEXT NOT NULL,
     FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
 );
+
+-- Screenshot results table (granular tracking)
+CREATE TABLE IF NOT EXISTS screenshot_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    screenshot_filename TEXT NOT NULL,
+    ocr_success INTEGER DEFAULT 0,
+    ocr_error TEXT,
+    ocr_data TEXT,
+    matches_found INTEGER DEFAULT 0,
+    unmapped_players TEXT,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
 """
 
 
@@ -266,3 +281,79 @@ def get_result(job_id: int) -> Optional[Dict]:
                 result['stats'] = json.loads(result['stats_json'])
             return result
     return None
+
+
+# ============================================================================
+# SCREENSHOT RESULT OPERATIONS
+# ============================================================================
+
+def save_screenshot_result(
+    job_id: int,
+    screenshot_filename: str,
+    ocr_success: bool,
+    ocr_error: Optional[str] = None,
+    ocr_data: Optional[Dict] = None,
+    matches_found: int = 0,
+    unmapped_players: Optional[List[str]] = None,
+    status: str = "success"
+):
+    """Save individual screenshot processing result"""
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO screenshot_results 
+            (job_id, screenshot_filename, ocr_success, ocr_error, ocr_data, matches_found, unmapped_players, status, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                job_id,
+                screenshot_filename,
+                1 if ocr_success else 0,
+                ocr_error,
+                json.dumps(ocr_data) if ocr_data else None,
+                matches_found,
+                json.dumps(unmapped_players) if unmapped_players else None,
+                status,
+                datetime.utcnow().isoformat()
+            )
+        )
+
+
+def get_screenshot_results(job_id: int) -> List[Dict]:
+    """Get all screenshot results for a job"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM screenshot_results WHERE job_id = ? ORDER BY created_at",
+            (job_id,)
+        ).fetchall()
+        results = []
+        for row in rows:
+            result = dict(row)
+            if result.get('ocr_data'):
+                result['ocr_data'] = json.loads(result['ocr_data'])
+            if result.get('unmapped_players'):
+                result['unmapped_players'] = json.loads(result['unmapped_players'])
+            result['ocr_success'] = bool(result.get('ocr_success'))
+            results.append(result)
+        return results
+
+
+def update_screenshot_result_matches(
+    job_id: int,
+    screenshot_filename: str,
+    matches_found: int,
+    unmapped_players: Optional[List[str]] = None,
+    status: str = "success"
+):
+    """Update screenshot result with match count and status"""
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE screenshot_results 
+            SET matches_found = ?, unmapped_players = ?, status = ?
+            WHERE job_id = ? AND screenshot_filename = ?""",
+            (
+                matches_found,
+                json.dumps(unmapped_players) if unmapped_players else None,
+                status,
+                job_id,
+                screenshot_filename
+            )
+        )
