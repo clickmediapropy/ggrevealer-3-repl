@@ -1149,6 +1149,83 @@ Usa el comando Read para leer este archivo y obtener contexto completo antes de 
     return prompt
 
 
+@app.post("/api/validate")
+async def validate_hand_history(file: UploadFile = File(...)):
+    """
+    Validate a hand history file against PokerTracker 4 requirements
+
+    This endpoint performs all 12 PT4 validations without processing the file.
+    Useful for testing and debugging hand histories.
+
+    Returns:
+        JSON with validation results, including:
+        - valid: whether PT4 would accept the hand
+        - pt4_would_reject: whether PT4 would reject based on errors
+        - errors: list of critical errors
+        - warnings: list of warnings
+        - validation_summary: summary statistics
+        - detailed_results: full validation details
+    """
+    from validator import GGPokerHandHistoryValidator
+
+    try:
+        # Read file content
+        content = await file.read()
+        hand_history_text = content.decode('utf-8')
+
+        # Create validator in permissive mode (only logs, doesn't reject)
+        validator = GGPokerHandHistoryValidator(strict_mode=False)
+
+        # Run all validations
+        results = validator.validate(hand_history_text)
+
+        # Get summary
+        summary = validator.get_validation_summary()
+
+        # Build response
+        errors = [r for r in results if r.result_type.value == "error"]
+        warnings = [r for r in results if r.result_type.value == "warning"]
+
+        return {
+            "success": True,
+            "filename": file.filename,
+            "valid": len(errors) == 0,
+            "pt4_would_reject": validator.should_reject_hand(),
+            "pt4_error_message": validator.get_pt4_error_message(),
+            "errors": [
+                {
+                    "validation": e.validation_name,
+                    "severity": e.severity.value if e.severity else None,
+                    "error_type": e.error_type,
+                    "message": e.message,
+                    "line_number": e.line_number,
+                    "player_name": e.player_name,
+                    "recommended_action": e.recommended_action,
+                    "metadata": e.metadata
+                }
+                for e in errors
+            ],
+            "warnings": [
+                {
+                    "validation": w.validation_name,
+                    "severity": w.severity.value if w.severity else None,
+                    "error_type": w.error_type,
+                    "message": w.message,
+                    "line_number": w.line_number,
+                    "player_name": w.player_name,
+                    "metadata": w.metadata
+                }
+                for w in warnings
+            ],
+            "validation_summary": summary
+        }
+
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid file encoding. Expected UTF-8 text file.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
+
+
 @app.delete("/api/job/{job_id}")
 async def delete_job_endpoint(job_id: int):
     """Delete a job and all its files"""

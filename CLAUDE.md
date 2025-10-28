@@ -426,6 +426,259 @@ The auto-exported file is named: `debug_job_{id}_{timestamp}.json`
 - **Logging**: Console shows prompt length for debugging
 - **Implementation**: `static/js/app.js:598-602,701-705`
 
+## PT4 Validation System (Oct 2025) 🆕
+
+**Feature**: Comprehensive PokerTracker 4 validation system with 12 critical validations
+
+GGRevealer now includes a complete validation system that replicates the exact validations that PokerTracker 4 (PT4) performs on hand histories. This helps identify why PT4 might reject hands (common 78% rejection rate for GGPoker files).
+
+### Architecture
+
+**Core Module**: `validator.py` (~1000 lines)
+- **Class**: `GGPokerHandHistoryValidator`
+- **Modes**: Strict (rejects like PT4) or Permissive (only logs)
+- **Result Types**: SUCCESS, WARNING, ERROR
+- **Severity Levels**: LOW, MEDIUM, HIGH, CRITICAL
+
+### The 12 Critical Validations
+
+#### 1. Pot Size Validation (MOST CRITICAL - 40% of failures)
+**Validates**: `Total pot = Sum(all bets) - Rake - Jackpot fees`
+
+**Common failure**: Cash Drop (1BB fee on pots > 30BB) not accounted for in hand history
+
+**Error message**: `Invalid pot size (X vs pot:Y rake:Z jpt:W)`
+
+**Implementation**: `validator.py:184-258` (`validate_pot_size()`)
+
+#### 2. Blind Consistency
+**Validates**: Stated blinds (header) = Posted blinds (actions)
+
+**PT4 version**: v4.15.35+ made this validation stricter
+
+**Error message**: `Stated blinds (X/Y) != Posted blinds (A/B)`
+
+**Implementation**: `validator.py:260-318` (`validate_blinds()`)
+
+#### 3. Stack Sizes
+**Validates**: All stacks > $0
+
+**Error message**: `Players with invalid stacks`
+
+**Implementation**: `validator.py:320-352` (`validate_stack_sizes()`)
+
+#### 4. Hand Metadata
+**Validates**: Hand ID format (RC/OM/TM/HD prefix + digits) and timestamp format (YYYY/MM/DD HH:MM:SS)
+
+**Known prefixes**: RC (Rush & Cash), OM (Omaha), TM/HD (Tournaments), MT/SG/TT (other formats)
+
+**Implementation**: `validator.py:354-417` (`validate_hand_metadata()`)
+
+#### 5. Player Identifiers
+**Validates**: Players have correct GGPoker format (Hero or 6-8 char hex IDs)
+
+**Format**: `Hero` or `[0-9a-f]{6,8}` (e.g., "478db80b", "5a3f9e2c")
+
+**Implementation**: `validator.py:419-480` (`validate_player_identifiers()`)
+
+#### 6. Card Validation
+**Validates**: No duplicate cards, valid format `[2-9TJQKA][hdcs]`
+
+**Error message**: `Duplicate cards in deck: [...]`
+
+**Implementation**: `validator.py:482-542` (`validate_cards()`)
+
+#### 7. Game Type Support
+**Validates**: Game type is supported by PT4
+
+**Supported**: Hold'em NL/PL, Omaha PL, PLO-5, PLO-6
+
+**NOT Supported**: Run It Three Times, Mixed Games (Razz, Stud, Draw)
+
+**Critical rejection**: Run It Three Times (hands with `*** THIRD FLOP ***`)
+
+**Implementation**: `validator.py:544-603` (`validate_game_type()`)
+
+#### 8. Action Sequence
+**Validates**: Actions follow logical poker rules (e.g., "calls" requires prior bet/raise)
+
+**Error message**: `Call action without prior bet/raise on STREET`
+
+**Implementation**: `validator.py:605-648` (`validate_action_sequence()`)
+
+#### 9. Stack Consistency
+**Validates**: Final stacks = Initial stacks ± actions
+
+**Status**: Placeholder (complex validation, requires full action tracking)
+
+**Implementation**: `validator.py:650-665` (`validate_stack_consistency()`)
+
+#### 10. Split Pots
+**Validates**: Side pots and multiple winners add up correctly
+
+**Format**: `Total pot X | Main pot Y. Side pot Z.`
+
+**Validation**: `Main pot + Side pot(s) = Total pot`
+
+**Implementation**: `validator.py:667-726` (`validate_split_pots()`)
+
+#### 11. EV Cashout Detection (GGPoker Exclusive)
+**Detects**: `Chooses to EV Cashout` in hand history
+
+**PT4 Bug**: Shows full pot as won instead of cashout amount (incorrect winnings calculation)
+
+**Severity**: HIGH (PT4 imports but calculates wrong statistics)
+
+**Implementation**: `validator.py:728-763` (`detect_ev_cashout()`)
+
+#### 12. All-in with Straddle
+**Detects**: Edge case of all-in hands with straddles
+
+**PT4 Bug History**: Fixed in v4.18.13 (older versions had incorrect pot calculations)
+
+**Severity**: MEDIUM (recommend PT4 v4.18.13+)
+
+**Implementation**: `validator.py:765-788` (`validate_all_in_with_straddle()`)
+
+### API Endpoint
+
+**Endpoint**: `POST /api/validate`
+
+**Purpose**: Validate hand history files independently (no processing)
+
+**Request**: Multipart file upload (TXT file)
+
+**Response**:
+```json
+{
+  "success": true,
+  "filename": "hand.txt",
+  "valid": true,
+  "pt4_would_reject": false,
+  "pt4_error_message": null,
+  "errors": [],
+  "warnings": [],
+  "validation_summary": {
+    "total_validations": 12,
+    "errors": 0,
+    "warnings": 1,
+    "critical": 0,
+    "would_reject": false,
+    "results": [...]
+  }
+}
+```
+
+**Implementation**: `main.py:1152-1227` (`validate_hand_history()`)
+
+### Usage Examples
+
+#### Via API (curl)
+```bash
+# Validate a single hand history file
+curl -X POST http://localhost:5000/api/validate \
+  -F "file=@hand_history.txt"
+```
+
+#### In Python
+```python
+from validator import GGPokerHandHistoryValidator
+
+# Create validator in permissive mode (only logs)
+validator = GGPokerHandHistoryValidator(strict_mode=False)
+
+# Read hand history
+with open('hand.txt', 'r') as f:
+    hand_history = f.read()
+
+# Run all validations
+results = validator.validate(hand_history)
+
+# Check if PT4 would reject
+if validator.should_reject_hand():
+    print(f"❌ PT4 would reject: {validator.get_pt4_error_message()}")
+else:
+    print("✅ PT4 would accept")
+
+# Get detailed summary
+summary = validator.get_validation_summary()
+print(f"Errors: {summary['errors']}, Warnings: {summary['warnings']}")
+```
+
+### Error Severity Levels
+
+| Severity | PT4 Behavior | Example Errors |
+|----------|--------------|----------------|
+| **CRITICAL** | Hand rejected | Invalid pot size, duplicate cards, RIT3, negative stacks |
+| **HIGH** | Warning shown, might reject | Missing blinds, EV Cashout detected, unsupported game |
+| **MEDIUM** | Warning shown, imports | Blind posting issues, straddle edge cases |
+| **LOW** | Informational | Unknown hand prefix, cosmetic issues |
+
+### Common Rejection Causes (% of 78% overall rejection rate)
+
+1. **Cash Drop / Jackpot Fees (40%)**: Pots > 30BB in Rush & Cash have 1BB jackpot fee not shown in hand history
+2. **Run It Three Times (15%)**: PT4 simply doesn't support this feature
+3. **Dual Tournament Import (20%)**: Importing both hand histories and tournament summaries counts winnings twice
+4. **Blind/Straddle Posting (10%)**: Stated blinds don't match posted amounts
+5. **Outdated PT4 Version (15%)**: Using PT4 < v4.18.x with known bugs
+
+### Testing
+
+**Test Suite**: `test_validator.py` (16 unit tests)
+
+**Run tests**:
+```bash
+pytest test_validator.py -v
+```
+
+**Test coverage**:
+- Valid tournament hands
+- Valid cash game hands
+- Invalid pot sizes (Cash Drop scenario)
+- Blind mismatches
+- Duplicate cards
+- Run It Three Times rejection
+- EV Cashout detection
+- Negative stacks
+- Invalid Hand ID formats
+- Strict vs Permissive modes
+
+### Integration Points
+
+**Current**: Independent endpoint (no pipeline integration)
+
+**Future integration options**:
+1. **Pre-processing**: Validate input files before matching
+2. **Post-processing**: Validate output files after desanonimization
+3. **Filtering**: Skip processing of files that would fail PT4 import
+4. **Reporting**: Include validation results in job status/debug info
+
+### Known Issues & Limitations
+
+1. **Stack Consistency**: Not fully implemented (complex, requires full action tracking)
+2. **Action Sequence**: Basic validation only (doesn't catch all illogical sequences)
+3. **Jackpot Fee Detection**: Infers from summary line, doesn't calculate from pot size/game type
+4. **Tournament vs Cash**: Some validations are cash-game specific
+
+### Recommended PT4 Version
+
+**Minimum**: PT4 v4.15.35 (Sept 2021) - Stricter blind validation
+**Recommended**: PT4 v4.18.13+ (March 2023) - All known GGPoker bugs fixed
+**Latest**: PT4 v4.18.10+ (2025) - Most stable
+
+### References
+
+**Document**: `notas-nico.md` (technical validation document from user)
+- Complete PT4 validation rules
+- Error message catalog
+- Edge case documentation
+- Implementation patterns
+
+**Related Files**:
+- `validator.py` - Core validation logic
+- `test_validator.py` - Unit tests
+- `main.py:1152-1227` - API endpoint
+
 ## Known Limitations
 
 1. **GEMINI_API_KEY required** - OCR returns mock data if not configured
