@@ -8,6 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Tech Stack**: Python 3.11+ • FastAPI • SQLite • Google Gemini 2.5 Flash Vision • Vanilla JS + Bootstrap 5
 
+## User Preferences
+
+- Prefer simple language
+- Want iterative development
+- Ask before making major changes
+- Prefer detailed explanations
+
 ## Development Commands
 
 ### Running the Application
@@ -213,6 +220,39 @@ Server console shows detailed pipeline logs:
 [JOB {id}] Generated {n} name mappings
 ```
 
+## Critical Bug Fixes & Implementation Notes
+
+### Octal Interpretation Bug in Regex Replacements (Oct 2025 - FIXED)
+**Problem**: PokerTracker rejected ~80% of hands when player names started with digits (e.g., "50Zoos", "9BetKing"). Seat lines were corrupted.
+
+**Root Cause**: Python's `re.sub()` interpreted escape sequences like `\150` as octal codes when using f-string replacements like `rf'\1{real_name}\2'`. Example:
+- Input: `Seat 3: 9d830e65 (625 in chips)`
+- Expected: `Seat 3: 50Zoos (625 in chips)` ✅
+- Actual: `hZoos (625 in chips)` ❌ (because `\150` octal = 'h')
+
+**Solution**: Changed all affected regex patterns in `writer.py` to use explicit group references: `r'\g<1>' + real_name + r'\g<2>'`
+
+**Affected Patterns** (5 of 14 total):
+1. Seat lines: `Seat X: PlayerID (stack in chips)`
+2. Dealt to (no cards): `Dealt to PlayerID`
+3. Dealt to (with cards): `Dealt to PlayerID [cards]`
+4. Summary lines: `Seat X: PlayerID (position)`
+5. Uncalled bet: `returned to PlayerID`
+
+### Duplicate Player Name Mapping Bug (Oct 2025 - FIXED)
+**Problem**: Multiple anonymized IDs mapped to same real name within a single hand (e.g., "TuichAAreko" appearing in multiple seats), causing PokerTracker rejections.
+
+**Root Cause**: The matcher sometimes assigned screenshots to incorrect hands, and the mapping creation logic didn't verify if a `resolved_name` was already used for a different player within the same hand.
+
+**Solution**: Enhanced `_build_seat_mapping()` in `matcher.py` to:
+1. Track `used_names` while building mappings for each hand
+2. Reject matches that create duplicate names within the same hand (return empty mapping)
+3. Allow same player across different hands/tables (per-hand scoping)
+
+**Important Note**: Hero position validation was NOT added because PokerCraft always displays Hero at bottom visually, regardless of actual seat number in hand history.
+
+**Impact**: Prevents duplicate player names by rejecting incorrect screenshot matches at the source. Rejected matches are logged with warnings including hand_id.
+
 ## Known Limitations
 
 1. **GEMINI_API_KEY required** - OCR returns mock data if not configured
@@ -220,3 +260,4 @@ Server console shows detailed pipeline logs:
 3. **Hero protection** - "Hero" is NEVER replaced (PokerTracker requirement, not a bug)
 4. **Hand count preservation** - All hands from input appear in output (matched or unmatched)
 5. **Table name extraction** - Uses regex on `Table 'Name'` format; fails if format differs
+6. **Hero position validation disabled** - PokerCraft's visual layout doesn't match seat numbers
