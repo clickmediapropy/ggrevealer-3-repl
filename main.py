@@ -332,12 +332,14 @@ async def get_debug_info(job_id: int):
     return debug_info
 
 
-@app.post("/api/debug/{job_id}/export")
-async def export_debug_info(job_id: int):
-    """Export debug information to JSON file in storage/debug/"""
+def _export_debug_json(job_id: int) -> dict:
+    """
+    Helper function to export debug information to JSON file
+    Returns dict with filepath, filename, and debug_info
+    """
     job = get_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        return None
 
     # Get all debug data
     files = get_job_files(job_id)
@@ -407,11 +409,26 @@ async def export_debug_info(job_id: int):
         json.dump(debug_info, f, indent=2, ensure_ascii=False)
 
     return {
-        "success": True,
-        "message": f"Debug info exported to {filename}",
         "filepath": str(filepath),
         "filename": filename,
-        "data": debug_info
+        "debug_info": debug_info
+    }
+
+
+@app.post("/api/debug/{job_id}/export")
+async def export_debug_info(job_id: int):
+    """Export debug information to JSON file in storage/debug/"""
+    result = _export_debug_json(job_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return {
+        "success": True,
+        "message": f"Debug info exported to {result['filename']}",
+        "filepath": result['filepath'],
+        "filename": result['filename'],
+        "data": result['debug_info']
     }
 
 
@@ -421,6 +438,11 @@ async def generate_claude_prompt(job_id: int):
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # Export debug JSON first (so Claude Code can read it)
+    debug_export = _export_debug_json(job_id)
+    debug_json_path = debug_export['filepath'] if debug_export else None
+    debug_json_filename = debug_export['filename'] if debug_export else None
 
     # Get all debug data
     files = get_job_files(job_id)
@@ -515,7 +537,9 @@ async def generate_claude_prompt(job_id: int):
         "error_logs": error_logs[:10],
         "warning_logs": warning_logs[:10],
         "failed_screenshots": failed_screenshots_with_details,
-        "screenshot_summary": screenshot_summary
+        "screenshot_summary": screenshot_summary,
+        "debug_json_path": debug_json_path,
+        "debug_json_filename": debug_json_filename
     }
 
     # If job has result with detailed stats, include them
@@ -529,7 +553,8 @@ async def generate_claude_prompt(job_id: int):
         return {
             "success": False,
             "message": "GEMINI_API_KEY not configured",
-            "prompt": _generate_fallback_prompt(context)
+            "prompt": _generate_fallback_prompt(context),
+            "debug_json_path": debug_json_path
         }
 
     try:
@@ -541,6 +566,14 @@ async def generate_claude_prompt(job_id: int):
         gemini_prompt = f"""Eres un experto en debugging de aplicaciones Python, análisis de errores y detección de problemas en pipelines de procesamiento de datos.
 
 Tu tarea es analizar la información de un job de GGRevealer y generar un prompt ÚTIL y ACCIONABLE para Claude Code.
+
+**MUY IMPORTANTE - ARCHIVO JSON DE DEBUG:**
+Se ha exportado un archivo JSON con información detallada del job:
+- Ruta: {debug_json_path}
+- Nombre: {debug_json_filename}
+
+Este archivo contiene toda la información del job incluyendo logs completos, estadísticas detalladas, resultados de screenshots, etc.
+En el prompt que generes, DEBES incluir una instrucción para que Claude Code LEA este archivo JSON primero antes de hacer cualquier análisis.
 
 **CONTEXTO DE GGREVEALER:**
 GGRevealer es una aplicación FastAPI que desanonimiza hand histories de poker usando OCR con Gemini Vision:
@@ -577,31 +610,36 @@ GGRevealer es una aplicación FastAPI que desanonimiza hand histories de poker u
 
 **GENERA UN PROMPT que:**
 
-1. **Identifique el problema de forma ESPECÍFICA** (no genérico)
+1. **PRIMERO: Instruye a Claude Code que lea el archivo JSON de debug**
+   - DEBE empezar con algo como: "Lee el archivo {debug_json_path} para obtener información completa del job"
+   - Esto es CRÍTICO porque el archivo JSON tiene toda la información detallada
+
+2. **Identifique el problema de forma ESPECÍFICA** (no genérico)
    - Ejemplo BUENO: "Match rate de 3.4% indica que el algoritmo de matching no está funcionando"
    - Ejemplo MALO: "Hay un error en el procesamiento"
 
-2. **Proporcione MÉTRICAS CLAVE**
+3. **Proporcione MÉTRICAS CLAVE**
    - Match rate, OCR success rate, screenshots procesados
    - Comparar con lo esperado
 
-3. **Liste ERRORES ESPECÍFICOS** (si los hay)
+4. **Liste ERRORES ESPECÍFICOS** (si los hay)
    - Con nombre de archivo, línea si es posible
    - Patrones detectados
 
-4. **Sugiera ARCHIVOS Y FUNCIONES CONCRETAS** a revisar
+5. **Sugiera ARCHIVOS Y FUNCIONES CONCRETAS** a revisar
    - No solo "revisa matcher.py" sino "revisa la función find_best_matches() en matcher.py:37"
 
-5. **Proponga PASOS CONCRETOS de debugging**
+6. **Proponga PASOS CONCRETOS de debugging**
    - Qué logs revisar, qué agregar, qué cambiar
 
-6. **Sea ACCIONABLE**
+7. **Sea ACCIONABLE**
    - Claude Code debe poder empezar a trabajar inmediatamente
 
 **FORMATO:**
-Usa markdown, secciones claras, bullets. Máximo 400 palabras. ENFÓCATE en lo más importante.
+Usa markdown, secciones claras, bullets. Máximo 500 palabras. ENFÓCATE en lo más importante.
 
 **IMPORTANTE:**
+- El prompt DEBE empezar con la instrucción de leer el archivo JSON: {debug_json_path}
 - NO generes prompt genérico si el problema es obvio (ej: match rate bajo = problema de matching)
 - Si no hay errores explícitos, ANALIZA las métricas y encuentra el problema real
 - Sé ESPECÍFICO y TÉCNICO
@@ -625,7 +663,9 @@ Genera SOLO el prompt para Claude Code:"""
         return {
             "success": True,
             "prompt": generated_prompt,
-            "context": context
+            "context": context,
+            "debug_json_path": debug_json_path,
+            "debug_json_filename": debug_json_filename
         }
 
     except Exception as e:
@@ -633,7 +673,8 @@ Genera SOLO el prompt para Claude Code:"""
         return {
             "success": False,
             "message": f"Error generating prompt: {str(e)}",
-            "prompt": _generate_fallback_prompt(context)
+            "prompt": _generate_fallback_prompt(context),
+            "debug_json_path": debug_json_path
         }
 
 
@@ -645,6 +686,8 @@ def _generate_fallback_prompt(context: dict) -> str:
     error_logs = context.get('error_logs', [])
     problem_indicators = context.get('problem_indicators', [])
     screenshot_summary = context.get('screenshot_summary', {})
+    debug_json_path = context.get('debug_json_path', '')
+    debug_json_filename = context.get('debug_json_filename', '')
 
     # Identify main problem
     main_problem = "Job completado con resultados subóptimos"
@@ -659,6 +702,24 @@ def _generate_fallback_prompt(context: dict) -> str:
         main_problem = f"OCR con baja tasa de éxito ({metrics.get('screenshot_success_rate_percent', 0):.1f}%)"
 
     prompt = f"""# Problema en GGRevealer - Job #{context.get('job_id')}
+
+## IMPORTANTE: Lee el archivo de debug primero
+
+**Antes de hacer cualquier análisis, lee el archivo JSON de debug completo:**
+```
+{debug_json_path}
+```
+
+Este archivo (`{debug_json_filename}`) contiene:
+- Información completa del job
+- Logs detallados (todos los niveles: DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Resultados de todos los screenshots con OCR y match counts
+- Estadísticas completas
+- Errores específicos de cada screenshot
+
+Usa el comando Read para leer este archivo y obtener contexto completo antes de continuar.
+
+---
 
 ## Problema Identificado
 {main_problem}
@@ -1130,6 +1191,15 @@ def run_processing_pipeline(job_id: int):
         # Persist logs to database
         logger.flush_to_db()
 
+        # Auto-export debug JSON for analysis
+        try:
+            debug_export = _export_debug_json(job_id)
+            if debug_export:
+                logger.info(f"📋 Debug JSON exported automatically: {debug_export['filename']}")
+                print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
+        except Exception as e:
+            logger.warning(f"Failed to export debug JSON: {str(e)}")
+
     except Exception as error:
         total_duration = int((time.time() - start_time) * 1000)
         logger.critical(f"❌ Processing failed: {str(error)}",
@@ -1141,6 +1211,15 @@ def run_processing_pipeline(job_id: int):
         logger.flush_to_db()
 
         update_job_status(job_id, 'failed', str(error))
+
+        # Auto-export debug JSON for analysis (especially important on failure)
+        try:
+            debug_export = _export_debug_json(job_id)
+            if debug_export:
+                logger.info(f"📋 Debug JSON exported automatically: {debug_export['filename']}")
+                print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
+        except Exception as e:
+            logger.warning(f"Failed to export debug JSON: {str(e)}")
 
 
 if __name__ == "__main__":
