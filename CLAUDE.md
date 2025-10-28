@@ -24,12 +24,20 @@ python main.py
 
 # Alternative with uvicorn directly
 uvicorn main:app --host 0.0.0.0 --port 5000 --reload
+
+# Quick restart (kills port 8000 and restarts - NOTE: restart.sh uses port 8000, main.py uses port 5000)
+./restart.sh
 ```
 
 ### Testing
 ```bash
 # Run CLI test suite (tests parser, writer, and API key configuration)
 python test_cli.py
+
+# Run matching tests
+python test_matching_simple.py
+python test_job3_matching.py
+python test_full_matching.py
 ```
 
 ### Environment Setup
@@ -41,14 +49,16 @@ Get API key from: https://makersuite.google.com/app/apikey
 
 ## Architecture & Data Flow
 
-### Core Pipeline (main.py:268-543 `run_processing_pipeline`)
+### Core Pipeline (main.py:740-1144 `run_processing_pipeline`)
 
 1. **Parse TXT files** → Extract hand histories using `GGPokerParser.parse_file()`
 2. **OCR Screenshots** → Parallel async processing (10 concurrent) with `ocr_screenshot()`
-3. **Match Hands** → Primary key matching using Hand ID, fallback to 100-point scoring
-4. **Generate Mappings** → Build seat-based anonymized_id → real_name mappings
+3. **Match Hands** → Primary key matching using Hand ID (with normalization), fallback to 100-point scoring
+4. **Generate Mappings** → Build seat-based anonymized_id → real_name mappings with duplicate detection
 5. **Write Outputs** → Generate per-table TXT files with 14 regex replacement patterns
 6. **Validate & Classify** → Split into `_resolved.txt` (clean) and `_fallado.txt` (has unmapped IDs)
+7. **Create ZIP archives** → Package resolved and failed files separately
+8. **Persist Logs** → Save structured logs to database for debugging
 
 ### Key Modules
 
@@ -85,6 +95,13 @@ Get API key from: https://makersuite.google.com/app/apikey
 - **files** table: Uploaded TXT and screenshot references
 - **results** table: Final outputs, mappings JSON, stats JSON
 - **screenshot_results** table: Per-screenshot OCR success/failure, match counts, errors (diagnostic granularity)
+- **logs** table: Structured logs with job_id, level, timestamp, message, and extra_data (JSON)
+
+**logger.py** - Structured logging system
+- Job-specific loggers with console output and database persistence
+- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- Buffered logging with `flush_to_db()` for batch persistence
+- Colored console output for different log levels
 
 ### File Classification System (CRITICAL - Never Lose Hands)
 
@@ -95,15 +112,26 @@ ALL hands from input TXT files are included in outputs. Files are classified per
 
 The system tracks `unmapped_ids` list per file and provides transparent reporting in UI.
 
-### API Endpoints (main.py:62-266)
+### API Endpoints (main.py:84-738)
 
+**Core Workflow:**
 - `POST /api/upload` → Upload TXT files + screenshots, creates job
-- `POST /api/process/{job_id}` → Start background processing
+- `POST /api/process/{job_id}` → Start background processing (supports reprocessing completed/failed jobs)
 - `GET /api/status/{job_id}` → Real-time status with OCR progress (ocr_processed/ocr_total), statistics, successful_files, failed_files
 - `GET /api/download/{job_id}` → Download `resolved_hands.zip` (clean files)
 - `GET /api/download-fallidos/{job_id}` → Download `fallidos.zip` (files with unmapped IDs)
-- `GET /api/job/{job_id}/screenshots` → Detailed screenshot results (OCR errors, match counts)
+- `GET /api/jobs` → List all jobs
 - `DELETE /api/job/{job_id}` → Delete job and files
+
+**Debugging & Diagnostics:**
+- `GET /api/job/{job_id}/screenshots` → Detailed screenshot results (OCR errors, match counts)
+- `GET /api/debug/{job_id}` → Comprehensive debug information (job, files, results, logs)
+- `POST /api/debug/{job_id}/export` → Export debug info to JSON file in `storage/debug/`
+- `POST /api/debug/{job_id}/generate-prompt` → Generate AI-powered debugging prompt using Gemini 2.5 Flash (analyzes job metrics, errors, and provides actionable debugging steps)
+
+**Frontend:**
+- `GET /` → Redirect to `/app`
+- `GET /app` → Serve main application page (Jinja2 template)
 
 ## Critical Implementation Rules
 
@@ -133,10 +161,12 @@ async def process_single_screenshot(screenshot_file):
 ```
 Prevents API rate limit violations while maximizing throughput.
 
-### Hand ID Matching Strategy (matcher.py:37-76)
-1. Check `screenshot.hand_id == hand.hand_id` (OCR extracted) → 100 points
-2. Check `hand.hand_id in screenshot.screenshot_id` (filename) → 100 points
-3. Fallback to multi-criteria scoring → 0-100 points
+### Hand ID Matching Strategy (matcher.py:11-162)
+1. **Normalize Hand IDs** → Remove prefixes like "SG", "HH", "MT", "TT" (handles OCR/parser differences)
+2. **PRIMARY**: Check `_normalize_hand_id(screenshot.hand_id) == _normalize_hand_id(hand.hand_id)` (OCR extracted) → 100 points
+3. **LEGACY**: Check `hand.hand_id in screenshot.screenshot_id` (filename) → 100 points
+4. **FALLBACK**: Multi-criteria scoring → 0-100 points (hero cards 40pts, board 30pts, hero position 15pts, player names 10pts, stack 5pts)
+5. **Duplicate Prevention**: `_build_seat_mapping()` validates mappings and returns empty dict if duplicate names detected within same hand
 
 ## Common Development Patterns
 
@@ -165,12 +195,16 @@ storage/
 ├── uploads/{job_id}/
 │   ├── txt/*.txt           # Original hand history files
 │   └── screenshots/*.png   # PokerCraft screenshots
-└── outputs/{job_id}/
-    ├── {table}_resolved.txt     # Clean files (all IDs mapped)
-    ├── {table}_fallado.txt      # Failed files (unmapped IDs)
-    ├── resolved_hands.zip       # ZIP of all _resolved.txt files
-    └── fallidos.zip             # ZIP of all _fallado.txt files
+├── outputs/{job_id}/
+│   ├── {table}_resolved.txt     # Clean files (all IDs mapped)
+│   ├── {table}_fallado.txt      # Failed files (unmapped IDs)
+│   ├── resolved_hands.zip       # ZIP of all _resolved.txt files
+│   └── fallidos.zip             # ZIP of all _fallado.txt files
+└── debug/
+    └── debug_job_{id}_{timestamp}.json  # Exported debug info
 ```
+
+**Database:** `ggrevealer.db` (SQLite) - Contains jobs, files, results, screenshot_results, and logs tables
 
 ## PokerTracker Compatibility
 
@@ -190,35 +224,59 @@ Violation of validation #1 or #10 will cause PokerTracker to REJECT the hand his
 
 ## Debugging Tips
 
-### Check OCR results
+### AI-Powered Debugging (Recommended)
+```bash
+# Use the built-in AI debugging endpoint
+curl -X POST http://localhost:5000/api/debug/{job_id}/generate-prompt
+```
+This generates a Claude Code debugging prompt that:
+- Analyzes job metrics (match rate, OCR success rate, etc.)
+- Identifies specific problems (matching issues, OCR failures, etc.)
+- Suggests concrete files and functions to review
+- Provides actionable debugging steps
+
+### Manual Debugging
+
+#### Check OCR results
 ```python
 # In ocr.py, print raw Gemini response
 print(f"Raw response: {response.text}")
 ```
 
-### Check matching scores
+#### Check matching scores
 ```python
 # In matcher.py, already logs to console:
 print(f"✅ Hand ID match: {hand.hand_id} ↔ {screenshot.screenshot_id}")
 print(f"⚠️  Fallback match: {hand.hand_id} ↔ {screenshot.screenshot_id} (score: {best_score:.1f})")
 ```
 
-### Inspect unmapped IDs
+#### Inspect unmapped IDs
 ```python
 # Check writer.py validation output
 unmapped_ids = detect_unmapped_ids_in_text(final_txt)
 print(f"Unmapped: {unmapped_ids}")
 ```
 
-### Review job processing logs
+#### Review job processing logs
 Server console shows detailed pipeline logs:
 ```
-[JOB {id}] Starting processing...
-[JOB {id}] Parsed {n} hands
-[JOB {id}] OCR completed: {n} screenshots analyzed
-[JOB {id}] Found {n} matches
-[JOB {id}] Generated {n} name mappings
+[JOB {id}] [INFO] Starting processing...
+[JOB {id}] [INFO] Parsed {n} hands
+[JOB {id}] [INFO] OCR completed: {n} screenshots analyzed
+[JOB {id}] [INFO] Found {n} matches
+[JOB {id}] [WARNING] Unmapped seats: Seat 2 (abc123)
 ```
+
+Logs are also persisted to database and can be retrieved via:
+- `GET /api/debug/{job_id}` → Returns logs with filtering by level
+- Database: `SELECT * FROM logs WHERE job_id = ? ORDER BY timestamp DESC`
+
+#### Export full debug report
+```bash
+# Export complete debug info to storage/debug/
+curl -X POST http://localhost:5000/api/debug/{job_id}/export
+```
+Includes: job details, files, results, screenshot analysis, logs, and statistics
 
 ## Critical Bug Fixes & Implementation Notes
 
@@ -253,6 +311,36 @@ Server console shows detailed pipeline logs:
 
 **Impact**: Prevents duplicate player names by rejecting incorrect screenshot matches at the source. Rejected matches are logged with warnings including hand_id.
 
+## Recent Features & Enhancements
+
+### Hand ID Normalization (Oct 2025)
+**Feature**: Automatic normalization of hand IDs to handle OCR/parser prefix differences
+- Strips prefixes like "SG", "HH", "MT", "TT" before comparison
+- Significantly improves matching accuracy when OCR omits hand ID prefixes
+- Location: `matcher.py:11-30` (`_normalize_hand_id()`)
+
+### Structured Logging System (Oct 2025)
+**Feature**: Comprehensive logging with database persistence and colored console output
+- Job-specific loggers with buffered writes
+- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- Persistent storage in SQLite for post-mortem analysis
+- Location: `logger.py`, `database.py` (logs table)
+
+### AI-Powered Debugging (Oct 2025)
+**Feature**: Gemini 2.5 Flash-powered debugging prompt generation
+- Analyzes job metrics, error logs, and screenshot failures
+- Generates actionable debugging prompts for Claude Code
+- Identifies specific problems (low match rate, OCR failures, etc.)
+- Endpoint: `POST /api/debug/{job_id}/generate-prompt`
+- Location: `main.py:418-717`
+
+### Job Reprocessing (Oct 2025)
+**Feature**: Ability to reprocess completed or failed jobs
+- Clears previous results from database and filesystem
+- Useful for testing fixes without re-uploading files
+- Endpoint: `POST /api/process/{job_id}` (detects and handles reprocessing)
+- Location: `main.py:121-148`
+
 ## Known Limitations
 
 1. **GEMINI_API_KEY required** - OCR returns mock data if not configured
@@ -261,3 +349,4 @@ Server console shows detailed pipeline logs:
 4. **Hand count preservation** - All hands from input appear in output (matched or unmatched)
 5. **Table name extraction** - Uses regex on `Table 'Name'` format; fails if format differs
 6. **Hero position validation disabled** - PokerCraft's visual layout doesn't match seat numbers
+7. **Port discrepancy** - `main.py` uses port 5000, `restart.sh` uses port 8000 (update restart.sh if needed)
