@@ -216,14 +216,17 @@ def _calculate_match_score(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> 
 def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dict[str, str]:
     """
     Build name mapping from hand to screenshot based on seat positions
-    Maps anonymized player IDs to real names
+    Maps anonymized player IDs to real names (including Hero to real hero name)
     """
     mapping = {}
     
     # Map by seat position (not by name!)
     for seat in hand.seats:
+        # Special handling for Hero: map to hero_name from OCR
         if seat.player_id == 'Hero':
-            continue  # Never map Hero
+            if screenshot.hero_name:
+                mapping['Hero'] = screenshot.hero_name
+            continue
         
         # Find player in same seat position in screenshot
         matching_player = next(

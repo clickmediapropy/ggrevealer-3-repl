@@ -77,7 +77,7 @@ def generate_txt_files_by_table(
 
 def detect_unmapped_ids_in_text(text: str) -> List[str]:
     """
-    Detect remaining anonymous IDs in processed text
+    Detect remaining anonymous IDs in processed text (including literal "Hero")
     
     Args:
         text: Processed hand history text
@@ -89,11 +89,16 @@ def detect_unmapped_ids_in_text(text: str) -> List[str]:
     remaining_anon = set()
     
     for line in text.split('\n'):
+        # Check for hex anonymous IDs
         for match in re.finditer(anon_pattern, line, re.IGNORECASE):
             anon_id = match.group(0)
             # Verify it appears in player context (not timestamps/card notation/hand IDs)
             if re.search(rf'(?:^{anon_id}:|Seat \d+: {anon_id})', line):
                 remaining_anon.add(anon_id)
+        
+        # Check for literal "Hero" (indicates OCR failed to detect player name)
+        if re.search(r'(?:^Hero:|Seat \d+: Hero\b|Dealt to Hero\b)', line):
+            remaining_anon.add('Hero')
     
     return sorted(list(remaining_anon))
 
@@ -196,10 +201,6 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
     for mapping in mappings:
         anon_id = mapping.anonymized_identifier
         real_name = mapping.resolved_name
-        
-        # CRITICAL: Never replace "Hero"
-        if anon_id.lower() == 'hero':
-            continue
         
         # Escape special regex characters
         anon_escaped = re.escape(anon_id)
@@ -321,32 +322,21 @@ def validate_output_format(original: str, modified: str) -> ValidationResult:
     """
     Validate output format for PokerTracker compatibility
     
-    10 critical validations:
-    1. Hero preservation
-    2. Line count match
-    3. Hand ID unchanged
-    4. Timestamp unchanged
-    5. No unexpected currency symbols
-    6. Summary section preserved
-    7. Table info unchanged
-    8. Seat count match
-    9. Chip format preserved
-    10. No unmapped anonymous IDs
+    9 critical validations:
+    1. Line count match
+    2. Hand ID unchanged
+    3. Timestamp unchanged
+    4. No unexpected currency symbols
+    5. Summary section preserved
+    6. Table info unchanged
+    7. Seat count match
+    8. Chip format preserved
+    9. No unmapped anonymous IDs
     """
     errors = []
     warnings = []
     
-    # 1. Hero preservation - CRITICAL
-    original_hero_count = original.count('Hero')
-    modified_hero_count = modified.count('Hero')
-    
-    if original_hero_count != modified_hero_count:
-        errors.append(
-            f"Hero count mismatch: original={original_hero_count}, modified={modified_hero_count}. "
-            "Hero MUST NEVER be replaced!"
-        )
-    
-    # 2. Line count match
+    # 1. Line count match
     original_lines = len(original.split('\n'))
     modified_lines = len(modified.split('\n'))
     

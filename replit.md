@@ -44,10 +44,9 @@ De-anonymize GGPoker hand histories by matching them with screenshots from Poker
    - Hero position: 15pts
    - Player names: 10pts
    - Stack size: 5pts
-5. **Name Mapping**: Automatic seat-based mapping (anonymized ID → real name)
-6. **Hero Protection**: Never replaces "Hero" in output (PokerTracker requirement)
-7. **Output Validation**: 9 critical checks for PokerTracker compatibility
-8. **Job History**: Persistent storage and retrieval of all processing jobs
+5. **Name Mapping**: Automatic seat-based mapping (anonymized ID → real name, including Hero → real player name)
+6. **Output Validation**: 9 critical checks for PokerTracker compatibility
+7. **Job History**: Persistent storage and retrieval of all processing jobs
 
 ## Configuration
 
@@ -131,7 +130,6 @@ Tests parser, writer, and checks GEMINI_API_KEY configuration.
 1. **GEMINI_API_KEY Required**: OCR will return mock data if not configured
 2. **Mock Mode**: When API key is missing, matcher uses mock OCR results for testing
 3. **Direct Matching**: Screenshots with hand ID in filename get 100% confidence match
-4. **Hero Protection**: "Hero" is NEVER replaced (PokerTracker requirement)
 
 ## Recent Changes (October 28, 2025)
 
