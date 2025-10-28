@@ -98,12 +98,16 @@ async def upload_files(
     screenshots_path.mkdir(exist_ok=True)
     
     for txt_file in txt_files:
+        if not txt_file.filename:
+            raise HTTPException(status_code=400, detail="File must have a filename")
         file_path = txt_path / txt_file.filename
         with open(file_path, "wb") as f:
             shutil.copyfileobj(txt_file.file, f)
         add_file(job_id, txt_file.filename, "txt", str(file_path))
     
     for screenshot in screenshots:
+        if not screenshot.filename:
+            raise HTTPException(status_code=400, detail="File must have a filename")
         file_path = screenshots_path / screenshot.filename
         with open(file_path, "wb") as f:
             shutil.copyfileobj(screenshot.file, f)
@@ -332,10 +336,10 @@ async def get_debug_info(job_id: int):
     return debug_info
 
 
-def _export_debug_json(job_id: int) -> dict:
+def _export_debug_json(job_id: int) -> dict | None:
     """
     Helper function to export debug information to JSON file
-    Returns dict with filepath, filename, and debug_info
+    Returns dict with filepath, filename, and debug_info, or None if job not found
     """
     job = get_job(job_id)
     if not job:
@@ -740,9 +744,9 @@ async def generate_claude_prompt(job_id: int):
         }
 
     try:
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=api_key)  # type: ignore
         # Use Gemini 2.5 Flash with thinking mode for better debugging analysis
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')  # type: ignore
 
         # Build detailed problem summary
         problem_summary = []
@@ -872,7 +876,7 @@ Genera SOLO el prompt para Claude Code (sin preamble, solo el prompt):"""
         response = await asyncio.to_thread(
             model.generate_content,
             gemini_prompt,
-            generation_config={
+            generation_config={  # type: ignore
                 "temperature": 0.3,  # Low temperature for consistent, focused output
                 "top_p": 0.8,
                 "top_k": 40,

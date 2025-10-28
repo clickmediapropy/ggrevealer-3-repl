@@ -286,34 +286,45 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     max_seats = len(hand.seats)  # Usually 3 for 3-max
 
     print(f"[DEBUG] Hero is at Seat {hero_seat_number} (real seat number)")
-    print(f"[DEBUG] Table has {max_seats} seats")
+    print(f"[DEBUG] Table has {max_seats} seats in hand history")
 
     # Step 2: Build mapping for ALL players in screenshot using counter-clockwise order
     # PokerCraft shows Hero at visual position 1, then other players in counter-clockwise order
-    # Formula: real_seat = (hero_seat - (visual_position - 1)) % max_seats, with wrap-around
-
+    # 
+    # IMPORTANT: PokerCraft visual positions are not seat numbers!
+    # - Visual position is the display order on screen (Hero always at position 1)
+    # - We need to calculate the REAL seat number from the visual position
+    # - Formula: real_seat = hero_seat - (visual_position - 1), with wrap-around
+    
+    # Get all available seat numbers from hand history
+    available_seats = sorted([s.seat_number for s in hand.seats])
+    print(f"[DEBUG] Available seats in hand: {available_seats}")
+    print(f"[DEBUG] Screenshot shows {len(screenshot.all_player_stacks)} players")
+    
     for player_stack in screenshot.all_player_stacks:
         visual_position = player_stack.position
         real_name = player_stack.player_name
 
-        # Calculate real seat number from visual position
-        # Visual position 1 = Hero seat
+        # Calculate real seat number using counter-clockwise mapping
+        # Visual position 1 = Hero's seat
         # Visual position 2 = Seat before Hero (counter-clockwise)
         # Visual position 3 = Seat 2 before Hero (counter-clockwise)
         offset = visual_position - 1
         real_seat_number = hero_seat_number - offset
 
         # Handle wrap-around for negative seat numbers
-        if real_seat_number < 1:
+        # If we go below 1, wrap around to the end
+        while real_seat_number < 1:
             real_seat_number += max_seats
 
-        print(f"[DEBUG] Visual position {visual_position} → Real seat {real_seat_number}")
+        print(f"[DEBUG] Visual position {visual_position} → Real seat {real_seat_number} (hero={hero_seat_number}, offset={offset})")
 
         # Find the anonymized ID at this real seat
         seat_at_position = next((s for s in hand.seats if s.seat_number == real_seat_number), None)
 
         if not seat_at_position:
             print(f"[WARNING] No seat found at position {real_seat_number} in hand history")
+            print(f"[WARNING] Available seats: {available_seats}, looking for seat {real_seat_number}")
             continue
 
         anon_id = seat_at_position.player_id
