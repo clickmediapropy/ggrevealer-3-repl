@@ -69,6 +69,7 @@ Get API key from: https://makersuite.google.com/app/apikey
 - Detects 3-max vs 6-max table formats
 
 **ocr.py** - Google Gemini Vision OCR
+- **REQUIRED MODEL**: `models/gemini-2.5-flash-image` (tested at 98% confidence, optimal for vision tasks)
 - 78-line optimized prompt for poker screenshot analysis
 - Extracts: hand ID, player names, hero cards, board cards, stacks, positions
 - Async processing with semaphore-based rate limiting (10 concurrent requests)
@@ -179,6 +180,7 @@ Prevents API rate limit violations while maximizing throughput.
 5. Add negative lookaheads to prevent over-matching
 
 ### Modifying OCR prompt (ocr.py:46-117)
+- **ALWAYS use model**: `models/gemini-2.5-flash-image` (do not change - tested and verified)
 - Prompt is structured: CRITICAL INSTRUCTIONS → HAND ID EXTRACTION → CARD FORMAT → OUTPUT FORMAT → VALIDATION RULES
 - Hand ID is MOST IMPORTANT for matching accuracy
 - JSON output must match `ScreenshotAnalysis` dataclass structure
