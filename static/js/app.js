@@ -806,23 +806,81 @@ function renderLogs(logs, levelFilter = '') {
     logsContainer.scrollTop = logsContainer.scrollHeight;
 }
 
-function exportDebugData(jobId, debugData) {
-    const exportData = {
-        job_id: jobId,
-        export_timestamp: new Date().toISOString(),
-        ...debugData
-    };
+async function exportDebugData(jobId, debugData) {
+    try {
+        // Disable button and show loading state
+        const exportBtn = document.getElementById('export-debug-btn');
+        const originalText = exportBtn.innerHTML;
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exportando...';
 
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
+        // Call API to save to server
+        const response = await fetch(`${API_BASE}/api/debug/${jobId}/export`, {
+            method: 'POST'
+        });
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ggrevealer_debug_job_${jobId}_${Date.now()}.json`;
-    link.click();
+        if (!response.ok) {
+            throw new Error('Failed to export debug data');
+        }
 
-    URL.revokeObjectURL(url);
+        const result = await response.json();
+
+        // Download to user's browser
+        const dataStr = JSON.stringify(result.data, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = result.filename;
+        link.click();
+
+        URL.revokeObjectURL(url);
+
+        // Show success message in button
+        exportBtn.innerHTML = '<i class="bi bi-check-circle"></i> Exportado';
+        exportBtn.classList.remove('btn-outline-primary');
+        exportBtn.classList.add('btn-success');
+
+        setTimeout(() => {
+            exportBtn.innerHTML = originalText;
+            exportBtn.classList.remove('btn-success');
+            exportBtn.classList.add('btn-outline-primary');
+            exportBtn.disabled = false;
+        }, 2000);
+
+        // Show notification in page
+        const notification = document.getElementById('export-notification');
+        const filepath = document.getElementById('export-filepath');
+        if (notification && filepath) {
+            filepath.textContent = result.filepath;
+            notification.classList.remove('d-none');
+
+            // Auto-hide notification after 10 seconds
+            setTimeout(() => {
+                notification.classList.add('d-none');
+            }, 10000);
+        }
+
+        console.log(`✅ Debug info guardado en servidor: ${result.filepath}`);
+
+    } catch (error) {
+        console.error('Error exporting debug data:', error);
+
+        const exportBtn = document.getElementById('export-debug-btn');
+        exportBtn.innerHTML = '<i class="bi bi-x-circle"></i> Error';
+        exportBtn.classList.remove('btn-outline-primary');
+        exportBtn.classList.add('btn-danger');
+
+        setTimeout(() => {
+            exportBtn.innerHTML = '<i class="bi bi-download"></i> Exportar Debug JSON';
+            exportBtn.classList.remove('btn-danger');
+            exportBtn.classList.add('btn-outline-primary');
+            exportBtn.disabled = false;
+        }, 2000);
+
+        alert('Error al exportar debug data: ' + error.message);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

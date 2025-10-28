@@ -4,6 +4,8 @@ FastAPI application entry point
 
 import os
 import asyncio
+import json
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -44,9 +46,11 @@ app.add_middleware(
 STORAGE_PATH = Path("storage")
 UPLOADS_PATH = STORAGE_PATH / "uploads"
 OUTPUTS_PATH = STORAGE_PATH / "outputs"
+DEBUG_PATH = STORAGE_PATH / "debug"
 
 UPLOADS_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUTS_PATH.mkdir(parents=True, exist_ok=True)
+DEBUG_PATH.mkdir(parents=True, exist_ok=True)
 
 Path("static").mkdir(exist_ok=True)
 Path("static/css").mkdir(exist_ok=True)
@@ -311,6 +315,89 @@ async def get_debug_info(job_id: int):
     }
 
     return debug_info
+
+
+@app.post("/api/debug/{job_id}/export")
+async def export_debug_info(job_id: int):
+    """Export debug information to JSON file in storage/debug/"""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get all debug data
+    files = get_job_files(job_id)
+    result = get_result(job_id)
+    screenshot_results = get_screenshot_results(job_id)
+    logs = get_job_logs(job_id, limit=1000)
+
+    # Build comprehensive debug info
+    debug_info = {
+        "job": job,
+        "files": {
+            "txt_files": [f for f in files if f['file_type'] == 'txt'],
+            "screenshots": [f for f in files if f['file_type'] == 'screenshot'],
+            "total_txt": len([f for f in files if f['file_type'] == 'txt']),
+            "total_screenshots": len([f for f in files if f['file_type'] == 'screenshot'])
+        },
+        "result": result,
+        "screenshots": {
+            "results": screenshot_results,
+            "summary": {
+                "total": len(screenshot_results),
+                "success": len([s for s in screenshot_results if s.get('status') == 'success']),
+                "warning": len([s for s in screenshot_results if s.get('status') == 'warning']),
+                "error": len([s for s in screenshot_results if s.get('status') == 'error'])
+            }
+        },
+        "logs": {
+            "entries": logs,
+            "count": len(logs),
+            "by_level": {
+                "DEBUG": len([l for l in logs if l.get('level') == 'DEBUG']),
+                "INFO": len([l for l in logs if l.get('level') == 'INFO']),
+                "WARNING": len([l for l in logs if l.get('level') == 'WARNING']),
+                "ERROR": len([l for l in logs if l.get('level') == 'ERROR']),
+                "CRITICAL": len([l for l in logs if l.get('level') == 'CRITICAL'])
+            }
+        },
+        "statistics": {
+            "txt_files": job.get('txt_files_count', 0),
+            "screenshots": job.get('screenshot_files_count', 0),
+            "hands_parsed": job.get('hands_parsed', 0),
+            "matched_hands": job.get('matched_hands', 0),
+            "name_mappings": job.get('name_mappings_count', 0),
+            "processing_time": job.get('processing_time_seconds'),
+            "ocr_processed": job.get('ocr_processed_count', 0),
+            "ocr_total": job.get('ocr_total_count', 0)
+        },
+        "timestamps": {
+            "created_at": job.get('created_at'),
+            "started_at": job.get('started_at'),
+            "completed_at": job.get('completed_at')
+        },
+        "export_timestamp": datetime.utcnow().isoformat(),
+        "export_info": {
+            "exported_at": datetime.utcnow().isoformat(),
+            "exporter": "GGRevealer Debug System",
+            "version": "1.0.0"
+        }
+    }
+
+    # Save to storage/debug/
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"debug_job_{job_id}_{timestamp}.json"
+    filepath = DEBUG_PATH / filename
+
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(debug_info, f, indent=2, ensure_ascii=False)
+
+    return {
+        "success": True,
+        "message": f"Debug info exported to {filename}",
+        "filepath": str(filepath),
+        "filename": filename,
+        "data": debug_info
+    }
 
 
 @app.delete("/api/job/{job_id}")
