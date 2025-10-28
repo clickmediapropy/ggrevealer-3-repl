@@ -441,8 +441,8 @@ async def generate_claude_prompt(job_id: int):
 
     # Export debug JSON first (so Claude Code can read it)
     debug_export = _export_debug_json(job_id)
-    debug_json_path = debug_export['filepath'] if debug_export else None
-    debug_json_filename = debug_export['filename'] if debug_export else None
+    debug_json_path = debug_export['filepath'] if debug_export else "No disponible (error al exportar)"
+    debug_json_filename = debug_export['filename'] if debug_export else "debug_info.json"
 
     # Get all debug data
     files = get_job_files(job_id)

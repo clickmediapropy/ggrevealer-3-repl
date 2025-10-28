@@ -59,6 +59,7 @@ Get API key from: https://makersuite.google.com/app/apikey
 6. **Validate & Classify** → Split into `_resolved.txt` (clean) and `_fallado.txt` (has unmapped IDs)
 7. **Create ZIP archives** → Package resolved and failed files separately
 8. **Persist Logs** → Save structured logs to database for debugging
+9. **Auto-Export Debug JSON** → Automatically export comprehensive debug info to `storage/debug/` (runs on both success and failure)
 
 ### Key Modules
 
@@ -225,15 +226,26 @@ Violation of validation #1 or #10 will cause PokerTracker to REJECT the hand his
 ## Debugging Tips
 
 ### AI-Powered Debugging (Recommended)
+
+**IMPORTANT**: After every job completes (success or failure), a debug JSON is **automatically exported** to `storage/debug/debug_job_{id}_{timestamp}.json`
+
 ```bash
 # Use the built-in AI debugging endpoint
 curl -X POST http://localhost:5000/api/debug/{job_id}/generate-prompt
 ```
+
 This generates a Claude Code debugging prompt that:
+- **References the auto-exported debug JSON file** (instructs Claude Code to read it first)
 - Analyzes job metrics (match rate, OCR success rate, etc.)
 - Identifies specific problems (matching issues, OCR failures, etc.)
 - Suggests concrete files and functions to review
 - Provides actionable debugging steps
+
+**UI Features**:
+- Debug prompts are shown automatically in the frontend when errors occur
+- **"Regenerate" button**: Retry prompt generation if it comes empty or fails
+- **"Copy" button**: Copy the generated prompt to clipboard for use in Claude Code
+- Auto-exported JSON path is included in all prompts for easy reference
 
 ### Manual Debugging
 
@@ -272,11 +284,16 @@ Logs are also persisted to database and can be retrieved via:
 - Database: `SELECT * FROM logs WHERE job_id = ? ORDER BY timestamp DESC`
 
 #### Export full debug report
+**Note**: Debug JSON is **automatically exported** after every job completion.
+
+Manual export (if needed):
 ```bash
 # Export complete debug info to storage/debug/
 curl -X POST http://localhost:5000/api/debug/{job_id}/export
 ```
 Includes: job details, files, results, screenshot analysis, logs, and statistics
+
+The auto-exported file is named: `debug_job_{id}_{timestamp}.json`
 
 ## Critical Bug Fixes & Implementation Notes
 
@@ -370,6 +387,42 @@ Includes: job details, files, results, screenshot analysis, logs, and statistics
 - Useful for testing fixes without re-uploading files
 - Endpoint: `POST /api/process/{job_id}` (detects and handles reprocessing)
 - Location: `main.py:121-148`
+
+### Automatic Debug JSON Export (Oct 2025) 🆕
+**Feature**: Automatic export of comprehensive debug information after every job
+- **Triggers**: Runs automatically at end of `run_processing_pipeline()` (both success and failure)
+- **Location**: Exports to `storage/debug/debug_job_{id}_{timestamp}.json`
+- **Contents**: Complete job info, logs, screenshot results, statistics, errors
+- **Integration**: `_export_debug_json()` helper function for reusability
+- **Logging**: Confirms export with filepath in console and database logs
+- **Implementation**: `main.py:335-415` (helper), `main.py:1194-1201` (success), `main.py:1215-1222` (failure)
+
+### JSON-Referenced Debug Prompts (Oct 2025) 🆕
+**Feature**: AI-generated prompts include explicit reference to debug JSON file
+- **Gemini Integration**: Instructs Gemini AI to tell Claude Code to read the JSON first
+- **Fallback Support**: Even fallback prompts include JSON reference section
+- **User Benefit**: Claude Code gets full context from JSON before debugging
+- **Format**: Prompts start with "Lee el archivo {debug_json_path} para obtener información completa"
+- **Auto-Export**: JSON is exported before prompt generation to ensure it exists
+- **Implementation**: `main.py:570-576` (Gemini instruction), `main.py:706-720` (fallback)
+
+### UI Prompt Regeneration (Oct 2025) 🆕
+**Feature**: "Regenerate" button for retrying failed or empty prompt generation
+- **UI Elements**: Blue "Regenerar" button next to "Copiar" in both error sections
+- **Functionality**: Calls `/api/debug/{job_id}/generate-prompt` again on click
+- **Visual Feedback**: Shows spinning icon with "Regenerando..." text during request
+- **Error Handling**: Button stays enabled even after errors to allow unlimited retries
+- **Use Cases**: Empty prompts, Gemini API timeouts, transient errors
+- **Implementation**: `templates/index.html:186-188,280-282`, `static/js/app.js:643-647,721-736`
+
+### Copy Prompt Button Fix (Oct 2025) 🆕
+**Feature**: Reliable prompt copying with data attribute persistence
+- **Problem Fixed**: Previous implementation lost prompt text in JavaScript scope
+- **Solution**: Store prompt in button's `data-prompt-text` attribute
+- **Validation**: Checks for empty prompts and throws error to trigger regeneration
+- **Feedback**: Button changes to "✓ Copiado" in green for 2 seconds
+- **Logging**: Console shows prompt length for debugging
+- **Implementation**: `static/js/app.js:598-602,701-705`
 
 ## Known Limitations
 
