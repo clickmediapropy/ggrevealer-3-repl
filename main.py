@@ -28,6 +28,7 @@ from matcher import find_best_matches
 from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format
 from models import NameMapping
 from logger import get_job_logger
+import google.generativeai as genai
 
 app = FastAPI(
     title="GGRevealer API",
@@ -398,6 +399,175 @@ async def export_debug_info(job_id: int):
         "filename": filename,
         "data": debug_info
     }
+
+
+@app.post("/api/debug/{job_id}/generate-prompt")
+async def generate_claude_prompt(job_id: int):
+    """Generate a Claude Code debugging prompt using Gemini AI"""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get all debug data
+    files = get_job_files(job_id)
+    result = get_result(job_id)
+    screenshot_results = get_screenshot_results(job_id)
+    logs = get_job_logs(job_id, limit=1000)
+
+    # Filter error logs
+    error_logs = [l for l in logs if l.get('level') in ['ERROR', 'CRITICAL']]
+    warning_logs = [l for l in logs if l.get('level') == 'WARNING']
+
+    # Get failed screenshots
+    failed_screenshots = [s for s in screenshot_results if s.get('status') == 'error']
+
+    # Build context for Gemini
+    context = {
+        "job_id": job_id,
+        "status": job.get('status'),
+        "error_message": job.get('error_message'),
+        "statistics": {
+            "txt_files": job.get('txt_files_count', 0),
+            "screenshots": job.get('screenshot_files_count', 0),
+            "hands_parsed": job.get('hands_parsed', 0),
+            "matched_hands": job.get('matched_hands', 0),
+            "name_mappings": job.get('name_mappings_count', 0),
+            "ocr_processed": job.get('ocr_processed_count', 0),
+            "ocr_total": job.get('ocr_total_count', 0)
+        },
+        "timestamps": {
+            "created_at": job.get('created_at'),
+            "started_at": job.get('started_at'),
+            "completed_at": job.get('completed_at'),
+            "processing_time_seconds": job.get('processing_time_seconds')
+        },
+        "error_logs": error_logs[:10],  # Last 10 errors
+        "warning_logs": warning_logs[:10],  # Last 10 warnings
+        "failed_screenshots": failed_screenshots[:5],  # First 5 failed screenshots
+        "screenshot_summary": {
+            "total": len(screenshot_results),
+            "success": len([s for s in screenshot_results if s.get('status') == 'success']),
+            "warning": len([s for s in screenshot_results if s.get('status') == 'warning']),
+            "error": len([s for s in screenshot_results if s.get('status') == 'error'])
+        }
+    }
+
+    # If job has result with detailed stats, include them
+    if result and result.get('stats'):
+        context["result_stats"] = result['stats']
+
+    # Configure Gemini
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key or api_key == 'your_gemini_api_key_here':
+        # Fallback: generate simple prompt without AI
+        return {
+            "success": False,
+            "message": "GEMINI_API_KEY not configured",
+            "prompt": _generate_fallback_prompt(context)
+        }
+
+    try:
+        genai.configure(api_key=api_key)
+        # Use Gemini 2.5 Flash with thinking mode for better debugging analysis
+        model = genai.GenerativeModel('gemini-2.5-flash')
+
+        # Create prompt for Gemini
+        gemini_prompt = f"""Eres un experto en debugging de aplicaciones Python y análisis de errores.
+
+Tu tarea es generar un prompt claro, detallado y accionable para Claude Code que le ayude a debuggear un error en GGRevealer (una aplicación FastAPI que desanonimiza hand histories de poker usando OCR con Gemini Vision).
+
+**INFORMACIÓN DEL ERROR:**
+
+{json.dumps(context, indent=2, ensure_ascii=False)}
+
+**ARQUITECTURA DE GGREVEALER:**
+- Backend: FastAPI + SQLite + Google Gemini Vision API
+- Pipeline: Upload → Parse TXT files → OCR Screenshots → Match Hands → Generate Mappings → Write Outputs
+- Archivos clave:
+  - main.py: Pipeline principal y API endpoints
+  - parser.py: Parsing de GGPoker hand histories
+  - ocr.py: OCR con Gemini 2.5 Flash Vision
+  - matcher.py: Matching inteligente de hands con screenshots
+  - writer.py: Generación de outputs con validaciones PokerTracker
+  - database.py: SQLite con tablas jobs, files, results, screenshot_results, logs
+  - logger.py: Sistema de logging estructurado
+
+**TU TAREA:**
+Genera un prompt en español para Claude Code que:
+
+1. **Explique el problema claramente**: Resume el error principal y su contexto
+2. **Proporcione estadísticas clave**: Qué funcionó y qué falló (OCR, matching, parsing, etc.)
+3. **Liste los errores específicos**: Extrae los mensajes de error más relevantes de los logs
+4. **Sugiera áreas a investigar**: Basándote en los errores, indica qué archivos o funciones revisar
+5. **Incluya pasos de debugging**: Qué debería hacer Claude Code primero
+6. **Sea accionable**: Que Claude Code pueda empezar a debuggear inmediatamente con esa información
+
+**FORMATO DEL PROMPT:**
+Usa markdown con secciones claras. Sé conciso pero completo. Prioriza la información más relevante.
+
+Genera SOLO el prompt para Claude Code, sin explicaciones adicionales ni metadatos."""
+
+        # Call Gemini
+        response = await asyncio.to_thread(
+            model.generate_content,
+            gemini_prompt,
+            generation_config={
+                "temperature": 0.3,  # Low temperature for consistent, focused output
+                "top_p": 0.8,
+                "top_k": 40,
+                "max_output_tokens": 2048,
+            }
+        )
+
+        generated_prompt = response.text.strip()
+
+        return {
+            "success": True,
+            "prompt": generated_prompt,
+            "context": context
+        }
+
+    except Exception as e:
+        print(f"Error calling Gemini for prompt generation: {e}")
+        return {
+            "success": False,
+            "message": f"Error generating prompt: {str(e)}",
+            "prompt": _generate_fallback_prompt(context)
+        }
+
+
+def _generate_fallback_prompt(context: dict) -> str:
+    """Generate a basic prompt when Gemini is not available"""
+    error_msg = context.get('error_message', 'Error desconocido')
+    stats = context.get('statistics', {})
+    error_logs = context.get('error_logs', [])
+
+    prompt = f"""Tengo un error en GGRevealer (Job #{context.get('job_id')}) y necesito ayuda para debuggearlo.
+
+## Error Principal
+{error_msg}
+
+## Estadísticas del Job
+- Archivos TXT: {stats.get('txt_files', 0)}
+- Screenshots: {stats.get('screenshots', 0)}
+- Manos parseadas: {stats.get('hands_parsed', 0)}
+- Manos matched: {stats.get('matched_hands', 0)}
+- OCR procesados: {stats.get('ocr_processed', 0)}/{stats.get('ocr_total', 0)}
+
+## Logs de Error
+"""
+
+    if error_logs:
+        for log in error_logs[:5]:
+            prompt += f"\n[{log.get('level')}] {log.get('message')}"
+            if log.get('extra_data'):
+                prompt += f"\n  Datos: {json.dumps(log.get('extra_data'))}"
+    else:
+        prompt += "\nNo hay logs de error específicos disponibles."
+
+    prompt += "\n\nPor favor, ayúdame a debuggear este problema. Los archivos principales están en main.py, parser.py, ocr.py, matcher.py, writer.py y database.py."
+
+    return prompt
 
 
 @app.delete("/api/job/{job_id}")

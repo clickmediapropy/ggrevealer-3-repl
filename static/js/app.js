@@ -385,6 +385,16 @@ async function showResults(job) {
     // Display successful and failed files
     displayFileResults(detailedStats);
 
+    // Check if there are partial errors (failed files, OCR errors, warnings)
+    const hasPartialErrors =
+        (detailedStats.failed_files && detailedStats.failed_files.length > 0) ||
+        (stats.screenshots_error && stats.screenshots_error > 0) ||
+        (detailedStats.validation_warnings && detailedStats.validation_warnings.length > 0);
+
+    if (hasPartialErrors) {
+        await generatePartialErrorPrompt(currentJobId);
+    }
+
     // Load debugging info
     await loadDebugInfo(currentJobId);
 
@@ -539,10 +549,123 @@ function displayFileResults(stats) {
     }
 }
 
-function showError(message) {
+async function showError(message) {
     processingSection.classList.add('d-none');
     errorSection.classList.remove('d-none');
     errorMessage.textContent = message;
+
+    // Generate Claude Code prompt
+    await generateErrorPrompt(currentJobId, message);
+}
+
+async function generateErrorPrompt(jobId, errorMessage) {
+    const promptText = document.getElementById('error-prompt-text');
+    const copyBtn = document.getElementById('copy-error-prompt-btn');
+
+    if (!promptText) return;
+
+    try {
+        // Show loading state
+        promptText.innerHTML = '<div class="text-muted"><i class="bi bi-hourglass-split"></i> Generando prompt con Gemini AI...</div>';
+        if (copyBtn) copyBtn.disabled = true;
+
+        // Call Gemini-powered endpoint
+        const response = await fetch(`${API_BASE}/api/debug/${jobId}/generate-prompt`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate prompt');
+        }
+
+        const result = await response.json();
+        const prompt = result.prompt;
+
+        // Display generated prompt
+        promptText.textContent = prompt;
+
+        // Setup copy button
+        if (copyBtn) {
+            copyBtn.disabled = false;
+            copyBtn.onclick = () => copyToClipboard(prompt, copyBtn);
+        }
+
+        // Show success indicator if Gemini was used
+        if (result.success) {
+            console.log('✅ Prompt generado exitosamente con Gemini AI');
+        } else {
+            console.log('⚠️ Usando prompt de fallback:', result.message);
+        }
+
+    } catch (error) {
+        console.error('Error generating Claude Code prompt:', error);
+
+        // Show fallback error message
+        promptText.innerHTML = `
+            <div class="text-danger mb-2">
+                <i class="bi bi-exclamation-triangle"></i> Error al generar prompt automáticamente
+            </div>
+            <div class="small">
+                Por favor, copia manualmente esta información:<br><br>
+                <strong>Error:</strong> ${errorMessage}<br>
+                <strong>Job ID:</strong> ${jobId}<br><br>
+                Revisa los logs del job para más detalles.
+            </div>
+        `;
+
+        if (copyBtn) copyBtn.disabled = true;
+    }
+}
+
+async function generatePartialErrorPrompt(jobId) {
+    const promptSection = document.getElementById('partial-error-claude-prompt');
+    const promptText = document.getElementById('partial-error-prompt-text');
+    const copyBtn = document.getElementById('copy-partial-error-prompt-btn');
+
+    if (!promptSection || !promptText) return;
+
+    try {
+        // Show the prompt section
+        promptSection.classList.remove('d-none');
+
+        // Show loading state
+        promptText.innerHTML = '<div class="text-muted"><i class="bi bi-hourglass-split"></i> Generando prompt con Gemini AI...</div>';
+        if (copyBtn) copyBtn.disabled = true;
+
+        // Call Gemini-powered endpoint
+        const response = await fetch(`${API_BASE}/api/debug/${jobId}/generate-prompt`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate prompt');
+        }
+
+        const result = await response.json();
+        const prompt = result.prompt;
+
+        // Display generated prompt
+        promptText.textContent = prompt;
+
+        // Setup copy button
+        if (copyBtn) {
+            copyBtn.disabled = false;
+            copyBtn.onclick = () => copyToClipboard(prompt, copyBtn);
+        }
+
+        // Show success indicator if Gemini was used
+        if (result.success) {
+            console.log('✅ Prompt de errores parciales generado con Gemini AI');
+        } else {
+            console.log('⚠️ Usando prompt de fallback para errores parciales');
+        }
+
+    } catch (error) {
+        console.error('Error generating partial error prompt:', error);
+
+        // Hide section on error
+        promptSection.classList.add('d-none');
+    }
 }
 
 function resetToWelcome() {
@@ -804,6 +927,25 @@ function renderLogs(logs, levelFilter = '') {
 
     // Auto-scroll to bottom to show most recent logs
     logsContainer.scrollTop = logsContainer.scrollHeight;
+}
+
+function copyToClipboard(text, button) {
+    navigator.clipboard.writeText(text).then(() => {
+        // Show success feedback
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check-circle"></i> Copiado';
+        button.classList.remove('btn-outline-dark', 'btn-outline-primary');
+        button.classList.add('btn-success');
+
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-dark');
+        }, 2000);
+    }).catch(err => {
+        console.error('Error copying to clipboard:', err);
+        alert('Error al copiar al portapapeles');
+    });
 }
 
 async function exportDebugData(jobId, debugData) {
