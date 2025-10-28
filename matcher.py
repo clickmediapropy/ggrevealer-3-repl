@@ -278,19 +278,28 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     if hero_seat and screenshot.hero_name:
         mapping['Hero'] = screenshot.hero_name
         used_names.add(screenshot.hero_name)
-        print(f"[DEBUG] Mapped Hero: {hero_seat.seat_number} -> {screenshot.hero_name}")
+        print(f"[DEBUG] Mapped Hero: Seat {hero_seat.seat_number} -> {screenshot.hero_name}")
     else:
         print(f"[DEBUG] Hero mapping failed: hero_seat={hero_seat}, screenshot.hero_name={screenshot.hero_name}")
 
     # Second pass: Map other players by seat position
+    # IMPORTANT: Exclude hero from screenshot candidates to avoid duplicate mapping
+    # (PokerCraft shows Hero visually at position 1 regardless of actual seat number)
+    non_hero_players = [
+        ps for ps in screenshot.all_player_stacks
+        if ps.player_name != screenshot.hero_name
+    ]
+
+    print(f"[DEBUG] Non-hero players available for mapping: {[(ps.position, ps.player_name) for ps in non_hero_players]}")
+
     unmapped_seats = []
     for seat in hand.seats:
         if seat.player_id == 'Hero':
             continue  # Already mapped above
 
-        # Find player in same seat position in screenshot
+        # Find player in same seat position in screenshot (excluding hero)
         matching_player = next(
-            (ps for ps in screenshot.all_player_stacks if ps.position == seat.seat_number),
+            (ps for ps in non_hero_players if ps.position == seat.seat_number),
             None
         )
 
