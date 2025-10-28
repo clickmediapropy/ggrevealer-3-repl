@@ -176,7 +176,7 @@ class GGPokerHandHistoryValidator:
         """
         Validation #1: Pot Size (MOST CRITICAL - 40% of failures)
 
-        Validates: Total pot = Sum(all bets) - Rake - Jackpot fees
+        Validates: Total pot = Sum(collected amounts) + Rake + Jackpot fees
 
         Common failure: Cash Drop (1BB fee on pots > 30BB) not accounted for
         """
@@ -195,13 +195,14 @@ class GGPokerHandHistoryValidator:
                 ))
                 return results
 
-            # Calculate expected pot from actions
-            total_bets = self._sum_all_actions(hand_history)
+            # Calculate expected pot: collected + rake + jackpot
+            # This is simpler and more reliable than summing all actions
+            collected_amounts = self._sum_collected_amounts(hand_history)
             rake = self._extract_rake(hand_history)
             jackpot_fee = self._detect_jackpot_fees(hand_history)
 
             # Calculate expected pot
-            expected_pot = total_bets - rake - jackpot_fee
+            expected_pot = collected_amounts + rake + jackpot_fee
 
             # Validate with 0.01 tolerance (floating point errors)
             difference = abs(reported_pot - expected_pot)
@@ -212,13 +213,13 @@ class GGPokerHandHistoryValidator:
                     validation_name="pot_size",
                     severity=ErrorSeverity.CRITICAL,
                     error_type="INVALID_POT_SIZE",
-                    message=f"Invalid pot size ({reported_pot} vs pot:{total_bets} "
-                           f"rake:{rake} jpt:{jackpot_fee})",
+                    message=f"Invalid pot size ({reported_pot} vs collected:{collected_amounts} + "
+                           f"rake:{rake} + jpt:{jackpot_fee} = {expected_pot})",
                     recommended_action="REJECT_HAND",
                     metadata={
                         "reported_pot": float(reported_pot),
                         "calculated_pot": float(expected_pot),
-                        "total_bets": float(total_bets),
+                        "collected_amounts": float(collected_amounts),
                         "rake": float(rake),
                         "jackpot_fee": float(jackpot_fee),
                         "difference": float(difference)
@@ -252,7 +253,7 @@ class GGPokerHandHistoryValidator:
 
         try:
             # Extract stated blinds from header
-            header_match = re.search(r'\(\$([\\d.]+)/\$([\\d.]+)\)', hand_history)
+            header_match = re.search(r'\(\$([\d.]+)/\$([\d.]+)\)', hand_history)
             if not header_match:
                 # Might be tournament format
                 results.append(PT4ValidationResult(
@@ -266,8 +267,8 @@ class GGPokerHandHistoryValidator:
             stated_bb = Decimal(header_match.group(2))
 
             # Extract posted blinds
-            sb_post_match = re.search(r'posts small blind \$([\\d.]+)', hand_history)
-            bb_post_match = re.search(r'posts big blind \$([\\d.]+)', hand_history)
+            sb_post_match = re.search(r'posts small blind \$?([\d.]+)', hand_history)
+            bb_post_match = re.search(r'posts big blind \$?([\d.]+)', hand_history)
 
             if not sb_post_match or not bb_post_match:
                 results.append(PT4ValidationResult(
@@ -319,7 +320,7 @@ class GGPokerHandHistoryValidator:
         results = []
 
         try:
-            seat_pattern = r'Seat \\d+: ([^(]+) \\(\$([\\d.]+) in chips\\)'
+            seat_pattern = r'Seat \d+: ([^(]+) \(\$?([\d.]+) in chips\)'
             seats = re.findall(seat_pattern, hand_history)
 
             invalid_stacks = []
@@ -363,7 +364,7 @@ class GGPokerHandHistoryValidator:
         results = []
 
         # Validate Hand ID
-        hand_id_match = re.search(r'Poker Hand #([A-Z]{2}\\d+):', hand_history)
+        hand_id_match = re.search(r'Poker Hand #([A-Z]{2}\d+):', hand_history)
         if not hand_id_match:
             results.append(PT4ValidationResult(
                 result_type=ValidationResultType.ERROR,
@@ -390,7 +391,7 @@ class GGPokerHandHistoryValidator:
 
         # Validate timestamp
         timestamp_match = re.search(
-            r'- (\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2})',
+            r'- (\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})',
             hand_history
         )
         if not timestamp_match:
@@ -434,7 +435,7 @@ class GGPokerHandHistoryValidator:
         results = []
 
         try:
-            seat_pattern = r'Seat \\d+: ([^(]+) \\('
+            seat_pattern = r'Seat \d+: ([^(]+) \('
             players = re.findall(seat_pattern, hand_history)
 
             invalid_players = []
@@ -500,14 +501,39 @@ class GGPokerHandHistoryValidator:
             all_cards = []
 
             # Extract board cards
-            board_pattern = r'\\*\\*\\* (?:FLOP|TURN|RIVER|FIRST FLOP|SECOND FLOP) \\*\\*\\* \\[([^\\]]+)\\]'
-            board_matches = re.findall(board_pattern, hand_history)
-            for board_str in board_matches:
+            # Note: TURN and RIVER show all previous cards plus new ones
+            # FLOP: [9d Ac Th]
+            # TURN: [9d Ac Th] [8s] <- only extract [8s]
+            # RIVER: [9d Ac Th 8s] [Tc] <- only extract [Tc]
+
+            # Extract FLOP cards (all cards)
+            flop_match = re.search(r'\*\*\* FLOP \*\*\* \[([^\]]+)\]', hand_history)
+            if flop_match:
+                cards = flop_match.group(1).split()
+                all_cards.extend(cards)
+
+            # Extract TURN card (only the last bracket)
+            turn_match = re.search(r'\*\*\* TURN \*\*\* \[[^\]]+\] \[([^\]]+)\]', hand_history)
+            if turn_match:
+                cards = turn_match.group(1).split()
+                all_cards.extend(cards)
+
+            # Extract RIVER card (only the last bracket)
+            river_match = re.search(r'\*\*\* RIVER \*\*\* \[[^\]]+\] \[([^\]]+)\]', hand_history)
+            if river_match:
+                cards = river_match.group(1).split()
+                all_cards.extend(cards)
+
+            # Handle RIT (Run It Twice) format
+            rit_pattern = r'\*\*\* (?:FIRST|SECOND|THIRD) (?:FLOP|TURN|RIVER) \*\*\* \[([^\]]+)\]'
+            rit_matches = re.findall(rit_pattern, hand_history)
+            for board_str in rit_matches:
                 cards = board_str.split()
+                # For RIT, add all cards as they're separate runouts
                 all_cards.extend(cards)
 
             # Extract hero cards
-            hero_cards_match = re.search(r'Dealt to Hero \\[([^\\]]+)\\]', hand_history)
+            hero_cards_match = re.search(r'Dealt to Hero \[([^\]]+)\]', hand_history)
             if hero_cards_match:
                 hero_cards = hero_cards_match.group(1).split()
                 all_cards.extend(hero_cards)
@@ -567,8 +593,10 @@ class GGPokerHandHistoryValidator:
 
         try:
             # Extract game type
+            # Cash format: "Poker Hand #RC123: Hold'em No Limit ($0.10/$0.20)"
+            # Tournament format: "Poker Hand #SG123: Tournament #456, Hold'em No Limit - Level1"
             game_type_match = re.search(
-                r'Poker Hand #[A-Z]{2}\\d+: ([^(]+) \\(',
+                r'Poker Hand #[A-Z]{2}\d+: (?:Tournament #\d+, )?([^-\(]+)',
                 hand_history
             )
 
@@ -590,10 +618,19 @@ class GGPokerHandHistoryValidator:
                 "Hold'em Pot Limit",
                 "Omaha Pot Limit",
                 "Omaha-5 Pot Limit",
-                "Omaha-6 Pot Limit"
+                "Omaha-6 Pot Limit",
+                "Spin&Gold #5 Hold'em No Limit",  # Tournament format
+                "Spin&Gold"  # Partial match for tournament variants
             ]
 
-            if game_type not in supported_games:
+            # Check if game type matches any supported games
+            is_supported = False
+            for supported in supported_games:
+                if supported in game_type:
+                    is_supported = True
+                    break
+
+            if not is_supported:
                 results.append(PT4ValidationResult(
                     result_type=ValidationResultType.WARNING,
                     validation_name="game_type",
@@ -643,7 +680,7 @@ class GGPokerHandHistoryValidator:
             streets = ['PREFLOP', 'FLOP', 'TURN', 'RIVER']
 
             for street in streets:
-                street_pattern = rf'\\*\\*\\* {street} \\*\\*\\*(.*?)(?=\\*\\*\\*|$)'
+                street_pattern = rf'\*\*\* {street} \*\*\*(.*?)(?=\*\*\*|$)'
                 street_match = re.search(street_pattern, hand_history, re.DOTALL)
 
                 if not street_match:
@@ -711,7 +748,7 @@ class GGPokerHandHistoryValidator:
         try:
             # Look for side pot information
             side_pot_match = re.search(
-                r'Total pot \\$([\\d,]+)(?: \\| Main pot \\$([\\d,]+)\\. Side pot \\$([\\d,]+)\\.)?',
+                r'Total pot \$([\d,]+)(?: \| Main pot \$([\d,]+)\. Side pot \$([\d,]+)\.)?',
                 hand_history
             )
 
@@ -784,7 +821,7 @@ class GGPokerHandHistoryValidator:
         player = cashout_player_match.group(1).strip() if cashout_player_match else "Unknown"
 
         cashout_amount_match = re.search(
-            r'Pays C?\\$([\\d.]+)',
+            r'Pays C?\$([\d.]+)',
             hand_history
         )
         amount = cashout_amount_match.group(1) if cashout_amount_match else "Unknown"
@@ -840,7 +877,7 @@ class GGPokerHandHistoryValidator:
         """Extract total pot from summary section"""
         try:
             # GGPoker format: "Total pot 1,250 | Rake 0 | Jackpot 0..."
-            pot_match = re.search(r'Total pot ([\\d,]+)', hand_history)
+            pot_match = re.search(r'Total pot ([\d,]+)', hand_history)
             if pot_match:
                 pot_str = pot_match.group(1).replace(',', '')
                 return Decimal(pot_str)
@@ -851,7 +888,7 @@ class GGPokerHandHistoryValidator:
     def _extract_rake(self, hand_history: str) -> Decimal:
         """Extract rake from summary section"""
         try:
-            rake_match = re.search(r'Rake ([\\d,]+)', hand_history)
+            rake_match = re.search(r'Rake ([\d,]+)', hand_history)
             if rake_match:
                 rake_str = rake_match.group(1).replace(',', '')
                 return Decimal(rake_str)
@@ -868,7 +905,7 @@ class GGPokerHandHistoryValidator:
         """
         try:
             # Extract jackpot from summary if present
-            jackpot_match = re.search(r'Jackpot ([\\d,]+)', hand_history)
+            jackpot_match = re.search(r'Jackpot ([\d,]+)', hand_history)
             if jackpot_match:
                 jackpot_str = jackpot_match.group(1).replace(',', '')
                 return Decimal(jackpot_str)
@@ -880,50 +917,26 @@ class GGPokerHandHistoryValidator:
         except (InvalidOperation, AttributeError):
             return Decimal('0')
 
-    def _sum_all_actions(self, hand_history: str) -> Decimal:
+    def _sum_collected_amounts(self, hand_history: str) -> Decimal:
         """
-        Sum all bets, calls, raises, and forced bets (blinds, antes, straddles)
+        Sum all collected amounts from the hand
 
-        Returns total money that went into the pot
+        This is the most reliable way to validate pot size:
+        Total pot = Sum(collected) + Rake + Jackpot
         """
         total = Decimal('0')
 
         try:
-            # Extract all monetary actions
-            # Blinds
-            blinds = re.findall(r'posts (?:small|big) blind \\$([\\d.]+)', hand_history)
-            for blind in blinds:
-                total += Decimal(blind)
-
-            # Antes
-            antes = re.findall(r'posts ante \\$([\\d.]+)', hand_history)
-            for ante in antes:
-                total += Decimal(ante)
-
-            # Straddles
-            straddles = re.findall(r'posts straddle \\$([\\d.]+)', hand_history)
-            for straddle in straddles:
-                total += Decimal(straddle)
-
-            # Bets
-            bets = re.findall(r'(?:bets|calls) \\$([\\d.]+)', hand_history)
-            for bet in bets:
-                total += Decimal(bet)
-
-            # Raises (extract "to" amount)
-            raises = re.findall(r'raises \\$[\\d.]+ to \\$([\\d.]+)', hand_history)
-            for raise_amount in raises:
-                total += Decimal(raise_amount)
-
-            # Collected amounts (subtract from total as they're payouts)
-            collected = re.findall(r'collected \\$([\\d,]+)', hand_history)
-            for collect in collected:
-                collect_str = collect.replace(',', '')
-                # Don't subtract collected - it's the result, not input
-                pass
+            # Extract collected amounts
+            # Tournament format: "collected 800 from pot"
+            # Cash format: "collected $12.10 from pot"
+            collected = re.findall(r'collected \$?([\d,]+)', hand_history)
+            for collect_str in collected:
+                collect_cleaned = collect_str.replace(',', '')
+                total += Decimal(collect_cleaned)
 
         except (InvalidOperation, AttributeError) as e:
-            print(f"Error summing actions: {e}")
+            print(f"Error summing collected amounts: {e}")
 
         return total
 
