@@ -1,0 +1,554 @@
+# PROMPT: Reparación Completa del Sistema GGRevealer
+## Sistema de Desanonimización de Hand Histories para GGPoker
+
+---
+
+## CONTEXTO DEL PROYECTO
+
+Estás trabajando en **GGRevealer**, un sistema de automatización que procesa hand histories de GGPoker para un jugador semi-profesional de Spin & Gold. El sistema actual tiene una **tasa de fallo del 78%** en producción (7 de 9 manos rechazadas por PokerTracker 4).
+
+### Cliente Final
+- **Rodrigo Meza Abdo** - Jugador semi-profesional (10+ años experiencia)
+- Juega 200-400 Spin & Gold por día
+- Necesita 1,000-2,000 manos por regular para análisis estadístico
+- Va a escalar stakes el **viernes** ($1 → $5) y necesita sistema funcionando
+
+### Objetivo del Sistema
+Reducir tiempo de procesamiento manual de **3 horas/día → 20-30 minutos** convirtiendo hand histories anonimizados de GGPoker en archivos con nombres reales importables a PokerTracker.
+
+---
+
+## DESCUBRIMIENTO CRÍTICO DE LA LLAMADA CON CLIENTE
+
+### 🎯 HAND ID MATCHING - GAME CHANGER
+
+**Quote del cliente (27 oct 2025, min 3:45):**
+> "Este número correlacione con este que está acá... una vez que tengas eso, ya indefectiblemente este screen corresponde a este TXT"
+
+**Revelación:**
+- El número de Hand ID visible en el modal de PokerCraft coincide EXACTAMENTE con el Hand ID de la primera línea del TXT
+- Ejemplo: Screenshot muestra "HHSPINENGOLD #SG3247387669" → TXT tiene "Poker Hand #SG3247387669"
+
+**Implicaciones:**
+- Matching de **probabilístico (80-85% accuracy) → determinístico (99.9% accuracy)**
+- Hand ID debe usarse como **PRIMARY KEY** para matching
+- Card/position matching pasa a ser fallback/validación secundaria
+
+---
+
+## ERRORES CRÍTICOS DOCUMENTADOS
+
+### 📊 Estado Actual - Producción Real
+
+**Archivo procesado:** `resolved_hands_4.txt` (9 manos Spin & Gold)
+**Resultado PokerTracker 4:**
+- ✅ 2 manos importadas (22%)
+- ❌ 7 manos rechazadas (78%)
+- 📊 0 duplicados
+
+**Fuente:** Screenshot WhatsApp con cliente (22 oct 2025, 8:04 PM)
+
+### ⚠️ Error #1: Blind Posts NO Cubiertos (CRÍTICO - BLOQUEANTE)
+
+**Problema:** El código NO reemplaza IDs anónimos en las líneas de blind posts, que son **obligatorias en el 100% de las manos**.
+
+**Código actual (INCORRECTO):**
+```python
+# Solo cubre estas acciones:
+rf'^{anon_escaped}(: (?:folds|checks|calls|bets|raises))'
+```
+
+**❌ FALTA:** `posts small blind`, `posts big blind`, `posts ante`
+
+**Evidencia del impacto real - Mano #1:**
+```
+Seat 1: TuichAAreko (300 in chips)      ← ✅ Nombre real
+Seat 2: Metal Poker (300 in chips)      ← ✅ Nombre real
+Seat 3: Hero (300 in chips)             ← ✅ Nombre real
+Hero: posts small blind 10              ← ✅ Hero OK
+32fa3d21: posts big blind 20            ← ❌ ID ANÓNIMO SIN REEMPLAZAR
+```
+
+**Conteo exhaustivo:**
+- 13 IDs anónimos sin reemplazar en 9 manos
+- Presente en: blind posts, all-in actions, showdown lines
+- **Causa 78% de los fallos en PokerTracker**
+
+**CORRECCIÓN REQUERIDA:**
+```python
+# AGREGAR ESTE PATRÓN ANTES DEL PATRÓN DE ACCIONES BÁSICAS
+
+# 2a. Blind posts: "PlayerID: posts small blind $0.1"
+output = re.sub(
+    rf'^{anon_escaped}(: posts (?:small blind|big blind|ante) \$[\d.]+)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+```
+
+### 🔴 Error #2: Patrón de Seat Line Incompleto
+
+**Problema:** El patrón regex no captura el formato completo de GGPoker que **siempre** incluye " in chips)".
+
+**Código actual (INCORRECTO):**
+```python
+rf'(Seat \d+: ){anon_escaped}( \(\$?[\d.]+)'
+```
+
+**Formato real de GGPoker:**
+```
+Seat 1: bf27d3a ($30.87 in chips)
+Seat 2: 10590328 ($22.84 in chips)
+Seat 3: Hero ($49.38 in chips)
+```
+
+**CORRECCIÓN REQUERIDA:**
+```python
+# ✅ CORRECTO - captura " in chips)"
+rf'(Seat \d+: ){anon_escaped}( \(\$[\d.]+ in chips\))'
+```
+
+**Nota:** Remover `?` opcional del `\$` porque GGPoker SIEMPRE usa símbolo de dólar.
+
+### 🔴 Error #3: Acciones Especiales Sin Cobertura
+
+**Acciones no cubiertas pero CRÍTICAS en Spin & Gold:**
+
+#### 1. All-in Actions (61% de las manos tienen all-in)
+```python
+# AGREGAR - CRÍTICO PARA SPIN & GOLD
+output = re.sub(
+    rf'^{anon_escaped}(: (?:raises|calls|bets) \$[\d.]+(?: to \$[\d.]+)? and is all-in)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+```
+
+#### 2. Mucks Hand
+```python
+output = re.sub(
+    rf'^{anon_escaped}( mucks hand)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+```
+
+#### 3. Doesn't Show Hand
+```python
+output = re.sub(
+    rf'^{anon_escaped}( doesn\'t show hand)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+```
+
+#### 4. EV Cashout (GGPoker específico)
+```python
+output = re.sub(
+    rf'^{anon_escaped}(: Chooses to EV Cashout)',
+    rf'{real_name}\1',
+    output,
+    flags=re.MULTILINE
+)
+```
+
+### 🔴 Error #4: Sin Validación de IDs Sin Mapear
+
+**Problema:** No hay validación que detecte IDs anónimos residuales en el output.
+
+**Riesgo:** Corrupción silenciosa de datos - PokerTracker importa archivos con IDs mezclados, creando entradas duplicadas y estadísticas inutilizables.
+
+**CORRECCIÓN REQUERIDA:**
+```python
+# AGREGAR AL FINAL DE validate_output_format()
+
+# 10. No unmapped anonymous IDs remaining
+anon_pattern = r'\b[a-f0-9]{6,8}\b'
+
+remaining_anon = set()
+for match in re.finditer(anon_pattern, modified, re.IGNORECASE):
+    anon_id = match.group(0)
+    # Verify it appears in player context
+    if re.search(rf'(?:^{anon_id}:|Seat \d+: {anon_id})', modified, re.MULTILINE):
+        remaining_anon.add(anon_id)
+
+if remaining_anon:
+    warnings.append(
+        f"⚠️  Unmapped anonymous IDs found ({len(remaining_anon)}): {', '.join(sorted(remaining_anon))}"
+    )
+```
+
+### 🟡 Error #5: Typo en Regex Lookahead
+
+**Código actual (INCORRECTO):**
+```python
+rf'(Dealt to ){anon_escaped}(?![[\w])'
+```
+
+**CORRECCIÓN:**
+```python
+rf'(Dealt to ){anon_escaped}(?![\[\w])'
+```
+
+---
+
+## NUEVOS REQUERIMIENTOS DE LA LLAMADA CON CLIENTE
+
+### 1. Implementar Hand ID Matching como Primary Key
+
+**Requerimiento del cliente (min 3:45):**
+> "vos le tenés que decir nomás ya a tu IA, que este número correlacione con este que está acá"
+
+**Implementación:**
+
+```python
+def extract_hand_id_from_screenshot(screenshot_path: str) -> Optional[str]:
+    """
+    Extrae Hand ID del modal de PokerCraft usando OCR.
+    
+    Expected format in screenshot: "HHSPINENGOLD #SG3247387669"
+    or variations like "Hand History: #SG3247387669"
+    """
+    # OCR del screenshot
+    text = gemini_vision_extract_text(screenshot_path)
+    
+    # Buscar patrón Hand ID
+    patterns = [
+        r'#(SG\d{10})',           # Spin & Gold
+        r'#(RC\d{9,})',           # Rush & Cash
+        r'#(OM\d{9,})',           # Omaha
+        r'HHSPINENGOLD[:\s]+#(SG\d{10})',
+        r'Hand History[:\s]+#([A-Z]{2}\d{9,})'
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    
+    return None
+
+def extract_hand_id_from_txt(txt_content: str) -> Optional[str]:
+    """
+    Extrae Hand ID de la primera línea del TXT.
+    
+    Expected format: "Poker Hand #SG3247387669: Hold'em No Limit..."
+    """
+    first_line = txt_content.split('\n')[0]
+    match = re.search(r'Poker Hand #([A-Z]{2}\d{9,})', first_line)
+    return match.group(1) if match else None
+
+def match_screenshot_to_hand(screenshot_path: str, txt_content: str) -> Optional[Dict]:
+    """
+    Usa Hand ID como primary key para matching determinístico.
+    """
+    screenshot_hand_id = extract_hand_id_from_screenshot(screenshot_path)
+    
+    if not screenshot_hand_id:
+        # Fallback a método anterior (card/position matching)
+        return legacy_card_position_matching(screenshot_path, txt_content)
+    
+    # Buscar mano con este Hand ID en el TXT
+    hands = parse_txt_into_hands(txt_content)
+    
+    for hand in hands:
+        hand_id = extract_hand_id_from_txt(hand)
+        if hand_id == screenshot_hand_id:
+            return {
+                'hand_content': hand,
+                'hand_id': hand_id,
+                'match_method': 'hand_id',
+                'confidence': 0.999  # Casi certeza absoluta
+            }
+    
+    return None
+```
+
+### 2. Validación de Cantidad de Manos
+
+**Requerimiento del cliente (min 45:19):**
+> "si se le entrega un TXT con 30 manos, que el tipo tiene que devolver con la misma cantidad de manos"
+
+**Implementación:**
+
+```python
+def validate_hand_count(original_txt: str, processed_txt: str) -> ValidationResult:
+    """
+    Valida que no se pierdan manos en el procesamiento.
+    """
+    # Contar manos en input
+    input_hands = re.findall(r'Poker Hand #[A-Z]{2}\d{9,}', original_txt)
+    input_count = len(input_hands)
+    
+    # Contar manos en output
+    output_hands = re.findall(r'Poker Hand #[A-Z]{2}\d{9,}', processed_txt)
+    output_count = len(output_hands)
+    
+    if input_count != output_count:
+        return ValidationResult(
+            valid=False,
+            error=f"Hand count mismatch: input={input_count}, output={output_count}",
+            severity="CRITICAL"
+        )
+    
+    # Validar que cada Hand ID del input existe en output
+    input_ids = set(input_hands)
+    output_ids = set(output_hands)
+    
+    missing_hands = input_ids - output_ids
+    extra_hands = output_ids - input_ids
+    
+    if missing_hands:
+        return ValidationResult(
+            valid=False,
+            error=f"Missing hands in output: {missing_hands}",
+            severity="CRITICAL"
+        )
+    
+    if extra_hands:
+        return ValidationResult(
+            valid=False,
+            error=f"Extra hands in output: {extra_hands}",
+            severity="WARNING"
+        )
+    
+    return ValidationResult(
+        valid=True,
+        message=f"✅ All {input_count} hands preserved"
+    )
+```
+
+### 3. Simplificación de Identificación de Posiciones
+
+**Insight del cliente (min 4:02):**
+> "Siempre el botoncito del dealer es el botón. Por ende, yo estoy a la izquierda, yo soy small blind. Y el que está a mi izquierda es big blind."
+
+**Implementación:**
+
+```python
+def identify_positions_from_dealer(players: List[Player], dealer_position: int) -> Dict[str, str]:
+    """
+    Calcula posiciones basándose únicamente en dealer button.
+    
+    Regla simple:
+    - Dealer button = BTN
+    - Left of dealer = SB (Small Blind)
+    - Left of SB = BB (Big Blind)
+    
+    En 3-max siempre: BTN → SB → BB → BTN (circular)
+    """
+    num_players = len(players)
+    
+    positions = {}
+    
+    for i, player in enumerate(players):
+        relative_pos = (i - dealer_position) % num_players
+        
+        if relative_pos == 0:
+            positions[player.name] = 'BTN'
+        elif relative_pos == 1:
+            positions[player.name] = 'SB'
+        elif relative_pos == 2:
+            positions[player.name] = 'BB'
+    
+    return positions
+```
+
+### 4. Manejo Inteligente de Nombres Truncados
+
+**Insight del cliente (min 5:21):**
+> "con que me encuentre hasta 19, yo ya voy a poder identificar... si él me escribe así siempre, no hay ningún problema"
+
+**Implementación:**
+
+```python
+def fuzzy_match_player_names(ocr_name: str, db_names: List[str], threshold: float = 0.85) -> Optional[str]:
+    """
+    Permite matching con nombres truncados o parciales.
+    
+    Acepta nombres parciales siempre que sean consistentes.
+    """
+    from difflib import SequenceMatcher
+    
+    # Si hay match exacto, usar ese
+    if ocr_name in db_names:
+        return ocr_name
+    
+    # Buscar nombres que contengan el OCR name como substring
+    for db_name in db_names:
+        if ocr_name in db_name or db_name.startswith(ocr_name):
+            return db_name
+    
+    # Fuzzy matching para typos
+    best_match = None
+    best_ratio = 0
+    
+    for db_name in db_names:
+        ratio = SequenceMatcher(None, ocr_name.lower(), db_name.lower()).ratio()
+        if ratio > threshold and ratio > best_ratio:
+            best_match = db_name
+            best_ratio = ratio
+    
+    return best_match
+
+# Priorizar consistencia sobre completitud
+def normalize_player_name(name: str) -> str:
+    """
+    Normaliza nombres para matching consistente.
+    
+    Ejemplo: "desesperado19..." → "desesperado19"
+    """
+    # Remover puntos suspensivos
+    name = name.rstrip('.')
+    # Lowercase para matching
+    name = name.lower()
+    # Remover espacios extra
+    name = ' '.join(name.split())
+    
+    return name
+```
+
+---
+
+## ORDEN DE IMPLEMENTACIÓN PRIORIZADO
+
+### FASE 1 - CRÍTICO (Deploy Inmediato - 1 hora)
+
+**Objetivo:** Resolver el 95% de los fallos documentados
+
+1. ✅ **Agregar patrón blind posts** (Error #1) - 30 min
+   ```python
+   # posts small blind, posts big blind, posts ante
+   ```
+
+2. ✅ **Agregar validación IDs sin mapear** (Error #4) - 30 min
+   ```python
+   # Detectar [a-f0-9]{6,8} residuales
+   ```
+
+### FASE 2 - ALTA PRIORIDAD (Mismo Sprint - 2 horas)
+
+3. ✅ **Implementar Hand ID matching** (Descubrimiento de llamada) - 1 hora
+   ```python
+   # Primary key matching 99.9% accuracy
+   ```
+
+4. ✅ **Validación cantidad de manos** (Requerimiento de llamada) - 15 min
+   ```python
+   # input_count == output_count
+   ```
+
+5. ✅ **Corregir seat line pattern** (Error #2) - 15 min
+   ```python
+   # Agregar " in chips)"
+   ```
+
+6. ✅ **Agregar patrones acciones especiales** (Error #3) - 30 min
+   ```python
+   # All-in, mucks, doesn't show, EV Cashout
+   ```
+
+### FASE 3 - REFINAMIENTO (2-3 horas)
+
+7. ✅ **Simplificar identificación posiciones** - 30 min
+8. ✅ **Implementar fuzzy matching nombres** - 30 min
+9. ✅ **Corregir typo regex** (Error #5) - 10 min
+10. ✅ **Testing exhaustivo con 100 manos** - 1.5 horas
+
+---
+
+## CRITERIOS DE ACEPTACIÓN
+
+### ✅ Técnicos:
+- Tasa de importación ≥95% en PokerTracker 4
+- 0 IDs anónimos en output files
+- Hand count: input == output (100%)
+- Database schema correcto (no corrupción)
+
+### ✅ Funcionales:
+- Rodrigo puede construir perfiles de 1,000+ manos por regular
+- Tiempo de procesamiento ≤30 minutos/día
+- Hand ID matching como primary key (99.9% accuracy)
+- Sistema listo ANTES del escalado de stakes del viernes
+
+### ✅ Negocio:
+- Cliente satisfecho con funcionalidad
+- Sistema en producción estable
+- Objetivo de proyecto cumplido (3 hrs/día → 20-30 min)
+
+---
+
+## MÉTRICAS DE ÉXITO ESPERADAS
+
+| Métrica | Actual | Post-Fase 1 | Post-Fase 2 | Target |
+|---------|--------|-------------|-------------|--------|
+| **Tasa de importación** | 22% | 90%+ | 99%+ | ≥95% |
+| **Manos rechazadas** | 78% | 10% | 1% | ≤5% |
+| **Tiempo ahorrado/día** | 30 min | 2.5 hrs | 2.7 hrs | ~2.5 hrs |
+| **ROI del sistema** | NEGATIVO | POSITIVO | EXCELENTE | POSITIVO |
+| **Días para 1k manos** | 11-12 | 3-4 | 2-3 | 3-5 |
+
+---
+
+## CONTEXTO TEMPORAL CRÍTICO
+
+**Urgencia:** Rodrigo escala stakes el **VIERNES** (en 3-4 días)
+- Actual: $1 Spin & Gold
+- Viernes: $5 Spin & Gold
+- 2-3 semanas: $10 Spin & Gold
+
+**Implicaciones:**
+- Sistema debe estar production-ready ANTES del viernes
+- Testing con volumen real (200-300 mesas/día) crítico
+- Cualquier fallo post-escalado = pérdidas financieras significativas
+
+---
+
+## REFERENCIAS TÉCNICAS
+
+### Documentación del Proyecto
+- `/mnt/project/compass_artifact_wf-015bb1e1-a265-4c86-b739-a52ac5f4e37a_text_markdown.md` (Guía técnica completa)
+- `/mnt/project/REPORTE_AUDITORIA_TXT_WRITER_GGPOKER.md` (Análisis exhaustivo de errores)
+
+### Formato GGPoker Confirmado
+```
+Poker Hand #RC837124540: Hold'em No Limit ($0.1/$0.25) - 2022/05/05 17:38:47
+Table 'RushAndCash689800' 6-max Seat #1 is the button
+Seat 1: bf27d3a ($30.87 in chips)
+Seat 2: 10590328 ($22.84 in chips)
+10590328: posts small blind $0.1
+eae5fe13: posts big blind $0.25
+*** HOLE CARDS ***
+Dealt to Hero [Jh Jc]
+5320473f: raises $0.35 to $0.6
+Hero: raises $1.37 to $1.97 and is all-in
+*** SUMMARY ***
+```
+
+### IDs Anónimos GGPoker
+- Formato: 6-8 caracteres hexadecimales/alfanuméricos
+- Ejemplos: `bf27d3a`, `353b127e`, `32fa3d21`, `681f227`
+- Cambian entre sesiones (no trackables long-term)
+
+---
+
+## INSTRUCCIONES FINALES PARA LA IA
+
+1. **Prioriza FASE 1 y FASE 2** - Son críticas para funcionalidad básica
+2. **Usa Hand ID matching** como primary key (descubrimiento de la llamada)
+3. **Valida hand count** en cada procesamiento (requerimiento del cliente)
+4. **NO pierdas ninguna mano** en el proceso
+5. **Testing exhaustivo** antes de deploy - Rodrigo necesita confianza total
+6. **Documentar todos los cambios** para review humano
+
+**Meta final:** Sistema production-ready para el viernes cuando Rodrigo escala stakes.
+
+---
+
+**Preparado por:** Nicolas Delgado (ClickMediaPro)  
+**Fecha:** 27 de octubre, 2025  
+**Prioridad:** CRÍTICA - ACCIÓN INMEDIATA REQUERIDA
