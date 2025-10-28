@@ -210,7 +210,7 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
         # 1. Seat lines: "Seat 1: PlayerID ($100 in chips)" or "Seat 1: PlayerID (100 in chips)"
         output = re.sub(
             rf'(Seat \d+: ){anon_escaped}( \(\$?[\d,.]+ in chips\))',
-            rf'\1{real_name}\2',
+            r'\g<1>' + real_name + r'\g<2>',
             output
         )
         
@@ -249,14 +249,14 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
         # 6. Dealt to (no cards): "Dealt to PlayerID"
         output = re.sub(
             rf'(Dealt to ){anon_escaped}(?![\[\w])',
-            rf'\1{real_name}',
+            r'\g<1>' + real_name,
             output
         )
         
         # 7. Dealt to (with cards): "Dealt to PlayerID [As Kh]"
         output = re.sub(
             rf'(Dealt to ){anon_escaped}( \[)',
-            rf'\1{real_name}\2',
+            r'\g<1>' + real_name + r'\g<2>',
             output
         )
         
@@ -295,14 +295,14 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
         # 12. Summary lines: "Seat 1: PlayerID (button)"
         output = re.sub(
             rf'(Seat \d+: ){anon_escaped}(\s+\()',
-            rf'\1{real_name}\2',
+            r'\g<1>' + real_name + r'\g<2>',
             output
         )
         
         # 13. Uncalled bet returned: "Uncalled bet ($10) returned to PlayerID"
         output = re.sub(
             rf'(returned to ){anon_escaped}\s*$',
-            rf'\1{real_name}',
+            r'\g<1>' + real_name,
             output,
             flags=re.MULTILINE
         )
