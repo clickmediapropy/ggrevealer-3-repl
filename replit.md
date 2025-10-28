@@ -56,12 +56,14 @@ The system employs a modular architecture with distinct components for parsing, 
 - `cdbe28b6` → TuichAAreko ❌ (wrong - from incorrect screenshot match)
 - `8e557da3` → TuichAAreko ❌ (wrong - from incorrect screenshot match)
 
-**Underlying Issue**: The matcher was sometimes assigning screenshots to incorrect hands, particularly in heads-up situations where the hero position and opponent positions didn't align properly with the screenshot data.
+**Underlying Issue**: The matcher was sometimes assigning screenshots to incorrect hands, causing multiple different anonymized IDs to map to the same real player name within a single hand.
 
 **Solution**: Enhanced `_build_seat_mapping()` in `matcher.py` to detect and prevent duplicate names **within individual hands**:
-1. **Hero Position Validation**: Before creating mappings, verify that Hero's seat position in the hand matches `hero_position` from the screenshot. If mismatch detected, return empty mapping (reject the match).
-2. **Duplicate Name Detection**: Track all `used_names` while building the mapping for each hand. If the same real name would be mapped to multiple different anonymized IDs within the same hand, return empty mapping (reject the match).
-3. **Per-Hand Scoping**: Validation operates on individual hand-screenshot pairs, allowing the same player to appear legitimately across different hands/tables.
+1. **Duplicate Name Detection**: Track all `used_names` while building the mapping for each hand. If the same real name would be mapped to multiple different anonymized IDs within the same hand, return empty mapping (reject the match).
+2. **Per-Hand Scoping**: Validation operates on individual hand-screenshot pairs, allowing the same player to appear legitimately across different hands/tables.
+3. **Match Rejection**: When duplicate detected, `find_best_matches()` skips that screenshot and continues searching for valid alternatives in all three matching paths (Hand ID, Filename, Fallback scoring).
+
+**Important Note**: Hero position validation was initially considered but removed because PokerCraft always displays the Hero at the bottom visually, regardless of their actual seat number in the hand history. This visual positioning doesn't correlate with seat numbers, making position-based validation incorrect.
 
 **Impact**: Prevents duplicate player names within the same hand by rejecting incorrect screenshot matches at the source. PokerTracker can now import all hands successfully. Rejected matches are logged with warnings including hand_id for diagnostics.
 
