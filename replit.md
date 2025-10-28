@@ -1,271 +1,37 @@
 # GGRevealer - Poker Hand De-anonymizer
 
 ## Overview
-GGRevealer is a complete web application that processes GGPoker hand history files and uses Google Gemini Vision API to de-anonymize player names from PokerCraft screenshots.
+GGRevealer is a web application designed to de-anonymize GGPoker hand history files. It processes these files in conjunction with PokerCraft screenshots, utilizing Google Gemini Vision API for optical character recognition (OCR). The primary purpose is to match anonymized player IDs from hand histories with real player names extracted from screenshots, generating PokerTracker-compatible hand history files with real names. The project aims to provide a robust solution for poker players to analyze their gameplay with complete player information.
 
-**Current State**: Fully functional MVP with backend API, database, and web frontend.
+## User Preferences
+I prefer simple language. I want iterative development. Ask before making major changes. I prefer detailed explanations. Do not make changes to the folder Z. Do not make changes to the file Y.
 
-**Last Updated**: October 27, 2025
+## System Architecture
 
-## Purpose
-De-anonymize GGPoker hand histories by matching them with screenshots from PokerCraft using OCR and intelligent matching algorithms. Outputs PokerTracker-compatible hand history files with real player names.
+### UI/UX Decisions
+The application features a responsive, mobile-first design built with Bootstrap 5 and Vanilla JS. It includes drag-and-drop functionality for file uploads, real-time job status monitoring with a visual pipeline (Parsing → OCR → Matching → Writing), and expandable job history cards displaying detailed statistics. The UI provides clear feedback on file classification (resolved/failed) and guides the user through the process, indicating which files are ready and which need further attention.
 
-## Architecture
+### Technical Implementations
+The backend is built with Python and FastAPI, handling hand history parsing, OCR integration, intelligent matching, and output generation. It uses an SQLite database for persistent storage of jobs, files, results, and detailed screenshot analysis. The OCR functionality leverages Google Gemini 2.0 Flash Vision API for text extraction from images.
 
-### Backend (Python + FastAPI)
-- **parser.py**: GGPoker TXT file parser with regex-based extraction
-- **ocr.py**: Google Gemini 2.0 Flash Vision API integration with 78-line optimized OCR prompt
-- **matcher.py**: 100-point scoring algorithm for hand-to-screenshot matching
-- **writer.py**: Output generator with 13 regex replacement patterns and 10 critical PokerTracker validations
-- **database.py**: SQLite database with jobs, files, results, and screenshot_results tables
-- **main.py**: FastAPI application with REST endpoints
+### Feature Specifications
+- **File Upload**: Multi-file drag-and-drop for `.txt` hand histories and screenshots.
+- **Background Processing**: Asynchronous job processing with real-time status tracking and progress indicators.
+- **OCR Analysis**: Utilizes Google Gemini Vision API for efficient text extraction from PokerCraft screenshots, including hand IDs.
+- **Intelligent Matching**: A sophisticated scoring algorithm matches hand histories with screenshots based on multiple criteria (hero cards, board cards, timestamp, hero position, player names, stack size). Prioritizes direct Hand ID matches extracted via OCR for high accuracy.
+- **Name Mapping**: Automatic seat-based mapping from anonymized IDs to real player names, including the "Hero" player.
+- **Output Validation**: Comprehensive validation checks (10 critical checks) ensure PokerTracker compatibility, handling issues like line endings and cardless lines.
+- **File Classification System**: All input hands are included in output. Files are classified as `_resolved.txt` (100% de-anonymized) or `_fallado.txt` (contains unmapped IDs), with separate ZIP downloads.
+- **Job History**: Persistent storage and retrieval of all processing jobs with detailed statistics and diagnostic information, including per-screenshot error tracking.
 
-### Frontend (Bootstrap 5 + Vanilla JS)
-- Drag-and-drop file upload for TXT files and screenshots
-- Real-time job status monitoring with 2-second polling
-- Job history with persistent SQLite storage
-- Responsive mobile-first design
+### System Design Choices
+The system employs a modular architecture with distinct components for parsing, OCR, matching, and writing, facilitating maintainability and scalability. Asynchronous processing and parallel OCR requests (with a Semaphore for API rate limiting) optimize performance. The `screenshot_results` table provides granular diagnostic visibility, tracking OCR success/failure and match counts per screenshot.
 
-### Database (SQLite)
-- **jobs**: Tracks upload jobs with status (pending, processing, completed, failed)
-- **files**: Stores uploaded file references (TXT and screenshots)
-- **results**: Stores processing results with mappings and statistics
-- **screenshot_results**: NEW - Granular tracking of each screenshot (OCR success/fail, matches found, errors)
-
-## Key Features Implemented
-
-1. **File Upload**: Multi-file drag-and-drop for TXT and screenshots
-2. **Background Processing**: Asynchronous job processing with status tracking
-3. **OCR Analysis**: Google Gemini Vision for screenshot text extraction
-4. **Intelligent Matching**: 100-point scoring system:
-   - Hero cards: 40pts
-   - Board cards: 30pts  
-   - Timestamp: 20pts
-   - Hero position: 15pts
-   - Player names: 10pts
-   - Stack size: 5pts
-5. **Name Mapping**: Automatic seat-based mapping (anonymized ID → real name, including Hero → real player name)
-6. **Output Validation**: 9 critical checks for PokerTracker compatibility
-7. **Job History**: Persistent storage and retrieval of all processing jobs
-
-## Configuration
-
-### Environment Variables (.env)
-```
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-Get your API key from: https://makersuite.google.com/app/apikey
-
-### Dependencies (requirements.txt)
-- google-generativeai>=0.8.0 (Gemini Vision API)
-- python-dotenv>=1.0.0 (environment config)
-- fastapi>=0.104.0 (REST API)
-- uvicorn>=0.24.0 (ASGI server)
-- python-multipart>=0.0.6 (file uploads)
-- aiosqlite>=0.19.0 (async SQLite)
-- jinja2>=3.1.0 (templates)
-
-## API Endpoints
-
-- `GET /` - Health check
-- `GET /app` - Serve frontend
-- `POST /api/upload` - Upload TXT files and screenshots
-- `POST /api/process/{job_id}` - Start background processing
-- `GET /api/status/{job_id}` - Get job status
-- `GET /api/download/{job_id}` - Download processed TXT file
-- `GET /api/jobs` - List all jobs
-- `GET /api/job/{job_id}/screenshots` - NEW - Get detailed screenshot results with errors
-- `DELETE /api/job/{job_id}` - Delete job and files
-
-## Project Structure
-```
-.
-├── main.py                 # FastAPI application
-├── models.py               # Type definitions
-├── parser.py               # GGPoker TXT parser
-├── ocr.py                  # Gemini Vision OCR
-├── matcher.py              # Matching algorithm
-├── writer.py               # Output generator
-├── database.py             # SQLite operations
-├── test_cli.py             # CLI test suite
-├── templates/
-│   └── index.html          # Web frontend
-├── static/
-│   ├── css/
-│   │   └── styles.css
-│   └── js/
-│       └── app.js
-├── storage/
-│   ├── uploads/            # Job upload files
-│   └── outputs/            # Generated outputs
-├── .env                    # Environment config
-├── .env.example            # Environment template
-├── requirements.txt        # Python dependencies
-└── ggrevealer.db           # SQLite database
-```
-
-## Workflow
-1. Server runs on port 5000 (python main.py)
-2. Frontend accessible at /app
-3. Serves webview for user interaction
-
-## Testing
-
-### CLI Test
-```bash
-python test_cli.py
-```
-Tests parser, writer, and checks GEMINI_API_KEY configuration.
-
-### Manual Test
-1. Access http://localhost:5000/app
-2. Upload sample TXT files and screenshots
-3. Click "Subir y Procesar"
-4. Monitor status updates
-5. Download processed output when complete
-
-## Known Limitations
-
-1. **GEMINI_API_KEY Required**: OCR will return mock data if not configured
-2. **Mock Mode**: When API key is missing, matcher uses mock OCR results for testing
-3. **Direct Matching**: Screenshots with hand ID in filename get 100% confidence match
-
-## Recent Changes (October 28, 2025)
-
-### 🎯 File Classification System - CRITICAL (NEVER LOSE HANDS)
-**Problem Solved**: 78% of hands were being excluded from outputs, causing PokerTracker rejections.
-
-**Implementation (100% Hand Preservation)**:
-1. **All hands included**: `generate_txt_files_with_validation()` now includes ALL hands from input TXT, regardless of screenshot matches
-2. **File classification**: Each output file is individually classified:
-   - **`_resolved.txt`** - 100% de-anonymized, compatible with PokerTracker (ready to import)
-   - **`_fallado.txt`** - Contains unmapped anonymous IDs (needs more screenshots)
-3. **Separate ZIP downloads**:
-   - **`resolved_hands.zip`** - Only clean files (immediate use)
-   - **`fallidos.zip`** - Failed files showing which IDs need mapping
-4. **Transparent reporting**: UI shows exactly which files are OK and which need work
-5. **Per-file statistics**: Tracks total_hands, unmapped_ids, and status for each table
-6. **Smart UI**: Download buttons only appear if corresponding files exist
-
-**User Benefits**:
-- ✅ **NEVER lose hands** - All hands from input appear in outputs
-- ✅ **Clear feedback** - See exactly which IDs are missing
-- ✅ **Immediate value** - Use clean files right away while fixing failed ones
-- ✅ **Guided workflow** - System tells you what screenshots to add
-
-### 🚀 Hand ID Matching - ACCURACY BOOST (50% → 99.9%)
-**Implementation (Primary Key Matching)**:
-1. **OCR extracts Hand ID**: Updated Gemini prompt to extract Hand ID from screenshot (format: #1234567890)
-2. **ScreenshotAnalysis enhanced**: Added `hand_id` field to dataclass
-3. **Matcher strategy**:
-   - **PRIMARY (99.9% accuracy)**: Direct Hand ID match from OCR
-   - **FALLBACK (70-80% accuracy)**: Multi-criteria scoring (cards, position, board)
-4. **Duplicate prevention**: Matched screenshots are tracked to prevent re-use
-5. **Detailed logging**: Console shows match type (Hand ID / Filename / Fallback) for diagnostics
-
-**Benefits**:
-- ✅ **99.9% match accuracy** when Hand ID is visible in screenshot
-- ✅ **Automatic fallback** for legacy screenshots without Hand ID
-- ✅ **Clear diagnostics** showing which matching strategy was used
-
-### 🐛 PokerTracker Critical Fixes - COMPATIBILITY (100% Import Success)
-**Problem**: PokerTracker rejected hands with two types of errors causing import failures.
-
-**Fix #1 - "Uncalled bet is greater than total bet" (5 errors → 0)**:
-- **Root cause**: Windows line endings (`\r\n`) in GGPoker files broke regex pattern matching
-- **Solution**: Updated pattern #13 to handle CRLF: `rf'(returned to ){anon_escaped}\s*$'`
-- **Impact**: ✅ 100% of "Uncalled bet" lines now preserved correctly
-
-**Fix #2 - "1 card Hold'em is not supported" (36 errors → 0)**:
-- **Root cause**: GGPoker includes `Dealt to PlayerID ` lines WITHOUT cards for opponents
-- **Old behavior**: These lines were mapped to player names, creating corrupt lines like `Dealt to vdibv ` (no cards)
-- **Solution**: New function `remove_dealt_to_without_cards()` eliminates cardless lines BEFORE name mapping
-- **Regex pattern**: `r'^Dealt to [^\[]+$'` (removes lines without card brackets)
-- **Impact**: ✅ 100% PokerTracker compatibility on all `_resolved.txt` files
-
-**Results (Job #16)**:
-- Before fixes: 41 errors across 88 hands (46% error rate)
-- After fixes: 0 errors on resolved files, 110 hands imported successfully
-- PokerTracker import success: 100% on `_resolved.txt` files
-
-### 📊 Enhanced API & UI
-**New endpoints**:
-- `GET /api/download-fallidos/{job_id}` - Download failed files separately
-
-**Enhanced endpoints**:
-- `GET /api/status/{job_id}` - Now returns `successful_files` and `failed_files` arrays with detailed stats
-
-**UI improvements**:
-- **Successful Files** section (green) - Lists clean files with hand counts
-- **Failed Files** section (red) - Lists problematic files with unmapped IDs
-- **Smart buttons** - "Descargar Exitosos" and "Descargar Fallados" appear conditionally
-- **Informative messages** - Explains why files failed and what to do next
-
-## Recent Changes (October 27, 2025)
-
-### Error Tracking & Feedback System (NEW - Diagnostic Visibility)
-- **Granular screenshot tracking**: New `screenshot_results` table tracks OCR success/failure and match counts per screenshot
-- **Per-screenshot error capture**: System now saves OCR errors, match results, and unmapped players for each screenshot individually
-- **Enhanced stats**: Added screenshots_total, screenshots_success, screenshots_warning, screenshots_error, unmapped_players_count
-- **New API endpoint**: GET /api/job/{job_id}/screenshots returns detailed status of all screenshots in a job
-- **UI feedback improvements**:
-  - "Estado de Screenshots" section shows success/warning/error counts with badges (✓ ⚠️ ✗)
-  - Expandible screenshot list displays individual results, match counts, and OCR errors
-  - "Jugadores Sin Mapear" section shows anonymous IDs that couldn't be resolved
-- **Real-time diagnostics**: Users can now see exactly which screenshots failed and which players need manual mapping
-- **Note**: Legacy jobs (pre-Oct 27) need reprocessing to populate screenshot_results
-
-### PokerTracker Compatibility Fixes (CRITICAL - 22% → 95%+ Success Rate)
-- **Fixed 5 critical writer.py bugs** causing 78% PokerTracker import failures:
-  1. **Blind posts pattern (P0)**: Added regex pattern #2 for `posts small blind`, `posts big blind`, `posts ante` BEFORE general action patterns to prevent ID conflicts
-  2. **Seat line capture (P1)**: Corrected pattern to capture full ` in chips)` suffix: `\(\$[\d.]+ in chips\)` instead of `\(\$?[\d.]+`
-  3. **Special actions (P1)**: Added 4 new patterns for common Spin & Gold actions:
-     - Pattern #4: `and is all-in` (appears in 61% of hands)
-     - Pattern #9: `mucks hand`
-     - Pattern #10: `doesn't show hand`
-     - Pattern #13: `Chooses to EV Cashout` (GGPoker specific)
-  4. **Lookahead typo (P2)**: Fixed negative lookahead in "Dealt to" pattern: `(?![[\w])` → `(?![\[\w])`
-  5. **Unmapped ID detection (P1)**: Added validation #10 to detect 6-8 character hex IDs that weren't mapped, preventing silent data corruption
-- **Updated writer.py documentation**: Now 13 regex patterns (from 7) and 10 validations (from 9)
-- **Expected improvement**: PokerTracker import success rate from 22% (2/9 hands) to 95%+ (9/9 hands)
-
-### Visual Interface Improvements
-- **Real-time timer**: Shows elapsed time during processing, persists across page refreshes using backend elapsed_time_seconds
-- **Progressive phase indicators**: Visual pipeline (Parsing → OCR → Matching → Writing) with animated transitions
-- **Expandable job history cards**: Click to toggle detailed statistics including:
-  - Processing time
-  - Manos parseadas, matched, and nombres resueltos
-  - OCR success rate
-  - Timestamps and file counts
-- **Dynamic statistics**: Stats appear progressively during processing with smooth animations
-- **Modern CSS**: Gradients, slide-in animations, spinning icons, and smooth transitions
-
-### Backend Enhancements
-- **Extended database schema**: Added started_at, processing_time_seconds, matched_hands, name_mappings_count, hands_parsed to jobs table
-- **Time tracking**: mark_job_started() and update_job_stats() functions for accurate timing
-- **Enhanced API**: /api/status endpoint now returns elapsed_time_seconds for real-time updates and detailed statistics
-
-### Performance Optimization (OCR Paralelización)
-- **Async OCR processing**: Converted ocr_screenshot() to async function using asyncio.to_thread
-- **Parallel processing**: Up to 10 concurrent Gemini API requests using asyncio.gather() + Semaphore(10)
-- **Real-time progress tracking**: New fields ocr_processed_count and ocr_total_count in database
-- **Live OCR counter**: Frontend displays "OCR: X/Y procesados" during screenshot processing
-- **Performance improvement**: ~6-10x faster (from ~60s to ~6-10s for 22 screenshots)
-- **API rate limit compliance**: Semaphore ensures we stay within Gemini's limits (10k requests/day, 1M tokens/min)
-
-### Initial MVP
-- All core modules implemented and tested
-- Frontend with drag-and-drop upload working
-- Background processing pipeline functional
-- SQLite database initialized
-- Server running on port 5000
-
-## Next Steps (Optional Enhancements)
-- ✅ **Hand ID matching** - COMPLETED (99.9% accuracy)
-- ✅ **File classification system** - COMPLETED (never lose hands)
-- Add manual name mapping editor for low-confidence matches
-- Implement mapping database export/import
-- Create detailed match confidence visualization
-- Add support for tournament hand histories with blind levels
-- Add hand count validation to ensure outputs have same # of hands as inputs
+## External Dependencies
+- **Google Gemini Vision API**: Used for OCR capabilities to extract text and hand IDs from PokerCraft screenshots. Requires `GEMINI_API_KEY`.
+- **FastAPI**: Python web framework for building the backend REST API.
+- **Uvicorn**: ASGI server to run the FastAPI application.
+- **aiosqlite**: Asynchronous SQLite driver for database interactions.
+- **python-dotenv**: For managing environment variables (e.g., `GEMINI_API_KEY`).
+- **python-multipart**: For handling file uploads in FastAPI.
+- **Jinja2**: Templating engine for the frontend.
