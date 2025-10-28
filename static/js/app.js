@@ -561,6 +561,7 @@ async function showError(message) {
 async function generateErrorPrompt(jobId, errorMessage) {
     const promptText = document.getElementById('error-prompt-text');
     const copyBtn = document.getElementById('copy-error-prompt-btn');
+    const regenerateBtn = document.getElementById('regenerate-error-prompt-btn');
 
     if (!promptText) return;
 
@@ -568,6 +569,7 @@ async function generateErrorPrompt(jobId, errorMessage) {
         // Show loading state
         promptText.innerHTML = '<div class="text-muted"><i class="bi bi-hourglass-split"></i> Generando prompt con Gemini AI...</div>';
         if (copyBtn) copyBtn.disabled = true;
+        if (regenerateBtn) regenerateBtn.disabled = true;
 
         // Call Gemini-powered endpoint
         const response = await fetch(`${API_BASE}/api/debug/${jobId}/generate-prompt`, {
@@ -588,6 +590,12 @@ async function generateErrorPrompt(jobId, errorMessage) {
         if (copyBtn) {
             copyBtn.disabled = false;
             copyBtn.onclick = () => copyToClipboard(prompt, copyBtn);
+        }
+
+        // Setup regenerate button
+        if (regenerateBtn) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.onclick = () => regenerateErrorPrompt(jobId, errorMessage);
         }
 
         // Show success indicator if Gemini was used
@@ -614,13 +622,35 @@ async function generateErrorPrompt(jobId, errorMessage) {
         `;
 
         if (copyBtn) copyBtn.disabled = true;
+        if (regenerateBtn) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.onclick = () => regenerateErrorPrompt(jobId, errorMessage);
+        }
     }
+}
+
+async function regenerateErrorPrompt(jobId, errorMessage) {
+    const regenerateBtn = document.getElementById('regenerate-error-prompt-btn');
+
+    if (!regenerateBtn) return;
+
+    // Show loading state on button
+    const originalHTML = regenerateBtn.innerHTML;
+    regenerateBtn.innerHTML = '<i class="bi bi-arrow-repeat spinning"></i> Regenerando...';
+    regenerateBtn.disabled = true;
+
+    // Call the generate function again
+    await generateErrorPrompt(jobId, errorMessage);
+
+    // Reset button (will be re-enabled by generateErrorPrompt)
+    regenerateBtn.innerHTML = originalHTML;
 }
 
 async function generatePartialErrorPrompt(jobId) {
     const promptSection = document.getElementById('partial-error-claude-prompt');
     const promptText = document.getElementById('partial-error-prompt-text');
     const copyBtn = document.getElementById('copy-partial-error-prompt-btn');
+    const regenerateBtn = document.getElementById('regenerate-partial-error-prompt-btn');
 
     if (!promptSection || !promptText) return;
 
@@ -631,6 +661,7 @@ async function generatePartialErrorPrompt(jobId) {
         // Show loading state
         promptText.innerHTML = '<div class="text-muted"><i class="bi bi-hourglass-split"></i> Generando prompt con Gemini AI...</div>';
         if (copyBtn) copyBtn.disabled = true;
+        if (regenerateBtn) regenerateBtn.disabled = true;
 
         // Call Gemini-powered endpoint
         const response = await fetch(`${API_BASE}/api/debug/${jobId}/generate-prompt`, {
@@ -653,6 +684,12 @@ async function generatePartialErrorPrompt(jobId) {
             copyBtn.onclick = () => copyToClipboard(prompt, copyBtn);
         }
 
+        // Setup regenerate button
+        if (regenerateBtn) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.onclick = () => regeneratePartialErrorPrompt(jobId);
+        }
+
         // Show success indicator if Gemini was used
         if (result.success) {
             console.log('✅ Prompt de errores parciales generado con Gemini AI');
@@ -663,9 +700,39 @@ async function generatePartialErrorPrompt(jobId) {
     } catch (error) {
         console.error('Error generating partial error prompt:', error);
 
-        // Hide section on error
-        promptSection.classList.add('d-none');
+        // Show error message instead of hiding
+        promptText.innerHTML = `
+            <div class="text-danger mb-2">
+                <i class="bi bi-exclamation-triangle"></i> Error al generar prompt automáticamente
+            </div>
+            <div class="small">
+                Por favor, intenta regenerar o revisa los logs del job para más detalles.
+            </div>
+        `;
+
+        if (copyBtn) copyBtn.disabled = true;
+        if (regenerateBtn) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.onclick = () => regeneratePartialErrorPrompt(jobId);
+        }
     }
+}
+
+async function regeneratePartialErrorPrompt(jobId) {
+    const regenerateBtn = document.getElementById('regenerate-partial-error-prompt-btn');
+
+    if (!regenerateBtn) return;
+
+    // Show loading state on button
+    const originalHTML = regenerateBtn.innerHTML;
+    regenerateBtn.innerHTML = '<i class="bi bi-arrow-repeat spinning"></i> Regenerando...';
+    regenerateBtn.disabled = true;
+
+    // Call the generate function again
+    await generatePartialErrorPrompt(jobId);
+
+    // Reset button (will be re-enabled by generatePartialErrorPrompt)
+    regenerateBtn.innerHTML = originalHTML;
 }
 
 function resetToWelcome() {
