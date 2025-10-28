@@ -39,8 +39,8 @@ async def ocr_screenshot(image_path: str, screenshot_id: str, semaphore: Optiona
             # Upload image (async)
             uploaded_file = await asyncio.to_thread(genai.upload_file, image_path)
             
-            # Create model (Gemini 2.5 Flash Image Preview - optimal for vision tasks)
-            model = genai.GenerativeModel('gemini-2-5-flash-image-preview')
+            # Create model (Gemini 2.5 Flash Image - optimal for vision tasks)
+            model = genai.GenerativeModel('models/gemini-2.5-flash-image')
             
             # Optimized prompt for poker screenshot OCR with Hand ID extraction
             prompt = """You are a specialized OCR system for poker hand screenshots from PokerCraft.
