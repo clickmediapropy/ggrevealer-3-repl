@@ -172,7 +172,7 @@ async def get_job_status(job_id: int):
 
 @app.get("/api/download/{job_id}")
 async def download_output(job_id: int):
-    """Download the processed TXT file for a job"""
+    """Download the processed ZIP file for a job"""
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -185,14 +185,23 @@ async def download_output(job_id: int):
         raise HTTPException(status_code=404, detail="Output file not found")
     
     output_path = Path(result['output_txt_path'])
-    if not output_path.exists():
-        raise HTTPException(status_code=404, detail="Output file not found on disk")
     
-    return FileResponse(
-        path=output_path,
-        filename=f"resolved_hands_{job_id}.txt",
-        media_type="text/plain"
-    )
+    # Check if it's a ZIP file (new format) or TXT file (old format)
+    if output_path.suffix == '.zip' and output_path.exists():
+        return FileResponse(
+            path=output_path,
+            filename=f"resolved_hands_{job_id}.zip",
+            media_type="application/zip"
+        )
+    elif output_path.suffix == '.txt' and output_path.exists():
+        # Legacy support for old TXT files
+        return FileResponse(
+            path=output_path,
+            filename=f"resolved_hands_{job_id}.txt",
+            media_type="text/plain"
+        )
+    else:
+        raise HTTPException(status_code=404, detail="Output file not found on disk")
 
 
 @app.get("/api/jobs")

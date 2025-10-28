@@ -352,6 +352,9 @@ async function showResults(job) {
     const detailedStats = job.detailed_stats || {};
     const processingTime = stats.processing_time ? formatDuration(stats.processing_time) : 'N/A';
 
+    const tablesCount = detailedStats.tables_count || 0;
+    const tablesText = tablesCount === 1 ? 'Mesa' : 'Mesas';
+    
     resultsStats.innerHTML = `
         <div class="stats-grid">
             <div class="stat-card">
@@ -363,8 +366,8 @@ async function showResults(job) {
                 <div class="stat-label">Nombres Resueltos</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${detailedStats.high_confidence_matches || 0}</div>
-                <div class="stat-label">Alta Confianza (≥80%)</div>
+                <div class="stat-value">${tablesCount}</div>
+                <div class="stat-label">${tablesText} Procesadas</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value">${processingTime}</div>
