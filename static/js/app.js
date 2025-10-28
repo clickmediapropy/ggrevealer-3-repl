@@ -581,15 +581,25 @@ async function generateErrorPrompt(jobId, errorMessage) {
         }
 
         const result = await response.json();
-        const prompt = result.prompt;
+        const prompt = result.prompt || '';
+
+        // Validate prompt is not empty
+        if (!prompt || prompt.trim() === '') {
+            throw new Error('Prompt vacío recibido del servidor');
+        }
 
         // Display generated prompt
         promptText.textContent = prompt;
 
-        // Setup copy button
+        // Setup copy button with proper text binding
         if (copyBtn) {
             copyBtn.disabled = false;
-            copyBtn.onclick = () => copyToClipboard(prompt, copyBtn);
+            // Store prompt text in button's data attribute for reliable access
+            copyBtn.setAttribute('data-prompt-text', prompt);
+            copyBtn.onclick = function() {
+                const textToCopy = this.getAttribute('data-prompt-text');
+                copyToClipboard(textToCopy, this);
+            };
         }
 
         // Setup regenerate button
@@ -601,6 +611,7 @@ async function generateErrorPrompt(jobId, errorMessage) {
         // Show success indicator if Gemini was used
         if (result.success) {
             console.log('✅ Prompt generado exitosamente con Gemini AI');
+            console.log('Prompt length:', prompt.length);
         } else {
             console.log('⚠️ Usando prompt de fallback:', result.message);
         }
@@ -673,15 +684,25 @@ async function generatePartialErrorPrompt(jobId) {
         }
 
         const result = await response.json();
-        const prompt = result.prompt;
+        const prompt = result.prompt || '';
+
+        // Validate prompt is not empty
+        if (!prompt || prompt.trim() === '') {
+            throw new Error('Prompt vacío recibido del servidor');
+        }
 
         // Display generated prompt
         promptText.textContent = prompt;
 
-        // Setup copy button
+        // Setup copy button with proper text binding
         if (copyBtn) {
             copyBtn.disabled = false;
-            copyBtn.onclick = () => copyToClipboard(prompt, copyBtn);
+            // Store prompt text in button's data attribute for reliable access
+            copyBtn.setAttribute('data-prompt-text', prompt);
+            copyBtn.onclick = function() {
+                const textToCopy = this.getAttribute('data-prompt-text');
+                copyToClipboard(textToCopy, this);
+            };
         }
 
         // Setup regenerate button
@@ -693,6 +714,7 @@ async function generatePartialErrorPrompt(jobId) {
         // Show success indicator if Gemini was used
         if (result.success) {
             console.log('✅ Prompt de errores parciales generado con Gemini AI');
+            console.log('Prompt length:', prompt.length);
         } else {
             console.log('⚠️ Usando prompt de fallback para errores parciales');
         }
