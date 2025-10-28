@@ -168,6 +168,107 @@ class GGPokerHandHistoryValidator:
         line_info = f" (Line #{error.line_number})" if error.line_number else ""
         return f"Error: GG Poker: {error.message}{line_info}"
 
+    def validate_file(self, file_content: str) -> Dict:
+        """
+        Validate a file that may contain multiple hands
+
+        This method handles files with multiple hands separated by blank lines,
+        validating each hand individually and returning aggregated results.
+
+        Args:
+            file_content: Raw file content (may contain 1 or more hands)
+
+        Returns:
+            Dictionary with:
+            - total_hands: number of hands in file
+            - hands_with_errors: number of hands with errors
+            - hands_with_warnings: number of hands with warnings only
+            - hands_valid: number of hands with no issues
+            - hands_with_critical_errors: number of hands with critical errors
+            - per_hand_results: list of validation results per hand
+            - aggregated_errors: total error count
+            - aggregated_warnings: total warning count
+            - aggregated_critical: total critical error count
+            - pt4_would_reject: whether PT4 would reject any hand
+        """
+        # Split hands by double/triple newline (GGPoker format)
+        hands = [h.strip() for h in file_content.split('\n\n\n') if h.strip()]
+
+        # If no triple newline, try double newline
+        if len(hands) == 1:
+            hands = [h.strip() for h in file_content.split('\n\n') if h.strip() and 'Poker Hand #' in h]
+
+        per_hand_results = []
+        total_errors = 0
+        total_warnings = 0
+        total_critical = 0
+        hands_with_errors = 0
+        hands_with_warnings = 0
+        hands_with_critical_errors = 0
+        hands_valid = 0
+
+        for i, hand in enumerate(hands, 1):
+            # Create fresh validator for each hand
+            validator = GGPokerHandHistoryValidator(strict_mode=self.strict_mode)
+            results = validator.validate(hand)
+            summary = validator.get_validation_summary()
+
+            # Extract hand ID for better tracking
+            hand_id_match = re.search(r'Poker Hand #([A-Z]{2}\d+)', hand)
+            hand_id = hand_id_match.group(1) if hand_id_match else f"Hand_{i}"
+
+            per_hand_results.append({
+                'hand_number': i,
+                'hand_id': hand_id,
+                'error_count': summary['errors'],
+                'warning_count': summary['warnings'],
+                'critical_count': summary['critical'],
+                'would_reject': summary['would_reject'],
+                'errors': [
+                    {
+                        'validation': r['validation'],
+                        'severity': r['severity'],
+                        'message': r['message'],
+                        'error_type': r['error_type']
+                    }
+                    for r in summary['results'] if r['type'] == 'error'
+                ],
+                'warnings': [
+                    {
+                        'validation': r['validation'],
+                        'message': r['message']
+                    }
+                    for r in summary['results'] if r['type'] == 'warning'
+                ]
+            })
+
+            total_errors += summary['errors']
+            total_warnings += summary['warnings']
+            total_critical += summary['critical']
+
+            if summary['critical'] > 0:
+                hands_with_critical_errors += 1
+
+            if summary['errors'] > 0:
+                hands_with_errors += 1
+            elif summary['warnings'] > 0:
+                hands_with_warnings += 1
+            else:
+                hands_valid += 1
+
+        return {
+            'total_hands': len(hands),
+            'hands_with_errors': hands_with_errors,
+            'hands_with_warnings': hands_with_warnings,
+            'hands_valid': hands_valid,
+            'hands_with_critical_errors': hands_with_critical_errors,
+            'per_hand_results': per_hand_results,
+            'aggregated_errors': total_errors,
+            'aggregated_warnings': total_warnings,
+            'aggregated_critical': total_critical,
+            'pt4_would_reject': hands_with_critical_errors > 0
+        }
+
     # ========================================================================
     # VALIDATION METHODS
     # ========================================================================
@@ -464,11 +565,11 @@ class GGPokerHandHistoryValidator:
 
             if not has_hero:
                 results.append(PT4ValidationResult(
-                    result_type=ValidationResultType.ERROR,
+                    result_type=ValidationResultType.WARNING,
                     validation_name="player_identifiers",
-                    severity=ErrorSeverity.CRITICAL,
+                    severity=ErrorSeverity.LOW,
                     error_type="MISSING_HERO",
-                    message="Player 'Hero' not found in seat lines",
+                    message="Player 'Hero' not found in seat lines (OK if using real names)",
                     recommended_action="VERIFY_FILE_FORMAT"
                 ))
 
