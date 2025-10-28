@@ -8,6 +8,28 @@ from datetime import timedelta
 from models import ParsedHand, ScreenshotAnalysis, HandMatch
 
 
+def _normalize_hand_id(hand_id: str) -> str:
+    """
+    Normalize hand_id by removing common prefixes (SG, HH, etc.)
+    This ensures OCR-extracted IDs match parser-extracted IDs
+
+    Examples:
+        "SG3260934198" -> "3260934198"
+        "3260934198" -> "3260934198"
+        "HH1234567890" -> "1234567890"
+    """
+    if not hand_id:
+        return ""
+
+    # Remove common GGPoker hand ID prefixes
+    prefixes = ['SG', 'HH', 'MT', 'TT']
+    for prefix in prefixes:
+        if hand_id.startswith(prefix):
+            return hand_id[len(prefix):]
+
+    return hand_id
+
+
 def find_best_matches(
     hands: List[ParsedHand],
     screenshots: List[ScreenshotAnalysis],
@@ -15,32 +37,36 @@ def find_best_matches(
 ) -> List[HandMatch]:
     """
     Find best matches between hands and screenshots using Hand ID as primary key
-    
+
     MATCHING STRATEGY (99.9% accuracy):
     1. PRIMARY: Direct Hand ID match from OCR (100 points) - most accurate
     2. FALLBACK: Multi-criteria scoring system (max 100 points) - for legacy screenshots
-    
+
     Args:
         hands: List of parsed hands
         screenshots: List of OCR analyzed screenshots
         confidence_threshold: Minimum confidence score (0-100)
-        
+
     Returns:
         List of HandMatch objects above threshold
     """
     matches = []
     matched_screenshots = set()  # Track used screenshots to prevent duplicates
-    
+
     for hand in hands:
         matched = False
-        
+
         # STRATEGY 1: Try Hand ID matching first (PRIMARY - 99.9% accuracy)
         for screenshot in screenshots:
             if screenshot.screenshot_id in matched_screenshots:
                 continue  # Skip already matched screenshots
-            
+
             # Check if screenshot has extracted Hand ID from OCR
-            if screenshot.hand_id and screenshot.hand_id == hand.hand_id:
+            # Normalize both IDs to handle prefix differences (OCR omits "SG", parser includes it)
+            normalized_screenshot_id = _normalize_hand_id(screenshot.hand_id) if screenshot.hand_id else None
+            normalized_hand_id = _normalize_hand_id(hand.hand_id)
+
+            if normalized_screenshot_id and normalized_screenshot_id == normalized_hand_id:
                 score = 100.0
                 breakdown = {"hand_id_match": 100.0}
                 mapping = _build_seat_mapping(hand, screenshot)
@@ -235,38 +261,61 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     """
     Build name mapping from hand to screenshot based on seat positions
     Maps anonymized player IDs to real names (including Hero to real hero name)
-    
+
     Returns empty dict if duplicate names detected (indicates incorrect match)
     """
     mapping = {}
     used_names = set()  # Track names we've already mapped to prevent duplicates
-    
+
+    # Debug logging
+    print(f"\n[DEBUG] Building seat mapping for hand {hand.hand_id}")
+    print(f"[DEBUG] Hand seats: {[(s.seat_number, s.player_id, s.stack) for s in hand.seats]}")
+    print(f"[DEBUG] Screenshot players: {[(ps.position, ps.player_name, ps.stack) for ps in screenshot.all_player_stacks]}")
+    print(f"[DEBUG] Hero in screenshot: {screenshot.hero_name} at position {screenshot.hero_position}")
+
     # First pass: Map Hero
     hero_seat = next((s for s in hand.seats if s.player_id == 'Hero'), None)
     if hero_seat and screenshot.hero_name:
         mapping['Hero'] = screenshot.hero_name
         used_names.add(screenshot.hero_name)
-    
+        print(f"[DEBUG] Mapped Hero: {hero_seat.seat_number} -> {screenshot.hero_name}")
+    else:
+        print(f"[DEBUG] Hero mapping failed: hero_seat={hero_seat}, screenshot.hero_name={screenshot.hero_name}")
+
     # Second pass: Map other players by seat position
+    unmapped_seats = []
     for seat in hand.seats:
         if seat.player_id == 'Hero':
             continue  # Already mapped above
-        
+
         # Find player in same seat position in screenshot
         matching_player = next(
             (ps for ps in screenshot.all_player_stacks if ps.position == seat.seat_number),
             None
         )
-        
+
         if matching_player:
             # Check for duplicate name within this hand
             if matching_player.player_name in used_names:
-                print(f"[WARNING] Duplicate name '{matching_player.player_name}' detected in mapping for hand {hand.hand_id}. This indicates an incorrect match. Skipping mapping.")
+                print(f"[WARNING] Duplicate name '{matching_player.player_name}' detected in mapping for hand {hand.hand_id}.")
+                print(f"[WARNING] Seat {seat.seat_number} ({seat.player_id}) tried to map to '{matching_player.player_name}' but it's already used.")
+                print(f"[WARNING] This indicates seat position mismatch. Rejecting mapping.")
                 return {}  # Return empty mapping - this is an incorrect match
-            
+
             mapping[seat.player_id] = matching_player.player_name
             used_names.add(matching_player.player_name)
-    
+            print(f"[DEBUG] Mapped player: Seat {seat.seat_number} ({seat.player_id}) -> {matching_player.player_name}")
+        else:
+            unmapped_seats.append(f"Seat {seat.seat_number} ({seat.player_id})")
+            print(f"[DEBUG] No matching player found for Seat {seat.seat_number} ({seat.player_id})")
+
+    if unmapped_seats:
+        print(f"[WARNING] Unmapped seats: {', '.join(unmapped_seats)}")
+        print(f"[WARNING] This may indicate OCR position extraction issues.")
+
+    print(f"[DEBUG] Final mapping: {mapping}")
+    print(f"[DEBUG] Mapping success: {len(mapping)} of {len(hand.seats)} seats mapped\n")
+
     return mapping
 
 
