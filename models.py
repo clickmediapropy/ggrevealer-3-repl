@@ -84,6 +84,7 @@ class PlayerStack:
 class ScreenshotAnalysis:
     """OCR analysis result from a screenshot"""
     screenshot_id: str
+    hand_id: Optional[str] = None
     timestamp: Optional[str] = None
     table_name: Optional[str] = None
     player_names: List[str] = field(default_factory=list)

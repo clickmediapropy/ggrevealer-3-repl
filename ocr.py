@@ -42,20 +42,27 @@ async def ocr_screenshot(image_path: str, screenshot_id: str, semaphore: Optiona
             # Create model (Gemini 2.5 Flash - optimal for vision tasks)
             model = genai.GenerativeModel('gemini-2.5-flash')
             
-            # Optimized 78-line prompt for poker screenshot OCR
+            # Optimized prompt for poker screenshot OCR with Hand ID extraction
             prompt = """You are a specialized OCR system for poker hand screenshots from PokerCraft.
 
 CRITICAL INSTRUCTIONS:
-1. Extract ALL visible player names EXACTLY as shown (case-sensitive)
-2. Identify the HERO player (usually highlighted or has special indicator)
-3. Extract hero's hole cards if visible
-4. Extract community cards (flop, turn, river) if visible
-5. Extract all player stack sizes
-6. Be EXTREMELY careful with character disambiguation:
+1. Extract the HAND ID number (usually at top of screenshot, format: #XXXXXXXXXX where X are digits)
+2. Extract ALL visible player names EXACTLY as shown (case-sensitive)
+3. Identify the HERO player (usually highlighted or has special indicator)
+4. Extract hero's hole cards if visible
+5. Extract community cards (flop, turn, river) if visible
+6. Extract all player stack sizes
+7. Be EXTREMELY careful with character disambiguation:
    - Letter O vs number 0
    - Letter I (uppercase i) vs number 1 vs letter l (lowercase L)
    - Letter S vs number 5
    - Letter Z vs number 2
+
+HAND ID EXTRACTION:
+- Look for "Hand #" or "#" followed by 10-12 digits at the top of the screenshot
+- Extract ONLY the numeric portion (no "#" symbol)
+- This is the MOST IMPORTANT field for matching accuracy
+- Example: If you see "Hand #1234567890" extract "1234567890"
 
 CARD FORMAT:
 - Rank: A, K, Q, J, T, 9, 8, 7, 6, 5, 4, 3, 2
@@ -70,6 +77,7 @@ PLAYER NAME RULES:
 
 OUTPUT FORMAT (JSON):
 {
+  "hand_id": "1234567890",
   "hero_name": "PlayerName",
   "hero_position": 1,
   "hero_stack": 1234.56,
@@ -92,15 +100,17 @@ OUTPUT FORMAT (JSON):
 }
 
 VALIDATION RULES:
-1. hero_name MUST be in player_names list
-2. All player_names MUST have corresponding entries in all_player_stacks
-3. position values: 1-6 for seat numbers
-4. Stack values: positive numbers (can have decimals)
-5. Cards: exactly 2 characters (rank + suit)
-6. confidence: 0-100 (how confident you are in the extraction)
-7. Add warnings for any uncertain extractions
+1. hand_id: 10-12 digit number (CRITICAL for matching)
+2. hero_name MUST be in player_names list
+3. All player_names MUST have corresponding entries in all_player_stacks
+4. position values: 1-6 for seat numbers
+5. Stack values: positive numbers (can have decimals)
+6. Cards: exactly 2 characters (rank + suit)
+7. confidence: 0-100 (how confident you are in the extraction)
+8. Add warnings for any uncertain extractions
 
 If you cannot extract certain data, use null for that field.
+If hand_id is not visible, set it to null (this will significantly reduce matching accuracy).
 If hero is not identifiable, set hero_name to null.
 Always return valid JSON.
 
@@ -132,8 +142,15 @@ Analyze this poker screenshot and extract all data:"""
                         position=int(ps_data['position'])
                     ))
                 
+                # Normalize hand_id (strip whitespace, ensure string format)
+                raw_hand_id = data.get('hand_id')
+                normalized_hand_id = None
+                if raw_hand_id:
+                    normalized_hand_id = str(raw_hand_id).strip()
+                
                 return ScreenshotAnalysis(
                     screenshot_id=screenshot_id,
+                    hand_id=normalized_hand_id,
                     table_name=data.get('table_name'),
                     player_names=data.get('player_names', []),
                     hero_name=data.get('hero_name'),
@@ -175,6 +192,7 @@ def _mock_ocr_result(screenshot_id: str) -> ScreenshotAnalysis:
     """Return mock OCR result when API key is not configured"""
     return ScreenshotAnalysis(
         screenshot_id=screenshot_id,
+        hand_id="1234567890",
         table_name="MockTable",
         player_names=["MockPlayer1", "MockPlayer2", "Hero"],
         hero_name="Hero",
