@@ -39,8 +39,8 @@ async def ocr_screenshot(image_path: str, screenshot_id: str, semaphore: Optiona
             # Upload image (async)
             uploaded_file = await asyncio.to_thread(genai.upload_file, image_path)
             
-            # Create model (Gemini 2.5 Flash - optimal for vision tasks)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            # Create model (Gemini 2.5 Flash Image Preview - optimal for vision tasks)
+            model = genai.GenerativeModel('gemini-2-5-flash-image-preview')
             
             # Optimized prompt for poker screenshot OCR with Hand ID extraction
             prompt = """You are a specialized OCR system for poker hand screenshots from PokerCraft.
@@ -64,13 +64,31 @@ HAND ID EXTRACTION:
 - This is the MOST IMPORTANT field for matching accuracy
 - Example: If you see "Hand #1234567890" extract "1234567890"
 
+HERO IDENTIFICATION (CRITICAL):
+- In PokerCraft screenshots, the HERO is ALWAYS at the BOTTOM CENTER position
+- Hero position is ALWAYS 1 (this is a fixed layout convention)
+- Hero may appear in different ways:
+  1. Regular seat with name and stack (most common)
+  2. WIN popup overlay at bottom center (shows name, cards, and stack)
+  3. LOSE/FOLD popup overlay at bottom center
+- If you see a WIN/LOSE popup at bottom center, extract that player's name as hero_name
+- Even if Hero appears only in a popup, they MUST be included in all_player_stacks with position 1
+- Hero position is ALWAYS 1 - do not set it to null
+
+PLAYER POSITION RULES (3-max tables):
+- Position 1: Bottom center (ALWAYS HERO)
+- Position 2: Left side
+- Position 3: Right side
+- Extract ALL visible player names at ALL positions
+- Include Hero in all_player_stacks even if they only appear in a popup
+
 CARD FORMAT:
 - Rank: A, K, Q, J, T, 9, 8, 7, 6, 5, 4, 3, 2
 - Suit: s (spades), h (hearts), d (diamonds), c (clubs)
 - Example: "As Kh" means Ace of spades, King of hearts
 
 PLAYER NAME RULES:
-- Include all alphanumeric characters, underscores, hyphens
+- Include all alphanumeric characters, underscores, hyphens, special characters (!, [], etc)
 - Preserve exact capitalization
 - DO NOT include position labels (BTN, SB, BB, etc) in names
 - DO NOT include stack amounts in names
@@ -82,10 +100,11 @@ OUTPUT FORMAT (JSON):
   "hero_position": 1,
   "hero_stack": 1234.56,
   "hero_cards": "As Kh",
-  "player_names": ["Player1", "Player2", "Hero"],
+  "player_names": ["HeroName", "Player2", "Player3"],
   "all_player_stacks": [
-    {"player_name": "Player1", "stack": 1000.00, "position": 1},
-    {"player_name": "Player2", "stack": 2000.00, "position": 2}
+    {"player_name": "HeroName", "stack": 1234.56, "position": 1},
+    {"player_name": "Player2", "stack": 2000.00, "position": 2},
+    {"player_name": "Player3", "stack": 3000.00, "position": 3}
   ],
   "board_cards": {
     "flop1": "Ks",
@@ -102,16 +121,19 @@ OUTPUT FORMAT (JSON):
 VALIDATION RULES:
 1. hand_id: 10-12 digit number (CRITICAL for matching)
 2. hero_name MUST be in player_names list
-3. All player_names MUST have corresponding entries in all_player_stacks
-4. position values: 1-6 for seat numbers
-5. Stack values: positive numbers (can have decimals)
-6. Cards: exactly 2 characters (rank + suit)
-7. confidence: 0-100 (how confident you are in the extraction)
-8. Add warnings for any uncertain extractions
+3. hero_position is ALWAYS 1 (bottom center position)
+4. Hero MUST appear in all_player_stacks with position 1
+5. All player_names MUST have corresponding entries in all_player_stacks
+6. position values: 1-3 for 3-max tables (1=bottom, 2=left, 3=right)
+7. Stack values: positive numbers (can have decimals)
+8. Cards: exactly 2 characters (rank + suit)
+9. confidence: 0-100 (how confident you are in the extraction)
+10. Add warnings for any uncertain extractions
 
-If you cannot extract certain data, use null for that field.
-If hand_id is not visible, set it to null (this will significantly reduce matching accuracy).
-If hero is not identifiable, set hero_name to null.
+If you cannot extract certain data, use null for that field EXCEPT:
+- hero_position should ALWAYS be 1 (never null)
+- If hand_id is not visible, set it to null (this will significantly reduce matching accuracy)
+- If hero name cannot be identified, set hero_name to null BUT still set hero_position to 1
 Always return valid JSON.
 
 Analyze this poker screenshot and extract all data:"""
