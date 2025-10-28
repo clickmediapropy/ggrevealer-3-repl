@@ -262,6 +262,9 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     Build name mapping from hand to screenshot based on seat positions
     Maps anonymized player IDs to real names (including Hero to real hero name)
 
+    IMPORTANT: PokerCraft reorganizes visual positions with Hero always at position 1.
+    We must calculate real seat numbers from visual positions using counter-clockwise mapping.
+
     Returns empty dict if duplicate names detected (indicates incorrect match)
     """
     mapping = {}
@@ -273,57 +276,67 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     print(f"[DEBUG] Screenshot players: {[(ps.position, ps.player_name, ps.stack) for ps in screenshot.all_player_stacks]}")
     print(f"[DEBUG] Hero in screenshot: {screenshot.hero_name} at position {screenshot.hero_position}")
 
-    # First pass: Map Hero
+    # Step 1: Find Hero's real seat number in hand history
     hero_seat = next((s for s in hand.seats if s.player_id == 'Hero'), None)
-    if hero_seat and screenshot.hero_name:
-        mapping['Hero'] = screenshot.hero_name
-        used_names.add(screenshot.hero_name)
-        print(f"[DEBUG] Mapped Hero: Seat {hero_seat.seat_number} -> {screenshot.hero_name}")
-    else:
-        print(f"[DEBUG] Hero mapping failed: hero_seat={hero_seat}, screenshot.hero_name={screenshot.hero_name}")
+    if not hero_seat:
+        print(f"[ERROR] No Hero seat found in hand {hand.hand_id}")
+        return {}
 
-    # Second pass: Map other players by seat position
-    # IMPORTANT: Exclude hero from screenshot candidates to avoid duplicate mapping
-    # (PokerCraft shows Hero visually at position 1 regardless of actual seat number)
-    non_hero_players = [
-        ps for ps in screenshot.all_player_stacks
-        if ps.player_name != screenshot.hero_name
-    ]
+    hero_seat_number = hero_seat.seat_number
+    max_seats = len(hand.seats)  # Usually 3 for 3-max
 
-    print(f"[DEBUG] Non-hero players available for mapping: {[(ps.position, ps.player_name) for ps in non_hero_players]}")
+    print(f"[DEBUG] Hero is at Seat {hero_seat_number} (real seat number)")
+    print(f"[DEBUG] Table has {max_seats} seats")
 
-    unmapped_seats = []
-    for seat in hand.seats:
-        if seat.player_id == 'Hero':
-            continue  # Already mapped above
+    # Step 2: Build mapping for ALL players in screenshot using counter-clockwise order
+    # PokerCraft shows Hero at visual position 1, then other players in counter-clockwise order
+    # Formula: real_seat = (hero_seat - (visual_position - 1)) % max_seats, with wrap-around
 
-        # Find player in same seat position in screenshot (excluding hero)
-        matching_player = next(
-            (ps for ps in non_hero_players if ps.position == seat.seat_number),
-            None
-        )
+    for player_stack in screenshot.all_player_stacks:
+        visual_position = player_stack.position
+        real_name = player_stack.player_name
 
-        if matching_player:
-            # Check for duplicate name within this hand
-            if matching_player.player_name in used_names:
-                print(f"[WARNING] Duplicate name '{matching_player.player_name}' detected in mapping for hand {hand.hand_id}.")
-                print(f"[WARNING] Seat {seat.seat_number} ({seat.player_id}) tried to map to '{matching_player.player_name}' but it's already used.")
-                print(f"[WARNING] This indicates seat position mismatch. Rejecting mapping.")
-                return {}  # Return empty mapping - this is an incorrect match
+        # Calculate real seat number from visual position
+        # Visual position 1 = Hero seat
+        # Visual position 2 = Seat before Hero (counter-clockwise)
+        # Visual position 3 = Seat 2 before Hero (counter-clockwise)
+        offset = visual_position - 1
+        real_seat_number = hero_seat_number - offset
 
-            mapping[seat.player_id] = matching_player.player_name
-            used_names.add(matching_player.player_name)
-            print(f"[DEBUG] Mapped player: Seat {seat.seat_number} ({seat.player_id}) -> {matching_player.player_name}")
-        else:
-            unmapped_seats.append(f"Seat {seat.seat_number} ({seat.player_id})")
-            print(f"[DEBUG] No matching player found for Seat {seat.seat_number} ({seat.player_id})")
+        # Handle wrap-around for negative seat numbers
+        if real_seat_number < 1:
+            real_seat_number += max_seats
 
-    if unmapped_seats:
-        print(f"[WARNING] Unmapped seats: {', '.join(unmapped_seats)}")
-        print(f"[WARNING] This may indicate OCR position extraction issues.")
+        print(f"[DEBUG] Visual position {visual_position} → Real seat {real_seat_number}")
+
+        # Find the anonymized ID at this real seat
+        seat_at_position = next((s for s in hand.seats if s.seat_number == real_seat_number), None)
+
+        if not seat_at_position:
+            print(f"[WARNING] No seat found at position {real_seat_number} in hand history")
+            continue
+
+        anon_id = seat_at_position.player_id
+
+        # Check for duplicate name within this hand
+        if real_name in used_names:
+            print(f"[WARNING] Duplicate name '{real_name}' detected in mapping for hand {hand.hand_id}.")
+            print(f"[WARNING] Seat {real_seat_number} ({anon_id}) tried to map to '{real_name}' but it's already used.")
+            print(f"[WARNING] This indicates incorrect match. Rejecting mapping.")
+            return {}  # Return empty mapping - this is an incorrect match
+
+        # Add mapping
+        mapping[anon_id] = real_name
+        used_names.add(real_name)
+        print(f"[DEBUG] Mapped: Seat {real_seat_number} ({anon_id}) → {real_name}")
 
     print(f"[DEBUG] Final mapping: {mapping}")
     print(f"[DEBUG] Mapping success: {len(mapping)} of {len(hand.seats)} seats mapped\n")
+
+    # Verify we mapped all seats
+    if len(mapping) != len(hand.seats):
+        unmapped = [s.player_id for s in hand.seats if s.player_id not in mapping]
+        print(f"[WARNING] Not all seats mapped. Unmapped: {unmapped}")
 
     return mapping
 

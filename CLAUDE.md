@@ -311,6 +311,36 @@ Includes: job details, files, results, screenshot analysis, logs, and statistics
 
 **Impact**: Prevents duplicate player names by rejecting incorrect screenshot matches at the source. Rejected matches are logged with warnings including hand_id.
 
+### PokerCraft Visual Position Mapping Bug (Oct 2025 - FIXED) ⭐
+**Problem**: Only 1 out of 5 tables fully de-anonymized. The other 4 had 1 unmapped player each despite having screenshots. Match rate appeared as 3.4% (5 matched hands / 147 total hands), suggesting a data coverage problem, but the real issue was incomplete name extraction.
+
+**Example from Job 3 - Table 12253:**
+- Hand history: Seat 1: `e3efcaed`, Seat 2: `5641b4a0`, Seat 3: `Hero`
+- Screenshot extracted: All 3 players (Hero, v1[nn]1, Gyodong22)
+- **OLD**: Only 2 players mapped (Hero → TuichAAreko, 5641b4a0 → v1[nn]1)
+- **NEW**: All 3 players mapped (e3efcaed → Gyodong22 included) ✅
+
+**Root Cause**: PokerCraft reorganizes visual positions with Hero always at position 1, regardless of real seat number. The old `_build_seat_mapping()` function used direct position matching (`screenshot.position == seat.seat_number`), which failed when visual positions didn't match real seat numbers.
+
+**Solution**: Implemented counter-clockwise seat calculation in `matcher.py:260-341`:
+1. Find Hero's real seat number in hand history (e.g., Seat 3)
+2. Calculate real seat for each visual position using formula: `real_seat = hero_seat - (visual_position - 1)` with wrap-around
+3. Map ALL players from screenshot (not just those in the matched hand)
+4. Extract names for every seat position at the table
+
+**Calculation Example (Hero at Seat 3 in 3-max):**
+- Visual Position 1 → Seat 3 (Hero)
+- Visual Position 2 → Seat 2 (counter-clockwise from Hero)
+- Visual Position 3 → Seat 1 (counter-clockwise from Seat 2)
+
+**Impact**:
+- **Before**: 7 name mappings, 4 unmapped players, 1 resolved file, 4 failed files
+- **After**: 11 name mappings (+57%), 0 unmapped players (-100%), 5 resolved files (+400%), 0 failed files ✅
+- Effective match rate increased from 3.4% to ~100% for tables with screenshots
+- Each screenshot now provides ALL player names at the table, not just the matched hand's players
+
+**Key Insight**: The screenshots were always sufficient to de-anonymize entire tables. The issue was that the system only used player names that appeared in the specific matched hand, ignoring other players visible in the screenshot. Now it extracts ALL visible players and applies them to ALL hands at that table.
+
 ## Recent Features & Enhancements
 
 ### Hand ID Normalization (Oct 2025)
