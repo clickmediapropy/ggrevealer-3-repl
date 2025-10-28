@@ -385,13 +385,16 @@ async function showResults(job) {
     // Display successful and failed files
     displayFileResults(detailedStats);
 
+    // Load debugging info
+    await loadDebugInfo(currentJobId);
+
     // Setup download buttons
     downloadBtn.onclick = () => downloadResult(currentJobId);
     const downloadFallidosBtn = document.getElementById('download-fallidos-btn');
     if (downloadFallidosBtn) {
         downloadFallidosBtn.onclick = () => downloadFailedFiles(currentJobId);
     }
-    
+
     loadJobs();
 }
 
@@ -691,6 +694,135 @@ function toggleJobCard(jobId) {
         icon.classList.remove('bi-chevron-up');
         icon.classList.add('bi-chevron-down');
     }
+}
+
+// Debug info state
+let debugData = null;
+let currentLogFilter = '';
+
+async function loadDebugInfo(jobId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/debug/${jobId}`);
+        if (!response.ok) {
+            console.error('Failed to fetch debug info');
+            return;
+        }
+
+        debugData = await response.json();
+
+        // Show debug section
+        document.getElementById('debug-section').classList.remove('d-none');
+
+        // Setup log level filter
+        const filterRadios = document.querySelectorAll('input[name="logLevel"]');
+        filterRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                currentLogFilter = e.target.value;
+                renderLogs(debugData.logs.entries, currentLogFilter);
+            });
+        });
+
+        // Setup export button
+        const exportBtn = document.getElementById('export-debug-btn');
+        exportBtn.onclick = () => exportDebugData(jobId, debugData);
+
+        // Initial log render
+        renderLogs(debugData.logs.entries, currentLogFilter);
+
+    } catch (error) {
+        console.error('Error loading debug info:', error);
+    }
+}
+
+function renderLogs(logs, levelFilter = '') {
+    const logsContainer = document.getElementById('logs-container');
+
+    if (!logs || logs.length === 0) {
+        logsContainer.innerHTML = '<div class="text-muted">No hay logs disponibles</div>';
+        return;
+    }
+
+    // Filter logs by level if specified
+    const filteredLogs = levelFilter
+        ? logs.filter(log => log.level === levelFilter)
+        : logs;
+
+    if (filteredLogs.length === 0) {
+        logsContainer.innerHTML = '<div class="text-muted">No hay logs con este nivel</div>';
+        return;
+    }
+
+    // Sort logs by timestamp (newest first -> oldest last for better readability)
+    const sortedLogs = [...filteredLogs].reverse();
+
+    const logsHTML = sortedLogs.map(log => {
+        const levelClass = {
+            'DEBUG': 'text-info',
+            'INFO': 'text-success',
+            'WARNING': 'text-warning',
+            'ERROR': 'text-danger',
+            'CRITICAL': 'text-danger fw-bold'
+        }[log.level] || 'text-secondary';
+
+        const levelBadge = {
+            'DEBUG': 'badge bg-info',
+            'INFO': 'badge bg-success',
+            'WARNING': 'badge bg-warning text-dark',
+            'ERROR': 'badge bg-danger',
+            'CRITICAL': 'badge bg-danger'
+        }[log.level] || 'badge bg-secondary';
+
+        const timestamp = new Date(log.timestamp).toLocaleString('es-ES', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            fractional: 3
+        });
+
+        const extraData = log.extra_data
+            ? `<div class="ms-4 mt-1 text-muted small">${JSON.stringify(log.extra_data)}</div>`
+            : '';
+
+        return `
+            <div class="log-entry mb-2 pb-2 border-bottom">
+                <div class="d-flex align-items-start">
+                    <span class="${levelBadge} me-2">${log.level}</span>
+                    <div class="flex-grow-1">
+                        <span class="text-muted small me-2">${timestamp}</span>
+                        <span class="${levelClass}">${log.message}</span>
+                        ${extraData}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    logsContainer.innerHTML = logsHTML;
+
+    // Auto-scroll to bottom to show most recent logs
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+}
+
+function exportDebugData(jobId, debugData) {
+    const exportData = {
+        job_id: jobId,
+        export_timestamp: new Date().toISOString(),
+        ...debugData
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ggrevealer_debug_job_${jobId}_${Date.now()}.json`;
+    link.click();
+
+    URL.revokeObjectURL(url);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
