@@ -4,6 +4,10 @@ FastAPI application entry point
 
 import os
 import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 import zipfile
 from dataclasses import asdict
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
@@ -15,12 +19,13 @@ from pathlib import Path
 from typing import List
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
 from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format
 from models import NameMapping
+from logger import get_job_logger
 
 app = FastAPI(
     title="GGRevealer API",
@@ -240,9 +245,72 @@ async def get_job_screenshots(job_id: int):
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     screenshot_results = get_screenshot_results(job_id)
     return {"screenshots": screenshot_results}
+
+
+@app.get("/api/debug/{job_id}")
+async def get_debug_info(job_id: int):
+    """Get comprehensive debugging information for a job"""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get all related data
+    files = get_job_files(job_id)
+    result = get_result(job_id)
+    screenshot_results = get_screenshot_results(job_id)
+    logs = get_job_logs(job_id, limit=1000)  # Last 1000 logs
+
+    # Build comprehensive debug info
+    debug_info = {
+        "job": job,
+        "files": {
+            "txt_files": [f for f in files if f['file_type'] == 'txt'],
+            "screenshots": [f for f in files if f['file_type'] == 'screenshot'],
+            "total_txt": len([f for f in files if f['file_type'] == 'txt']),
+            "total_screenshots": len([f for f in files if f['file_type'] == 'screenshot'])
+        },
+        "result": result,
+        "screenshots": {
+            "results": screenshot_results,
+            "summary": {
+                "total": len(screenshot_results),
+                "success": len([s for s in screenshot_results if s.get('status') == 'success']),
+                "warning": len([s for s in screenshot_results if s.get('status') == 'warning']),
+                "error": len([s for s in screenshot_results if s.get('status') == 'error'])
+            }
+        },
+        "logs": {
+            "entries": logs,
+            "count": len(logs),
+            "by_level": {
+                "DEBUG": len([l for l in logs if l.get('level') == 'DEBUG']),
+                "INFO": len([l for l in logs if l.get('level') == 'INFO']),
+                "WARNING": len([l for l in logs if l.get('level') == 'WARNING']),
+                "ERROR": len([l for l in logs if l.get('level') == 'ERROR']),
+                "CRITICAL": len([l for l in logs if l.get('level') == 'CRITICAL'])
+            }
+        },
+        "statistics": {
+            "txt_files": job.get('txt_files_count', 0),
+            "screenshots": job.get('screenshot_files_count', 0),
+            "hands_parsed": job.get('hands_parsed', 0),
+            "matched_hands": job.get('matched_hands', 0),
+            "name_mappings": job.get('name_mappings_count', 0),
+            "processing_time": job.get('processing_time_seconds'),
+            "ocr_processed": job.get('ocr_processed_count', 0),
+            "ocr_total": job.get('ocr_total_count', 0)
+        },
+        "timestamps": {
+            "created_at": job.get('created_at'),
+            "started_at": job.get('started_at'),
+            "completed_at": job.get('completed_at')
+        }
+    }
+
+    return debug_info
 
 
 @app.delete("/api/job/{job_id}")
@@ -267,35 +335,67 @@ async def delete_job_endpoint(job_id: int):
 
 def run_processing_pipeline(job_id: int):
     """Execute the full processing pipeline for a job"""
+    import time
+
+    # Initialize logger for this job
+    logger = get_job_logger(job_id)
+    start_time = time.time()
+
     try:
-        print(f"[JOB {job_id}] Starting processing...")
-        
+        logger.info("🚀 Starting processing pipeline", job_id=job_id)
+
         # Mark job as started with timestamp
         mark_job_started(job_id)
-        
+
+        # Step 1: Load TXT files
+        step_start = time.time()
         txt_files = get_job_files(job_id, 'txt')
-        print(f"[JOB {job_id}] Found {len(txt_files)} TXT files")
-        
+        logger.info(f"📄 Found {len(txt_files)} TXT files",
+                   count=len(txt_files),
+                   duration_ms=int((time.time() - step_start) * 1000))
+
+        # Step 2: Parse hands
+        step_start = time.time()
         all_hands = []
-        for txt_file in txt_files:
+        for i, txt_file in enumerate(txt_files, 1):
+            file_start = time.time()
             content = Path(txt_file['file_path']).read_text(encoding='utf-8')
             hands = GGPokerParser.parse_file(content)
             all_hands.extend(hands)
-        
-        print(f"[JOB {job_id}] Parsed {len(all_hands)} hands")
-        
+            logger.debug(f"Parsed file {i}/{len(txt_files)}: {txt_file['filename']}",
+                        file_num=i,
+                        filename=txt_file['filename'],
+                        hands_found=len(hands),
+                        duration_ms=int((time.time() - file_start) * 1000))
+
+        logger.info(f"✅ Parsed {len(all_hands)} hands from {len(txt_files)} files",
+                   total_hands=len(all_hands),
+                   total_files=len(txt_files),
+                   duration_ms=int((time.time() - step_start) * 1000))
+
         if len(all_hands) == 0:
+            logger.error("❌ No hands could be parsed from TXT files")
             raise Exception("No hands could be parsed")
-        
+
+        # Step 3: Load screenshots
+        step_start = time.time()
         screenshot_files = get_job_files(job_id, 'screenshot')
-        print(f"[JOB {job_id}] Found {len(screenshot_files)} screenshots")
+        logger.info(f"🖼️  Found {len(screenshot_files)} screenshots",
+                   count=len(screenshot_files),
+                   duration_ms=int((time.time() - step_start) * 1000))
         
         # Set total count for progress tracking
         set_ocr_total_count(job_id, len(screenshot_files))
-        
+
+        # Step 4: Process screenshots with OCR
+        logger.info(f"🔍 Starting OCR processing for {len(screenshot_files)} screenshots",
+                   screenshot_count=len(screenshot_files),
+                   max_concurrent=10)
+        step_start = time.time()
+
         # Process screenshots in parallel with semaphore to limit concurrency
         semaphore = asyncio.Semaphore(10)  # Max 10 concurrent requests
-        
+
         async def process_single_screenshot(screenshot_file):
             """Process one screenshot and update progress, save results"""
             filename = screenshot_file['filename']
@@ -304,6 +404,7 @@ def run_processing_pipeline(job_id: int):
             ocr_data = None
             status = "error"
             
+            ocr_start = time.time()
             try:
                 result = await ocr_screenshot(
                     screenshot_file['file_path'],
@@ -313,7 +414,13 @@ def run_processing_pipeline(job_id: int):
                 ocr_success = True
                 ocr_data = result
                 status = "success"
-                
+
+                ocr_duration = int((time.time() - ocr_start) * 1000)
+                logger.debug(f"✅ OCR successful: {filename}",
+                           filename=filename,
+                           hand_id=result.hand_id if result else None,
+                           duration_ms=ocr_duration)
+
                 # Save initial screenshot result (matches will be updated later)
                 # Convert ScreenshotAnalysis dataclass to dict for JSON serialization
                 save_screenshot_result(
@@ -324,14 +431,20 @@ def run_processing_pipeline(job_id: int):
                     matches_found=0,  # Will be updated after matching
                     status="pending_match"
                 )
-                
+
                 increment_ocr_processed_count(job_id)
                 return result
-                
+
             except Exception as e:
                 ocr_error = str(e)
                 status = "error"
-                
+                ocr_duration = int((time.time() - ocr_start) * 1000)
+
+                logger.error(f"❌ OCR failed: {filename}",
+                           filename=filename,
+                           error=ocr_error,
+                           duration_ms=ocr_duration)
+
                 # Save failed screenshot result
                 save_screenshot_result(
                     job_id=job_id,
@@ -341,9 +454,8 @@ def run_processing_pipeline(job_id: int):
                     matches_found=0,
                     status="error"
                 )
-                
+
                 increment_ocr_processed_count(job_id)
-                print(f"[JOB {job_id}] ❌ OCR failed for {filename}: {ocr_error}")
                 return None
         
         async def process_all_screenshots():
@@ -355,14 +467,32 @@ def run_processing_pipeline(job_id: int):
         
         ocr_results_raw = asyncio.run(process_all_screenshots())
         ocr_results = [r for r in ocr_results_raw if r is not None]
-        
-        print(f"[JOB {job_id}] OCR completed: {len(ocr_results)} screenshots analyzed")
-        
+
+        ocr_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ OCR completed: {len(ocr_results)}/{len(screenshot_files)} screenshots analyzed",
+                   success_count=len(ocr_results),
+                   total_count=len(screenshot_files),
+                   failed_count=len(screenshot_files) - len(ocr_results),
+                   duration_ms=ocr_duration)
+
         if len(ocr_results) == 0:
+            logger.error("❌ No screenshots could be analyzed")
             raise Exception("No screenshots could be analyzed")
-        
+
+        # Step 5: Match hands with screenshots
+        step_start = time.time()
+        logger.info(f"🔗 Starting hand matching (threshold: 50)",
+                   hands_count=len(all_hands),
+                   screenshots_count=len(ocr_results))
+
         matches = find_best_matches(all_hands, ocr_results, confidence_threshold=50)
-        print(f"[JOB {job_id}] Found {len(matches)} matches")
+
+        match_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ Found {len(matches)} matches",
+                   matches_count=len(matches),
+                   hands_count=len(all_hands),
+                   match_rate=round(len(matches) / len(all_hands) * 100, 1) if len(all_hands) > 0 else 0,
+                   duration_ms=match_duration)
         
         # Track matches per screenshot
         screenshot_match_count = {}
@@ -382,9 +512,13 @@ def run_processing_pipeline(job_id: int):
                 status=status
             )
         
+        # Step 6: Generate name mappings
+        step_start = time.time()
+        logger.info("🏷️  Generating name mappings from matches")
+
         name_mappings = []
         matched_hand_ids = set()
-        
+
         for match in matches:
             matched_hand_ids.add(match.hand_id)
             if match.auto_mapping:
@@ -398,27 +532,43 @@ def run_processing_pipeline(job_id: int):
                             confidence=match.confidence,
                             locked=False
                         ))
-        
-        print(f"[JOB {job_id}] Generated {len(name_mappings)} name mappings")
-        
+
+        mapping_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ Generated {len(name_mappings)} name mappings",
+                   mappings_count=len(name_mappings),
+                   unique_players=len(set(m.resolved_name for m in name_mappings)),
+                   duration_ms=mapping_duration)
+
         matched_hands = [hand for hand in all_hands if hand.hand_id in matched_hand_ids]
-        
+
+        # Step 7: Generate output files
+        step_start = time.time()
+        logger.info("📝 Generating output TXT files by table")
+
         # Generate separate TXT files by table with validation info (ALL HANDS, not just matched)
         txt_files_info = generate_txt_files_with_validation(all_hands, name_mappings)
+
+        gen_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ Generated {len(txt_files_info)} table files",
+                   table_count=len(txt_files_info),
+                   total_hands=len(all_hands),
+                   duration_ms=gen_duration)
         
-        print(f"[JOB {job_id}] Generated {len(txt_files_info)} table files (including all hands)")
-        
+        # Step 8: Validate and write files
+        step_start = time.time()
+        logger.info("✍️  Validating and writing output files to disk")
+
         # Create output directory
         job_output_path = OUTPUTS_PATH / str(job_id)
         job_output_path.mkdir(exist_ok=True)
-        
+
         # Validate all files and write them
         validation_errors_all = []
         validation_warnings_all = []
         successful_files = []
         failed_files = []
         all_unmapped_ids = set()
-        
+
         for table_name, file_info in txt_files_info.items():
             final_txt = file_info['content']
             total_hands = file_info['total_hands']
@@ -455,8 +605,27 @@ def run_processing_pipeline(job_id: int):
             # Write individual TXT file with appropriate suffix
             txt_path = job_output_path / f"{table_name}{filename_suffix}.txt"
             txt_path.write_text(final_txt, encoding='utf-8')
-            print(f"[JOB {job_id}] ✓ Wrote {table_name}{filename_suffix}.txt ({total_hands} hands, {len(unmapped_ids)} unmapped IDs)")
-        
+
+            logger.debug(f"Wrote {table_name}{filename_suffix}.txt",
+                        table=table_name,
+                        suffix=filename_suffix,
+                        hands=total_hands,
+                        unmapped_ids_count=len(unmapped_ids),
+                        has_unmapped=has_unmapped)
+
+        write_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ Validated and wrote {len(txt_files_info)} files",
+                   total_files=len(txt_files_info),
+                   successful=len(successful_files),
+                   failed=len(failed_files),
+                   validation_errors=len(validation_errors_all),
+                   validation_warnings=len(validation_warnings_all),
+                   duration_ms=write_duration)
+
+        # Step 9: Create ZIP files
+        step_start = time.time()
+        logger.info("📦 Creating ZIP archives")
+
         # Create ZIP file for successful files
         zip_path = None
         if successful_files:
@@ -464,8 +633,10 @@ def run_processing_pipeline(job_id: int):
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for txt_file in job_output_path.glob("*_resolved.txt"):
                     zipf.write(txt_file, txt_file.name)
-            print(f"[JOB {job_id}] ✓ Created resolved_hands.zip with {len(successful_files)} files")
-        
+            logger.info(f"✅ Created resolved_hands.zip",
+                       files_count=len(successful_files),
+                       zip_path=str(zip_path))
+
         # Create ZIP file for failed files
         zip_path_failed = None
         if failed_files:
@@ -473,7 +644,13 @@ def run_processing_pipeline(job_id: int):
             with zipfile.ZipFile(zip_path_failed, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for txt_file in job_output_path.glob("*_fallado.txt"):
                     zipf.write(txt_file, txt_file.name)
-            print(f"[JOB {job_id}] ✓ Created fallidos.zip with {len(failed_files)} files")
+            logger.info(f"⚠️  Created fallidos.zip",
+                       files_count=len(failed_files),
+                       zip_path=str(zip_path_failed))
+
+        zip_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ ZIP archives created",
+                   duration_ms=zip_duration)
         
         # Get screenshot results for stats
         screenshot_results = get_screenshot_results(job_id)
@@ -534,11 +711,31 @@ def run_processing_pipeline(job_id: int):
         )
         
         update_job_status(job_id, 'completed')
-        
-        print(f"[JOB {job_id}] ✅ Processing completed successfully")
-        
+
+        # Final summary
+        total_duration = int((time.time() - start_time) * 1000)
+        logger.info(f"🎉 Processing completed successfully",
+                   total_duration_ms=total_duration,
+                   total_duration_sec=round(total_duration / 1000, 2),
+                   total_hands=len(all_hands),
+                   matched_hands=len(matched_hands),
+                   name_mappings=len(name_mappings),
+                   successful_files=len(successful_files),
+                   failed_files=len(failed_files))
+
+        # Persist logs to database
+        logger.flush_to_db()
+
     except Exception as error:
-        print(f"[JOB {job_id}] ❌ Processing failed: {error}")
+        total_duration = int((time.time() - start_time) * 1000)
+        logger.critical(f"❌ Processing failed: {str(error)}",
+                       error=str(error),
+                       error_type=type(error).__name__,
+                       total_duration_ms=total_duration)
+
+        # Persist logs to database even on failure
+        logger.flush_to_db()
+
         update_job_status(job_id, 'failed', str(error))
 
 

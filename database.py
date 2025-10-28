@@ -70,6 +70,21 @@ CREATE TABLE IF NOT EXISTS screenshot_results (
     created_at TEXT NOT NULL,
     FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
 );
+
+-- Logs table (structured logging)
+CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
+    timestamp TEXT NOT NULL,
+    level TEXT NOT NULL,
+    message TEXT NOT NULL,
+    extra_data TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_logs_job_id ON logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
 
 
@@ -346,7 +361,7 @@ def update_screenshot_result_matches(
     """Update screenshot result with match count and status"""
     with get_db() as conn:
         conn.execute(
-            """UPDATE screenshot_results 
+            """UPDATE screenshot_results
             SET matches_found = ?, unmapped_players = ?, status = ?
             WHERE job_id = ? AND screenshot_filename = ?""",
             (
@@ -357,3 +372,100 @@ def update_screenshot_result_matches(
                 screenshot_filename
             )
         )
+
+
+# ============================================================================
+# LOG OPERATIONS
+# ============================================================================
+
+def save_log(
+    job_id: Optional[int],
+    timestamp: str,
+    level: str,
+    message: str,
+    extra_data: Optional[Dict] = None
+):
+    """Save a single log entry"""
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO logs (job_id, timestamp, level, message, extra_data, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                job_id,
+                timestamp,
+                level,
+                message,
+                json.dumps(extra_data) if extra_data else None,
+                datetime.utcnow().isoformat()
+            )
+        )
+
+
+def save_logs_batch(job_id: int, log_entries: List[Dict]):
+    """Save multiple log entries at once"""
+    with get_db() as conn:
+        for log_entry in log_entries:
+            conn.execute(
+                """INSERT INTO logs (job_id, timestamp, level, message, extra_data, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    job_id,
+                    log_entry.get('timestamp'),
+                    log_entry.get('level'),
+                    log_entry.get('message'),
+                    json.dumps(log_entry.get('extra')) if log_entry.get('extra') else None,
+                    datetime.utcnow().isoformat()
+                )
+            )
+
+
+def get_job_logs(job_id: int, level: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
+    """Get logs for a specific job, optionally filtered by level"""
+    with get_db() as conn:
+        query = "SELECT * FROM logs WHERE job_id = ?"
+        params = [job_id]
+
+        if level:
+            query += " AND level = ?"
+            params.append(level)
+
+        query += " ORDER BY timestamp DESC"
+
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        results = []
+        for row in rows:
+            result = dict(row)
+            if result.get('extra_data'):
+                result['extra_data'] = json.loads(result['extra_data'])
+            results.append(result)
+        return results
+
+
+def get_system_logs(level: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
+    """Get system logs (logs without job_id)"""
+    with get_db() as conn:
+        query = "SELECT * FROM logs WHERE job_id IS NULL"
+        params = []
+
+        if level:
+            query += " AND level = ?"
+            params.append(level)
+
+        query += " ORDER BY timestamp DESC"
+
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        results = []
+        for row in rows:
+            result = dict(row)
+            if result.get('extra_data'):
+                result['extra_data'] = json.loads(result['extra_data'])
+            results.append(result)
+        return results
