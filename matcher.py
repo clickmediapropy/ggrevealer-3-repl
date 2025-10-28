@@ -241,15 +241,9 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     mapping = {}
     used_names = set()  # Track names we've already mapped to prevent duplicates
     
-    # First pass: Map Hero and verify position
+    # First pass: Map Hero
     hero_seat = next((s for s in hand.seats if s.player_id == 'Hero'), None)
     if hero_seat and screenshot.hero_name:
-        # CRITICAL: Verify hero position matches
-        if screenshot.hero_position and screenshot.hero_position != hero_seat.seat_number:
-            # Hero position mismatch - this is likely an incorrect match
-            print(f"[WARNING] Hero position mismatch: hand {hand.hand_id} has Hero at seat {hero_seat.seat_number}, screenshot has hero at position {screenshot.hero_position}. Skipping mapping.")
-            return {}  # Return empty mapping - this is an incorrect match
-        
         mapping['Hero'] = screenshot.hero_name
         used_names.add(screenshot.hero_name)
     
