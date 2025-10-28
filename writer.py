@@ -104,16 +104,16 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
         
         # 7 regex patterns for replacement (in order)
         
-        # 1. Seat lines: "Seat 1: PlayerID ($100 in chips)"
+        # 1. Seat lines: "Seat 1: PlayerID ($100 in chips)" or "Seat 1: PlayerID (100 in chips)"
         output = re.sub(
-            rf'(Seat \d+: ){anon_escaped}( \(\$[\d.]+ in chips\))',
+            rf'(Seat \d+: ){anon_escaped}( \(\$?[\d,.]+ in chips\))',
             rf'\1{real_name}\2',
             output
         )
         
-        # 2. Blind posts: "PlayerID: posts small blind $0.1" (CRITICAL - must come before general actions)
+        # 2. Blind posts: "PlayerID: posts small blind $0.1" or "10" (CRITICAL - must come before general actions)
         output = re.sub(
-            rf'^{anon_escaped}(: posts (?:small blind|big blind|ante) \$[\d.]+)',
+            rf'^{anon_escaped}(: posts (?:small blind|big blind|ante) \$?[\d.]+)',
             rf'{real_name}\1',
             output,
             flags=re.MULTILINE
