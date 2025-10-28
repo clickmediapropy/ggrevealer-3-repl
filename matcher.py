@@ -45,6 +45,11 @@ def find_best_matches(
                 breakdown = {"hand_id_match": 100.0}
                 mapping = _build_seat_mapping(hand, screenshot)
                 
+                # Reject match if mapping is empty (indicates validation failure)
+                if not mapping:
+                    print(f"❌ Hand ID match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (validation failed)")
+                    continue  # Try next screenshot
+                
                 matches.append(HandMatch(
                     hand_id=hand.hand_id,
                     screenshot_id=screenshot.screenshot_id,
@@ -62,6 +67,11 @@ def find_best_matches(
                 score = 100.0
                 breakdown = {"filename_match": 100.0}
                 mapping = _build_seat_mapping(hand, screenshot)
+                
+                # Reject match if mapping is empty (indicates validation failure)
+                if not mapping:
+                    print(f"❌ Filename match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (validation failed)")
+                    continue  # Try next screenshot
                 
                 matches.append(HandMatch(
                     hand_id=hand.hand_id,
@@ -90,10 +100,18 @@ def find_best_matches(
                 score, breakdown = _calculate_match_score(hand, screenshot)
                 
                 if score > best_score:
-                    best_score = score
-                    best_breakdown = breakdown
-                    best_match = screenshot
-                    best_mapping = _build_seat_mapping(hand, screenshot)
+                    # Build mapping and validate BEFORE accepting as best candidate
+                    mapping = _build_seat_mapping(hand, screenshot)
+                    
+                    # Only accept if mapping is valid (not empty)
+                    if mapping:
+                        best_score = score
+                        best_breakdown = breakdown
+                        best_match = screenshot
+                        best_mapping = mapping
+                    else:
+                        # Log rejected candidate
+                        print(f"❌ Fallback candidate rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (validation failed, score: {score:.1f})")
             
             # Add best match if above threshold
             if best_match and best_score >= confidence_threshold:
@@ -217,16 +235,28 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     """
     Build name mapping from hand to screenshot based on seat positions
     Maps anonymized player IDs to real names (including Hero to real hero name)
+    
+    Returns empty dict if duplicate names detected (indicates incorrect match)
     """
     mapping = {}
+    used_names = set()  # Track names we've already mapped to prevent duplicates
     
-    # Map by seat position (not by name!)
+    # First pass: Map Hero and verify position
+    hero_seat = next((s for s in hand.seats if s.player_id == 'Hero'), None)
+    if hero_seat and screenshot.hero_name:
+        # CRITICAL: Verify hero position matches
+        if screenshot.hero_position and screenshot.hero_position != hero_seat.seat_number:
+            # Hero position mismatch - this is likely an incorrect match
+            print(f"[WARNING] Hero position mismatch: hand {hand.hand_id} has Hero at seat {hero_seat.seat_number}, screenshot has hero at position {screenshot.hero_position}. Skipping mapping.")
+            return {}  # Return empty mapping - this is an incorrect match
+        
+        mapping['Hero'] = screenshot.hero_name
+        used_names.add(screenshot.hero_name)
+    
+    # Second pass: Map other players by seat position
     for seat in hand.seats:
-        # Special handling for Hero: map to hero_name from OCR
         if seat.player_id == 'Hero':
-            if screenshot.hero_name:
-                mapping['Hero'] = screenshot.hero_name
-            continue
+            continue  # Already mapped above
         
         # Find player in same seat position in screenshot
         matching_player = next(
@@ -235,7 +265,13 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
         )
         
         if matching_player:
+            # Check for duplicate name within this hand
+            if matching_player.player_name in used_names:
+                print(f"[WARNING] Duplicate name '{matching_player.player_name}' detected in mapping for hand {hand.hand_id}. This indicates an incorrect match. Skipping mapping.")
+                return {}  # Return empty mapping - this is an incorrect match
+            
             mapping[seat.player_id] = matching_player.player_name
+            used_names.add(matching_player.player_name)
     
     return mapping
 

@@ -48,6 +48,23 @@ The system employs a modular architecture with distinct components for parsing, 
 
 **Validation**: All 14 regex patterns in `generate_final_txt()` now safely handle player names starting with any character, including digits.
 
+#### Duplicate Player Name Mapping Bug (Oct 2025 - FIXED)
+**Problem**: Multiple anonymized player IDs were being mapped to the same real player name (e.g., "TuichAAreko" appearing in multiple seats within the same hand), causing PokerTracker to reject hands with duplicate player names in different positions.
+
+**Root Cause**: The name mapping creation logic in `main.py` (lines 388-414) only checked if an `anonymized_identifier` already existed in the mappings list, but did NOT verify if the `resolved_name` was already being used for a different player. This allowed incorrect matches to create multiple mappings like:
+- `Hero` → TuichAAreko ✅ (correct)
+- `cdbe28b6` → TuichAAreko ❌ (wrong - from incorrect screenshot match)
+- `8e557da3` → TuichAAreko ❌ (wrong - from incorrect screenshot match)
+
+**Underlying Issue**: The matcher was sometimes assigning screenshots to incorrect hands, particularly in heads-up situations where the hero position and opponent positions didn't align properly with the screenshot data.
+
+**Solution**: Enhanced `_build_seat_mapping()` in `matcher.py` to detect and prevent duplicate names **within individual hands**:
+1. **Hero Position Validation**: Before creating mappings, verify that Hero's seat position in the hand matches `hero_position` from the screenshot. If mismatch detected, return empty mapping (reject the match).
+2. **Duplicate Name Detection**: Track all `used_names` while building the mapping for each hand. If the same real name would be mapped to multiple different anonymized IDs within the same hand, return empty mapping (reject the match).
+3. **Per-Hand Scoping**: Validation operates on individual hand-screenshot pairs, allowing the same player to appear legitimately across different hands/tables.
+
+**Impact**: Prevents duplicate player names within the same hand by rejecting incorrect screenshot matches at the source. PokerTracker can now import all hands successfully. Rejected matches are logged with warnings including hand_id for diagnostics.
+
 ## External Dependencies
 - **Google Gemini Vision API**: Used for OCR capabilities to extract text and hand IDs from PokerCraft screenshots. Requires `GEMINI_API_KEY`.
 - **FastAPI**: Python web framework for building the backend REST API.
