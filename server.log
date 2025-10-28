@@ -5,7 +5,7 @@
         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
         
   @app.on_event("startup")
-INFO:     Started server process [37449]
+INFO:     Started server process [6700]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 5000): [errno 48] address already in use

@@ -1,0 +1,69 @@
+# Problema en GGRevealer - Job #7
+
+## IMPORTANTE: Lee el archivo de debug primero
+
+**Antes de hacer cualquier análisis, lee el archivo JSON de debug completo:**
+```
+storage/debug/debug_job_7_20251028_055101.json
+```
+
+Este archivo (`debug_job_7_20251028_055101.json`) contiene:
+- Información completa del job
+- Logs detallados (todos los niveles: DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Resultados de todos los screenshots con OCR y match counts
+- Estadísticas completas
+- Errores específicos de cada screenshot
+
+Usa el comando Read para leer este archivo y obtener contexto completo antes de continuar.
+
+---
+
+## Problema Identificado
+Job completado con resultados subóptimos (Severidad: HIGH)
+
+## Métricas Clave
+- **Match Rate:** 0.6% (5/0 manos)
+- **OCR Success:** 95.0% (0/0 screenshots)
+- **Archivos:** 0 TXT, 0 screenshots
+
+## Problemas Específicos Detectados
+
+- **2 jugadores sin mapear** en 1 tablas diferentes
+- **2 errores de validación** en archivos de salida
+
+
+### Jugadores Sin Mapear (2 total)
+
+Estos jugadores anónimos no pudieron ser identificados:
+
+1. **ID:** `478db80b` | **Tabla:** `N/A` | **Manos:** N/A
+2. **ID:** `478db80b` | **Tabla:** `7639` | **Manos:** 30
+
+
+### Issues Priorizados (1 total)
+
+**1. [HIGH] Sin descripción**
+- Ubicación: `N/A`
+
+
+### Errores de Validación (2 total)
+
+1. Seat count mismatch: 150 -> 144
+
+2. CRITICAL: 1 unmapped anonymous IDs found - PokerTracker will REJECT these hands:
+  • 478db80b at line 4: Seat 2: 478db80b (400 in chips)
+
+
+## Pasos de Debugging Sugeridos
+
+1. **Lee el archivo JSON completo** para obtener contexto detallado
+2. **Revisa las ubicaciones específicas** mencionadas en los patrones detectados
+3. **Investiga los IDs sin mapear** - busca por qué no se encontraron matches
+4. **Verifica los screenshots fallidos** - revisa si el OCR está funcionando correctamente
+5. **Aplica las soluciones sugeridas** en los priority issues
+
+**Archivos principales a revisar:**
+- `main.py:740-1144` - Pipeline de procesamiento
+- `matcher.py:37-76` - Algoritmo de matching
+- `ocr.py:46-117` - Extracción de datos de screenshots
+- `writer.py:174-282` - Generación de archivos de salida

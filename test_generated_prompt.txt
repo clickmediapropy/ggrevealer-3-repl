@@ -1,0 +1,46 @@
+# Problema en GGRevealer - Job #13
+
+## IMPORTANTE: Lee el archivo de debug primero
+
+**Antes de hacer cualquier análisis, lee el archivo JSON de debug completo:**
+```
+storage/debug/debug_job_13_20251028_090121.json
+```
+
+Este archivo (`debug_job_13_20251028_090121.json`) contiene:
+- Información completa del job
+- Logs detallados (todos los niveles: DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Resultados de todos los screenshots con OCR y match counts
+- Estadísticas completas
+- Errores específicos de cada screenshot
+
+Usa el comando Read para leer este archivo y obtener contexto completo antes de continuar.
+
+---
+
+## Problema Identificado
+Job completado con resultados subóptimos
+
+## Métricas Clave
+- **Match Rate:** 0.0% (11/0 manos)
+- **OCR Success:** 0.0% (0/0 screenshots)
+- **Archivos:** 0 TXT, 0 screenshots
+
+## Problemas Específicos Detectados
+
+No se detectaron problemas específicos
+
+
+## Pasos de Debugging Sugeridos
+
+1. **Lee el archivo JSON completo** para obtener contexto detallado
+2. **Revisa las ubicaciones específicas** mencionadas en los patrones detectados
+3. **Investiga los IDs sin mapear** - busca por qué no se encontraron matches
+4. **Verifica los screenshots fallidos** - revisa si el OCR está funcionando correctamente
+5. **Aplica las soluciones sugeridas** en los priority issues
+
+**Archivos principales a revisar:**
+- `main.py:740-1144` - Pipeline de procesamiento
+- `matcher.py:37-76` - Algoritmo de matching
+- `ocr.py:46-117` - Extracción de datos de screenshots
+- `writer.py:174-282` - Generación de archivos de salida
