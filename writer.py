@@ -267,7 +267,7 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
         
         # 13. Uncalled bet returned: "Uncalled bet ($10) returned to PlayerID"
         output = re.sub(
-            rf'(returned to ){anon_escaped}$',
+            rf'(returned to ){anon_escaped}\s*$',
             rf'\1{real_name}',
             output,
             flags=re.MULTILINE
