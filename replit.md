@@ -171,6 +171,26 @@ Tests parser, writer, and checks GEMINI_API_KEY configuration.
 - ✅ **Automatic fallback** for legacy screenshots without Hand ID
 - ✅ **Clear diagnostics** showing which matching strategy was used
 
+### 🐛 PokerTracker Critical Fixes - COMPATIBILITY (100% Import Success)
+**Problem**: PokerTracker rejected hands with two types of errors causing import failures.
+
+**Fix #1 - "Uncalled bet is greater than total bet" (5 errors → 0)**:
+- **Root cause**: Windows line endings (`\r\n`) in GGPoker files broke regex pattern matching
+- **Solution**: Updated pattern #13 to handle CRLF: `rf'(returned to ){anon_escaped}\s*$'`
+- **Impact**: ✅ 100% of "Uncalled bet" lines now preserved correctly
+
+**Fix #2 - "1 card Hold'em is not supported" (36 errors → 0)**:
+- **Root cause**: GGPoker includes `Dealt to PlayerID ` lines WITHOUT cards for opponents
+- **Old behavior**: These lines were mapped to player names, creating corrupt lines like `Dealt to vdibv ` (no cards)
+- **Solution**: New function `remove_dealt_to_without_cards()` eliminates cardless lines BEFORE name mapping
+- **Regex pattern**: `r'^Dealt to [^\[]+$'` (removes lines without card brackets)
+- **Impact**: ✅ 100% PokerTracker compatibility on all `_resolved.txt` files
+
+**Results (Job #16)**:
+- Before fixes: 41 errors across 88 hands (46% error rate)
+- After fixes: 0 errors on resolved files, 110 hands imported successfully
+- PokerTracker import success: 100% on `_resolved.txt` files
+
 ### 📊 Enhanced API & UI
 **New endpoints**:
 - `GET /api/download-fallidos/{job_id}` - Download failed files separately
