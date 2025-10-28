@@ -432,6 +432,182 @@ async def export_debug_info(job_id: int):
     }
 
 
+def _analyze_debug_data(debug_json_path: str) -> dict:
+    """
+    Analiza el archivo JSON de debug y extrae información específica y accionable
+
+    Returns:
+        dict con análisis detallado incluyendo:
+        - unmapped_players: lista de IDs no mapeados con tablas
+        - validation_errors: errores de validación específicos
+        - screenshot_failures: screenshots que fallaron OCR con detalles
+        - critical_logs: logs ERROR/CRITICAL con contexto
+        - patterns_detected: patrones identificados (ej: hero_position null)
+        - priority_issues: lista priorizada de problemas
+    """
+    try:
+        with open(debug_json_path, 'r') as f:
+            debug_data = json.load(f)
+    except Exception as e:
+        return {
+            "error": f"No se pudo leer el archivo debug: {str(e)}",
+            "unmapped_players": [],
+            "validation_errors": [],
+            "screenshot_failures": [],
+            "critical_logs": [],
+            "patterns_detected": [],
+            "priority_issues": []
+        }
+
+    analysis = {
+        "unmapped_players": [],
+        "validation_errors": [],
+        "screenshot_failures": [],
+        "critical_logs": [],
+        "patterns_detected": [],
+        "priority_issues": [],
+        "specific_problems": []
+    }
+
+    # 1. Extraer unmapped players de result.stats
+    result = debug_data.get('result', {})
+    stats = result.get('stats', {})
+
+    if stats.get('unmapped_players'):
+        for unmapped_id in stats['unmapped_players']:
+            analysis['unmapped_players'].append({
+                "player_id": unmapped_id,
+                "count": stats['unmapped_players_count']
+            })
+
+    # Obtener unmapped_ids por archivo desde failed_files
+    if stats.get('failed_files'):
+        for failed_file in stats['failed_files']:
+            table = failed_file.get('table')
+            unmapped_ids = failed_file.get('unmapped_ids', [])
+            for uid in unmapped_ids:
+                analysis['unmapped_players'].append({
+                    "player_id": uid,
+                    "table": table,
+                    "hands_in_table": failed_file.get('total_hands')
+                })
+
+    # 2. Extraer validation errors
+    if stats.get('validation_errors'):
+        for error in stats['validation_errors']:
+            analysis['validation_errors'].append(error)
+            # Detectar errores críticos
+            if "CRITICAL" in error or "PokerTracker will REJECT" in error:
+                analysis['priority_issues'].append({
+                    "type": "VALIDATION_CRITICAL",
+                    "description": error,
+                    "severity": "HIGH"
+                })
+
+    # 3. Analizar screenshot results
+    screenshots = debug_data.get('screenshots', {}).get('results', [])
+    hero_position_issues = 0
+    hand_id_missing = 0
+    player_count_low = 0
+
+    for screenshot in screenshots:
+        if not screenshot.get('ocr_success'):
+            analysis['screenshot_failures'].append({
+                "filename": screenshot.get('screenshot_filename'),
+                "error": screenshot.get('ocr_error'),
+                "matches_found": screenshot.get('matches_found', 0)
+            })
+        else:
+            # Analizar datos OCR para detectar patrones
+            ocr_data = screenshot.get('ocr_data', {})
+
+            # Detectar hero_position null
+            if ocr_data.get('hero_position') is None and ocr_data.get('hero_name') is None:
+                hero_position_issues += 1
+
+            # Detectar hand_id faltante
+            if not ocr_data.get('hand_id'):
+                hand_id_missing += 1
+
+            # Detectar pocos jugadores extraídos
+            player_stacks = ocr_data.get('all_player_stacks', [])
+            if len(player_stacks) < 3:  # Esperamos 3 jugadores en 3-max
+                player_count_low += 1
+
+            # Si no hubo matches, es un problema
+            if screenshot.get('matches_found', 0) == 0:
+                analysis['screenshot_failures'].append({
+                    "filename": screenshot.get('screenshot_filename'),
+                    "issue": "OCR exitoso pero 0 matches encontrados",
+                    "hand_id_extracted": ocr_data.get('hand_id'),
+                    "hero_position": ocr_data.get('hero_position'),
+                    "players_extracted": len(player_stacks)
+                })
+
+    # 4. Extraer logs críticos
+    logs = debug_data.get('logs', {}).get('entries', [])
+    for log in logs:
+        if log.get('level') in ['ERROR', 'CRITICAL']:
+            analysis['critical_logs'].append({
+                "level": log.get('level'),
+                "message": log.get('message'),
+                "timestamp": log.get('timestamp'),
+                "extra_data": log.get('extra_data')
+            })
+
+    # 5. Detectar patrones
+    total_screenshots = len(screenshots)
+
+    if hero_position_issues > total_screenshots * 0.5:
+        analysis['patterns_detected'].append({
+            "pattern": "HERO_POSITION_NULL",
+            "description": f"{hero_position_issues}/{total_screenshots} screenshots sin hero_position",
+            "impact": "Impide el mapping de jugadores (counter-clockwise algorithm necesita hero_position)",
+            "location": "ocr.py línea 46-117 (extracción de datos) o matcher.py línea 260 (_build_seat_mapping)"
+        })
+        analysis['priority_issues'].append({
+            "type": "HERO_POSITION_NULL",
+            "description": f"Mayoría de screenshots ({hero_position_issues}/{total_screenshots}) no tienen hero_position extraído",
+            "severity": "HIGH",
+            "suggested_fix": "Revisar prompt de OCR en ocr.py para asegurar que siempre extrae hero_position=1"
+        })
+
+    if hand_id_missing > total_screenshots * 0.3:
+        analysis['patterns_detected'].append({
+            "pattern": "HAND_ID_MISSING",
+            "description": f"{hand_id_missing}/{total_screenshots} screenshots sin hand_id",
+            "impact": "Sin hand_id, el matching es imposible",
+            "location": "ocr.py línea 62-65 (extracción de Hand ID)"
+        })
+
+    if player_count_low > total_screenshots * 0.5:
+        analysis['patterns_detected'].append({
+            "pattern": "LOW_PLAYER_EXTRACTION",
+            "description": f"{player_count_low}/{total_screenshots} screenshots con menos de 3 jugadores",
+            "impact": "Mappings incompletos, algunos jugadores quedan sin mapear",
+            "location": "ocr.py prompt de Gemini"
+        })
+
+    # 6. Crear lista de problemas específicos con contexto
+    if analysis['unmapped_players']:
+        analysis['specific_problems'].append({
+            "problem": f"{len(analysis['unmapped_players'])} jugadores sin mapear",
+            "details": f"IDs no mapeados en {len(set(p.get('table') for p in analysis['unmapped_players'] if p.get('table')))} tablas",
+            "examples": [p['player_id'] for p in analysis['unmapped_players'][:5]],
+            "action": "Revisar por qué estos IDs no se mapearon - falta screenshot o matching falló"
+        })
+
+    if analysis['screenshot_failures']:
+        analysis['specific_problems'].append({
+            "problem": f"{len(analysis['screenshot_failures'])} screenshots con problemas",
+            "details": "Algunos screenshots no generaron matches a pesar de OCR exitoso",
+            "examples": [s['filename'] for s in analysis['screenshot_failures'][:3]],
+            "action": "Revisar matcher.py o calidad de extracción OCR"
+        })
+
+    return analysis
+
+
 @app.post("/api/debug/{job_id}/generate-prompt")
 async def generate_claude_prompt(job_id: int):
     """Generate a Claude Code debugging prompt using Gemini AI"""
@@ -443,6 +619,9 @@ async def generate_claude_prompt(job_id: int):
     debug_export = _export_debug_json(job_id)
     debug_json_path = debug_export['filepath'] if debug_export else "No disponible (error al exportar)"
     debug_json_filename = debug_export['filename'] if debug_export else "debug_info.json"
+
+    # Analyze debug data to extract specific information
+    detailed_analysis = _analyze_debug_data(debug_json_path) if debug_export else {}
 
     # Get all debug data
     files = get_job_files(job_id)
@@ -546,6 +725,9 @@ async def generate_claude_prompt(job_id: int):
     if result and result.get('stats'):
         context["result_stats"] = result['stats']
 
+    # Add detailed analysis to context
+    context["detailed_analysis"] = detailed_analysis
+
     # Configure Gemini
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key or api_key == 'your_gemini_api_key_here':
@@ -553,7 +735,7 @@ async def generate_claude_prompt(job_id: int):
         return {
             "success": False,
             "message": "GEMINI_API_KEY not configured",
-            "prompt": _generate_fallback_prompt(context),
+            "prompt": _generate_fallback_prompt(context, detailed_analysis),
             "debug_json_path": debug_json_path
         }
 
@@ -561,6 +743,20 @@ async def generate_claude_prompt(job_id: int):
         genai.configure(api_key=api_key)
         # Use Gemini 2.5 Flash with thinking mode for better debugging analysis
         model = genai.GenerativeModel('gemini-2.5-flash')
+
+        # Build detailed problem summary
+        problem_summary = []
+        if detailed_analysis.get('unmapped_players'):
+            unmapped_count = len(detailed_analysis['unmapped_players'])
+            tables_affected = len(set(p.get('table') for p in detailed_analysis['unmapped_players'] if p.get('table')))
+            problem_summary.append(f"- {unmapped_count} jugadores sin mapear en {tables_affected} tablas")
+
+        if detailed_analysis.get('patterns_detected'):
+            for pattern in detailed_analysis['patterns_detected']:
+                problem_summary.append(f"- {pattern['pattern']}: {pattern['description']}")
+
+        if detailed_analysis.get('validation_errors'):
+            problem_summary.append(f"- {len(detailed_analysis['validation_errors'])} errores de validación")
 
         # Create prompt for Gemini
         gemini_prompt = f"""Eres un experto en debugging de aplicaciones Python, análisis de errores y detección de problemas en pipelines de procesamiento de datos.
@@ -586,65 +782,91 @@ GGRevealer es una aplicación FastAPI que desanonimiza hand histories de poker u
 
 {json.dumps(context, indent=2, ensure_ascii=False)}
 
+**ANÁLISIS DETALLADO (DATOS CONCRETOS EXTRAÍDOS DEL JSON):**
+
+**Problemas Específicos Detectados:**
+{chr(10).join(problem_summary) if problem_summary else 'No se detectaron problemas específicos'}
+
+**Unmapped Players ({len(detailed_analysis.get('unmapped_players', []))} total):**
+{json.dumps(detailed_analysis.get('unmapped_players', [])[:5], indent=2, ensure_ascii=False) if detailed_analysis.get('unmapped_players') else 'Ninguno'}
+
+**Patrones Detectados:**
+{json.dumps(detailed_analysis.get('patterns_detected', []), indent=2, ensure_ascii=False) if detailed_analysis.get('patterns_detected') else 'Ninguno'}
+
+**Priority Issues:**
+{json.dumps(detailed_analysis.get('priority_issues', []), indent=2, ensure_ascii=False) if detailed_analysis.get('priority_issues') else 'Ninguno'}
+
+**Screenshot Failures ({len(detailed_analysis.get('screenshot_failures', []))} total):**
+{json.dumps(detailed_analysis.get('screenshot_failures', [])[:3], indent=2, ensure_ascii=False) if detailed_analysis.get('screenshot_failures') else 'Ninguno'}
+
+**Validation Errors:**
+{json.dumps(detailed_analysis.get('validation_errors', [])[:5], indent=2, ensure_ascii=False) if detailed_analysis.get('validation_errors') else 'Ninguno'}
+
 **INDICADORES DE PROBLEMAS DETECTADOS:**
 {', '.join(problem_indicators) if problem_indicators else 'Ninguno detectado automáticamente'}
 
-**TU ANÁLISIS DEBE IDENTIFICAR:**
+**USA EL ANÁLISIS DETALLADO para generar un prompt ESPECÍFICO:**
 
-1. **¿Cuál es el problema REAL?**
-   - Si match_rate es bajo (<30%): El problema es en el MATCHING (matcher.py o calidad de screenshots)
-   - Si OCR success rate es bajo: El problema es en OCR (ocr.py o calidad de imágenes)
-   - Si hay error_message: Analiza el error específico
-   - Si no hay errores pero resultados malos: Identifica qué métrica está mal
+El análisis detallado ya extrajo información concreta del JSON:
+- Unmapped Players: IDs específicos y en qué tablas están
+- Patrones Detectados: problemas sistemáticos (ej: hero_position null en todos los screenshots)
+- Priority Issues: problemas de alta severidad con suggested_fix
+- Screenshot Failures: screenshots que no generaron matches con detalles de qué falló
+- Validation Errors: errores de PokerTracker
 
-2. **¿Por qué está fallando?**
-   - Analiza error_logs para patrones
-   - Revisa failed_screenshots para errores comunes
-   - Considera warning_logs si son relevantes
+**IDENTIFICA LA CAUSA RAÍZ:**
 
-3. **¿Dónde buscar?**
-   - main.py (líneas 400-800): Pipeline y OCR paralelo
-   - matcher.py: Algoritmo de matching (Hand ID, scoring)
-   - ocr.py: Llamadas a Gemini Vision
-   - parser.py: Parsing de TXT files
+1. Si hay PATRONES DETECTADOS:
+   - Usa el pattern['location'] para sugerir archivos y funciones EXACTAS
+   - Usa el pattern['impact'] para explicar por qué es crítico
+   - Usa el pattern['suggested_fix'] si existe
+
+2. Si hay UNMAPPED PLAYERS con tablas:
+   - Menciona IDs específicos (ej: "478db80b en tabla 7639")
+   - Correlaciona con screenshots que deberían haber mapeado esos jugadores
+
+3. Si hay PRIORITY ISSUES:
+   - Priorízalos en el prompt
+   - Incluye la severidad (HIGH/MEDIUM/LOW)
+   - Menciona el suggested_fix
 
 **GENERA UN PROMPT que:**
 
 1. **PRIMERO: Instruye a Claude Code que lea el archivo JSON de debug**
-   - DEBE empezar con algo como: "Lee el archivo {debug_json_path} para obtener información completa del job"
-   - Esto es CRÍTICO porque el archivo JSON tiene toda la información detallada
+   ```
+   Lee el archivo {debug_json_path} para obtener información completa del job.
+   ```
 
-2. **Identifique el problema de forma ESPECÍFICA** (no genérico)
-   - Ejemplo BUENO: "Match rate de 3.4% indica que el algoritmo de matching no está funcionando"
-   - Ejemplo MALO: "Hay un error en el procesamiento"
+2. **Identifica el problema CONCRETO** (usa los datos específicos)
+   - Ejemplo: "5 screenshots no tienen hero_position extraído, causando que _build_seat_mapping() en matcher.py:260 falle"
+   - NO: "El matching no funciona bien"
 
-3. **Proporcione MÉTRICAS CLAVE**
-   - Match rate, OCR success rate, screenshots procesados
-   - Comparar con lo esperado
+3. **Menciona IDs, tablas, archivos ESPECÍFICOS**
+   - Si hay unmapped ID "478db80b" en tabla "7639": menciónalo
+   - Si screenshot "2025-10-27_10_55_AM.png" falló: menciónalo
+   - Si función "_build_seat_mapping()" está involucrada: menciónala con línea
 
-4. **Liste ERRORES ESPECÍFICOS** (si los hay)
-   - Con nombre de archivo, línea si es posible
-   - Patrones detectados
+4. **Sugiere archivos/funciones EXACTAS basándote en los patrones detectados**
+   - Usa pattern['location'] del análisis (ej: "ocr.py línea 46-117" o "matcher.py línea 260")
+   - Proporciona el suggested_fix si existe
 
-5. **Sugiera ARCHIVOS Y FUNCIONES CONCRETAS** a revisar
-   - No solo "revisa matcher.py" sino "revisa la función find_best_matches() en matcher.py:37"
-
-6. **Proponga PASOS CONCRETOS de debugging**
-   - Qué logs revisar, qué agregar, qué cambiar
-
-7. **Sea ACCIONABLE**
-   - Claude Code debe poder empezar a trabajar inmediatamente
+5. **Propone pasos ACCIONABLES**
+   - Basados en el problema real detectado
+   - Con comandos específicos si es posible
 
 **FORMATO:**
-Usa markdown, secciones claras, bullets. Máximo 500 palabras. ENFÓCATE en lo más importante.
+- Markdown con secciones claras
+- Máximo 500 palabras
+- Enfócate en el problema #1 (el más crítico)
+- Incluye ejemplos concretos (IDs, tablas, archivos con líneas)
 
 **IMPORTANTE:**
-- El prompt DEBE empezar con la instrucción de leer el archivo JSON: {debug_json_path}
-- NO generes prompt genérico si el problema es obvio (ej: match rate bajo = problema de matching)
-- Si no hay errores explícitos, ANALIZA las métricas y encuentra el problema real
-- Sé ESPECÍFICO y TÉCNICO
+- USA LOS DATOS ESPECÍFICOS del análisis detallado (unmapped players, patterns, priority issues)
+- Menciona archivos Y líneas (ej: "matcher.py:260" no solo "matcher.py")
+- Incluye IDs de jugadores, nombres de tablas, nombres de screenshots reales
+- Si el análisis detallado tiene suggested_fix, ÚSALO
 
-Genera SOLO el prompt para Claude Code:"""
+Genera SOLO el prompt para Claude Code (sin preamble, solo el prompt):"""
 
         # Call Gemini
         response = await asyncio.to_thread(
@@ -660,12 +882,30 @@ Genera SOLO el prompt para Claude Code:"""
 
         generated_prompt = response.text.strip()
 
+        # Validate the generated prompt
+        validation_result = _validate_generated_prompt(generated_prompt, detailed_analysis, debug_json_path)
+
+        if not validation_result['valid']:
+            print(f"⚠️  Generated prompt has quality issues (score: {validation_result['quality_score']}):")
+            for issue in validation_result['issues']:
+                print(f"  - {issue}")
+
+            # If validation fails badly (score < 50), use fallback instead
+            if validation_result['quality_score'] < 50:
+                print("❌ Prompt quality too low, using fallback instead")
+                generated_prompt = _generate_fallback_prompt(context, detailed_analysis)
+                validation_result = _validate_generated_prompt(generated_prompt, detailed_analysis, debug_json_path)
+                print(f"✅ Fallback prompt quality score: {validation_result['quality_score']}")
+        else:
+            print(f"✅ Generated prompt passed validation (score: {validation_result['quality_score']})")
+
         return {
             "success": True,
             "prompt": generated_prompt,
             "context": context,
             "debug_json_path": debug_json_path,
-            "debug_json_filename": debug_json_filename
+            "debug_json_filename": debug_json_filename,
+            "validation": validation_result
         }
 
     except Exception as e:
@@ -673,13 +913,72 @@ Genera SOLO el prompt para Claude Code:"""
         return {
             "success": False,
             "message": f"Error generating prompt: {str(e)}",
-            "prompt": _generate_fallback_prompt(context),
+            "prompt": _generate_fallback_prompt(context, detailed_analysis),
             "debug_json_path": debug_json_path
         }
 
 
-def _generate_fallback_prompt(context: dict) -> str:
-    """Generate a basic prompt when Gemini is not available"""
+def _validate_generated_prompt(prompt: str, detailed_analysis: dict, debug_json_path: str) -> dict:
+    """
+    Validate the quality of a generated debugging prompt
+
+    Returns:
+        dict with 'valid' (bool) and 'issues' (list of problems found)
+    """
+    issues = []
+
+    # Check 1: Prompt is not empty
+    if not prompt or len(prompt.strip()) == 0:
+        issues.append("Prompt está vacío")
+        return {"valid": False, "issues": issues}
+
+    # Check 2: Minimum length (200 chars for meaningful content)
+    if len(prompt) < 200:
+        issues.append(f"Prompt muy corto ({len(prompt)} chars, mínimo 200)")
+
+    # Check 3: Contains debug JSON path reference
+    if debug_json_path and debug_json_path not in prompt:
+        issues.append("Prompt no menciona el archivo JSON de debug")
+
+    # Check 4: If there are unmapped players, prompt should mention them
+    if detailed_analysis.get('unmapped_players') and len(detailed_analysis['unmapped_players']) > 0:
+        # Look for keywords: "unmapped", "sin mapear", "anónimos", "player"
+        has_unmapped_mention = any(keyword in prompt.lower() for keyword in
+                                  ['unmapped', 'sin mapear', 'anónimo', 'player', 'jugador'])
+        if not has_unmapped_mention:
+            issues.append("Hay jugadores sin mapear pero el prompt no los menciona")
+
+    # Check 5: If there are patterns detected, prompt should mention them
+    if detailed_analysis.get('patterns_detected') and len(detailed_analysis['patterns_detected']) > 0:
+        has_pattern_mention = any(keyword in prompt.lower() for keyword in
+                                 ['patrón', 'pattern', 'detectado'])
+        if not has_pattern_mention:
+            issues.append("Hay patrones detectados pero el prompt no los menciona")
+
+    # Check 6: If there are priority issues, prompt should mention specific files/locations
+    if detailed_analysis.get('priority_issues') and len(detailed_analysis['priority_issues']) > 0:
+        # Check for file references like "file.py:123" or "file.py línea"
+        import re
+        has_file_references = re.search(r'\w+\.py:\d+', prompt) or 'línea' in prompt.lower()
+        if not has_file_references:
+            issues.append("Hay issues prioritarios pero el prompt no menciona archivos/líneas específicas")
+
+    # Check 7: Prompt should have structure (sections with ##)
+    if '##' not in prompt:
+        issues.append("Prompt no tiene estructura (falta formato con ##)")
+
+    # Validation passes if no issues or only minor issues
+    valid = len(issues) == 0
+
+    return {
+        "valid": valid,
+        "issues": issues,
+        "quality_score": max(0, 100 - (len(issues) * 15))  # Each issue reduces score by 15%
+    }
+
+
+def _generate_fallback_prompt(context: dict, detailed_analysis: dict) -> str:
+    """Generate a detailed prompt using analyzed debug data when Gemini is not available"""
     error_msg = context.get('error_message') or 'No hay mensaje de error explícito'
     stats = context.get('statistics', {})
     metrics = context.get('calculated_metrics', {})
@@ -689,10 +988,33 @@ def _generate_fallback_prompt(context: dict) -> str:
     debug_json_path = context.get('debug_json_path', '')
     debug_json_filename = context.get('debug_json_filename', '')
 
-    # Identify main problem
+    # Build detailed problem summary using analyzed data
+    problems_detected = []
+
+    if detailed_analysis.get('unmapped_players'):
+        unmapped_count = len(detailed_analysis['unmapped_players'])
+        tables_affected = len(set(p.get('table') for p in detailed_analysis['unmapped_players'] if p.get('table')))
+        problems_detected.append(f"- **{unmapped_count} jugadores sin mapear** en {tables_affected} tablas diferentes")
+
+    if detailed_analysis.get('patterns_detected'):
+        for pattern in detailed_analysis['patterns_detected']:
+            problems_detected.append(f"- **{pattern['pattern']}**: {pattern['description']} (Impacto: {pattern.get('impact', 'No especificado')})")
+
+    if detailed_analysis.get('validation_errors'):
+        validation_count = len(detailed_analysis['validation_errors'])
+        problems_detected.append(f"- **{validation_count} errores de validación** en archivos de salida")
+
+    if detailed_analysis.get('screenshot_failures'):
+        failure_count = len(detailed_analysis['screenshot_failures'])
+        problems_detected.append(f"- **{failure_count} screenshots fallidos** en OCR")
+
+    # Identify main problem from priority issues
     main_problem = "Job completado con resultados subóptimos"
 
-    if 'JOB_FAILED' in problem_indicators:
+    if detailed_analysis.get('priority_issues') and len(detailed_analysis['priority_issues']) > 0:
+        top_issue = detailed_analysis['priority_issues'][0]
+        main_problem = f"{top_issue.get('problem', main_problem)} (Severidad: {top_issue.get('severity', 'unknown')})"
+    elif 'JOB_FAILED' in problem_indicators:
         main_problem = f"Job falló: {error_msg}"
     elif 'VERY_LOW_MATCH_RATE' in problem_indicators:
         main_problem = f"Match rate muy bajo ({metrics.get('match_rate_percent', 0):.1f}%) - Problema de matching"
@@ -729,51 +1051,100 @@ Usa el comando Read para leer este archivo y obtener contexto completo antes de 
 - **OCR Success:** {metrics.get('screenshot_success_rate_percent', 0):.1f}% ({screenshot_summary.get('success', 0)}/{screenshot_summary.get('total', 0)} screenshots)
 - **Archivos:** {stats.get('txt_files', 0)} TXT, {stats.get('screenshots', 0)} screenshots
 
-## Análisis
+## Problemas Específicos Detectados
+
+{chr(10).join(problems_detected) if problems_detected else 'No se detectaron problemas específicos'}
 
 """
 
-    # Add specific analysis based on problem
-    if metrics.get('match_rate_percent', 0) < 30:
-        prompt += """### Problema: Match Rate Bajo
-El problema principal es que muy pocas manos están siendo matched con screenshots.
+    # Add unmapped players details
+    if detailed_analysis.get('unmapped_players'):
+        prompt += f"\n### Jugadores Sin Mapear ({len(detailed_analysis['unmapped_players'])} total)\n\n"
+        prompt += "Estos jugadores anónimos no pudieron ser identificados:\n\n"
+        for i, player in enumerate(detailed_analysis['unmapped_players'][:10]):
+            prompt += f"{i+1}. **ID:** `{player.get('player_id', 'N/A')}` | **Tabla:** `{player.get('table', 'N/A')}` | **Manos:** {player.get('hands_in_table', 'N/A')}\n"
 
-**Posibles causas:**
-1. Hand IDs no coinciden entre TXT y screenshots
-2. Algoritmo de scoring en matcher.py no funciona bien
-3. Screenshots de calidad pobre o formato diferente
-4. OCR no extrae Hand IDs correctamente
-
-**Archivos a revisar:**
-- `matcher.py:37-76` - Función find_best_matches()
-- `ocr.py:46-117` - Extracción de Hand ID
-- Logs de matching para ver scores
-
-"""
-
-    if screenshot_summary.get('error', 0) > 0:
-        prompt += f"""### Screenshots Fallidos: {screenshot_summary.get('error', 0)}
-Hay screenshots que fallaron en OCR. Revisa los errores específicos.
-
-"""
-
-    if error_logs:
-        prompt += "## Logs de Error\n"
-        for log in error_logs[:5]:
-            prompt += f"\n[{log.get('level')}] {log.get('message')}"
-            if log.get('extra_data'):
-                prompt += f"\n  Extra: {json.dumps(log.get('extra_data'))}"
+        if len(detailed_analysis['unmapped_players']) > 10:
+            prompt += f"\n...y {len(detailed_analysis['unmapped_players']) - 10} más (ver JSON completo)\n"
         prompt += "\n"
 
+    # Add patterns detected details
+    if detailed_analysis.get('patterns_detected'):
+        prompt += f"\n### Patrones Detectados ({len(detailed_analysis['patterns_detected'])} total)\n\n"
+        for pattern in detailed_analysis['patterns_detected']:
+            prompt += f"**{pattern['pattern']}:**\n"
+            prompt += f"- Descripción: {pattern.get('description', 'N/A')}\n"
+            prompt += f"- Impacto: {pattern.get('impact', 'N/A')}\n"
+            prompt += f"- Ubicación sugerida: `{pattern.get('location', 'N/A')}`\n\n"
+
+    # Add priority issues with suggested fixes
+    if detailed_analysis.get('priority_issues'):
+        prompt += f"\n### Issues Priorizados ({len(detailed_analysis['priority_issues'])} total)\n\n"
+        for i, issue in enumerate(detailed_analysis['priority_issues'][:5], 1):
+            prompt += f"**{i}. [{issue.get('severity', 'UNKNOWN')}] {issue.get('problem', 'Sin descripción')}**\n"
+            prompt += f"- Ubicación: `{issue.get('location', 'N/A')}`\n"
+            if issue.get('suggested_fix'):
+                prompt += f"- Solución sugerida: {issue.get('suggested_fix')}\n"
+            if issue.get('evidence'):
+                prompt += f"- Evidencia: {issue.get('evidence')}\n"
+            prompt += "\n"
+
+    # Add validation errors
+    if detailed_analysis.get('validation_errors'):
+        prompt += f"\n### Errores de Validación ({len(detailed_analysis['validation_errors'])} total)\n\n"
+        for i, error in enumerate(detailed_analysis['validation_errors'][:5], 1):
+            # Handle both string and dict formats
+            if isinstance(error, str):
+                prompt += f"{i}. {error}\n"
+            else:
+                prompt += f"{i}. **Archivo:** `{error.get('filename', 'N/A')}`\n"
+                prompt += f"   - Validación fallida: {error.get('validation_failed', 'N/A')}\n"
+                prompt += f"   - Detalles: {error.get('details', 'N/A')}\n"
+            prompt += "\n"
+
+    # Add screenshot failures
+    if detailed_analysis.get('screenshot_failures'):
+        prompt += f"\n### Screenshots Fallidos ({len(detailed_analysis['screenshot_failures'])} total)\n\n"
+        for i, failure in enumerate(detailed_analysis['screenshot_failures'][:5], 1):
+            # Handle both string and dict formats
+            if isinstance(failure, str):
+                prompt += f"{i}. {failure}\n\n"
+            else:
+                prompt += f"{i}. **Archivo:** `{failure.get('filename', 'N/A')}`\n"
+                if 'error' in failure:
+                    prompt += f"   - Error: {failure.get('error', 'N/A')}\n"
+                if 'issue' in failure:
+                    prompt += f"   - Issue: {failure.get('issue', 'N/A')}\n"
+                if 'ocr_success' in failure:
+                    prompt += f"   - Success: {failure.get('ocr_success', 'N/A')}\n"
+                if 'matches_found' in failure:
+                    prompt += f"   - Matches: {failure.get('matches_found', 'N/A')}\n"
+                prompt += "\n"
+
+    # Add critical logs
+    if detailed_analysis.get('critical_logs'):
+        prompt += f"\n### Logs Críticos ({len(detailed_analysis['critical_logs'])} total)\n\n"
+        for log in detailed_analysis['critical_logs'][:5]:
+            prompt += f"[{log.get('level', 'N/A')}] {log.get('message', 'Sin mensaje')}\n"
+            if log.get('extra_data'):
+                prompt += f"  Contexto: {json.dumps(log.get('extra_data'), indent=2, ensure_ascii=False)}\n"
+            prompt += "\n"
+
     prompt += """
-## Pasos de Debugging
+## Pasos de Debugging Sugeridos
 
-1. Revisa los logs del job en la sección de debugging
-2. Verifica qué está retornando el OCR (Hand IDs, player names)
-3. Chequea el algoritmo de matching y sus scores
-4. Exporta el debug JSON para análisis detallado
+1. **Lee el archivo JSON completo** para obtener contexto detallado
+2. **Revisa las ubicaciones específicas** mencionadas en los patrones detectados
+3. **Investiga los IDs sin mapear** - busca por qué no se encontraron matches
+4. **Verifica los screenshots fallidos** - revisa si el OCR está funcionando correctamente
+5. **Aplica las soluciones sugeridas** en los priority issues
 
-**Archivos principales:** main.py, parser.py, ocr.py, matcher.py, writer.py"""
+**Archivos principales a revisar:**
+- `main.py:740-1144` - Pipeline de procesamiento
+- `matcher.py:37-76` - Algoritmo de matching
+- `ocr.py:46-117` - Extracción de datos de screenshots
+- `writer.py:174-282` - Generación de archivos de salida
+"""
 
     return prompt
 
