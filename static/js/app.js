@@ -381,8 +381,17 @@ async function showResults(job) {
     
     // Display unmapped players warning
     displayUnmappedPlayers(detailedStats);
+    
+    // Display successful and failed files
+    displayFileResults(detailedStats);
 
+    // Setup download buttons
     downloadBtn.onclick = () => downloadResult(currentJobId);
+    const downloadFallidosBtn = document.getElementById('download-fallidos-btn');
+    if (downloadFallidosBtn) {
+        downloadFallidosBtn.onclick = () => downloadFailedFiles(currentJobId);
+    }
+    
     loadJobs();
 }
 
@@ -467,6 +476,66 @@ function displayUnmappedPlayers(stats) {
     document.getElementById('unmapped-players-list').innerHTML = playersList + moreText;
 }
 
+function displayFileResults(stats) {
+    const successfulFiles = stats.successful_files || [];
+    const failedFiles = stats.failed_files || [];
+    
+    // Show/hide download buttons based on what files exist
+    const downloadBtn = document.getElementById('download-btn');
+    const downloadFallidosBtn = document.getElementById('download-fallidos-btn');
+    
+    if (successfulFiles.length > 0) {
+        downloadBtn.classList.remove('d-none');
+        document.getElementById('successful-files-section').classList.remove('d-none');
+        
+        const filesList = successfulFiles.map(file => 
+            `<div class="mt-1">
+                <i class="bi bi-file-earmark-check text-success"></i> 
+                <strong>${file.table}</strong> - ${file.total_hands} manos
+            </div>`
+        ).join('');
+        
+        document.getElementById('successful-files-list').innerHTML = filesList;
+    } else {
+        downloadBtn.classList.add('d-none');
+        document.getElementById('successful-files-section').classList.add('d-none');
+    }
+    
+    if (failedFiles.length > 0) {
+        downloadFallidosBtn.classList.remove('d-none');
+        document.getElementById('failed-files-section').classList.remove('d-none');
+        
+        const filesList = failedFiles.map(file => {
+            const unmappedIds = file.unmapped_ids || [];
+            const unmappedList = unmappedIds.slice(0, 5).map(id => 
+                `<span class="badge bg-danger me-1">${id}</span>`
+            ).join('');
+            const moreText = unmappedIds.length > 5 ? 
+                `<span class="text-muted small">+${unmappedIds.length - 5} más</span>` : '';
+            
+            return `
+                <div class="card bg-light mb-2">
+                    <div class="card-body py-2">
+                        <div>
+                            <i class="bi bi-file-earmark-x text-danger"></i> 
+                            <strong>${file.table}</strong> - ${file.total_hands} manos
+                        </div>
+                        <div class="mt-1">
+                            <small class="text-muted">IDs sin mapear (${unmappedIds.length}):</small>
+                            <div class="mt-1">${unmappedList} ${moreText}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        document.getElementById('failed-files-list').innerHTML = filesList;
+    } else {
+        downloadFallidosBtn.classList.add('d-none');
+        document.getElementById('failed-files-section').classList.add('d-none');
+    }
+}
+
 function showError(message) {
     processingSection.classList.add('d-none');
     errorSection.classList.remove('d-none');
@@ -496,6 +565,10 @@ retryBtn.addEventListener('click', resetToWelcome);
 
 async function downloadResult(jobId) {
     window.location.href = `${API_BASE}/api/download/${jobId}`;
+}
+
+async function downloadFailedFiles(jobId) {
+    window.location.href = `${API_BASE}/api/download-fallidos/${jobId}`;
 }
 
 async function loadJobs() {

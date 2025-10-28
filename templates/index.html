@@ -117,9 +117,32 @@
                             <div id="unmapped-players-list"></div>
                         </div>
                         
+                        <!-- Failed Files Section -->
+                        <div id="failed-files-section" class="alert alert-danger d-none">
+                            <h6><i class="bi bi-x-circle"></i> Archivos Fallados</h6>
+                            <p class="mb-2">Los siguientes archivos contienen IDs anónimos sin desanonimizar:</p>
+                            <div id="failed-files-list"></div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i> 
+                                    Estos archivos NO son compatibles con PokerTracker. Agrega más screenshots para completar el mapeo.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- Successful Files Section -->
+                        <div id="successful-files-section" class="alert alert-success d-none">
+                            <h6><i class="bi bi-check-circle"></i> Archivos Exitosos</h6>
+                            <p class="mb-0">Archivos completamente desanonimizados y listos para PokerTracker:</p>
+                            <div id="successful-files-list"></div>
+                        </div>
+                        
                         <div class="d-grid gap-2 d-md-flex">
-                            <button id="download-btn" class="btn btn-success btn-lg">
-                                <i class="bi bi-file-earmark-zip"></i> <span id="download-btn-text">Descargar ZIP</span>
+                            <button id="download-btn" class="btn btn-success btn-lg d-none">
+                                <i class="bi bi-file-earmark-zip"></i> <span id="download-btn-text">Descargar Exitosos</span>
+                            </button>
+                            <button id="download-fallidos-btn" class="btn btn-warning btn-lg d-none">
+                                <i class="bi bi-file-earmark-zip"></i> Descargar Fallados
                             </button>
                             <button id="new-job-btn" class="btn btn-secondary">
                                 <i class="bi bi-plus-circle"></i> Nuevo Job

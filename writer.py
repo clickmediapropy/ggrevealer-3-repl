@@ -51,7 +51,7 @@ def generate_txt_files_by_table(
     Generate separate TXT files for each table
     
     Args:
-        hands: List of matched hands
+        hands: List of all hands (matched and unmatched)
         mappings: Name mappings to apply
         
     Returns:
@@ -71,6 +71,75 @@ def generate_txt_files_by_table(
         # Clean table name for filename (remove invalid chars)
         safe_table_name = re.sub(r'[^\w\-_\.]', '_', table_name)
         result[safe_table_name] = final_txt
+    
+    return result
+
+
+def detect_unmapped_ids_in_text(text: str) -> List[str]:
+    """
+    Detect remaining anonymous IDs in processed text
+    
+    Args:
+        text: Processed hand history text
+        
+    Returns:
+        List of unmapped anonymous IDs found
+    """
+    anon_pattern = r'\b[a-f0-9]{6,8}\b'
+    remaining_anon = set()
+    
+    for line in text.split('\n'):
+        for match in re.finditer(anon_pattern, line, re.IGNORECASE):
+            anon_id = match.group(0)
+            # Verify it appears in player context (not timestamps/card notation/hand IDs)
+            if re.search(rf'(?:^{anon_id}:|Seat \d+: {anon_id})', line):
+                remaining_anon.add(anon_id)
+    
+    return sorted(list(remaining_anon))
+
+
+def generate_txt_files_with_validation(
+    hands: List[ParsedHand],
+    mappings: List[NameMapping]
+) -> Dict[str, Dict]:
+    """
+    Generate TXT files by table with validation info
+    
+    Args:
+        hands: List of all hands (matched and unmatched)
+        mappings: Name mappings to apply
+        
+    Returns:
+        Dictionary mapping table_name -> {
+            'content': final txt content,
+            'total_hands': total hands in file,
+            'unmapped_ids': list of IDs that couldn't be mapped,
+            'has_unmapped': boolean indicating if file has unmapped IDs
+        }
+    """
+    # Group hands by table
+    tables = group_hands_by_table(hands)
+    
+    result = {}
+    for table_name, table_hands in tables.items():
+        # Combine raw texts for this table
+        original_txt = '\n\n'.join([hand.raw_text for hand in table_hands])
+        
+        # Apply name mappings
+        final_txt = generate_final_txt(original_txt, mappings)
+        
+        # Detect unmapped IDs
+        unmapped_ids = detect_unmapped_ids_in_text(final_txt)
+        
+        # Clean table name for filename
+        safe_table_name = re.sub(r'[^\w\-_\.]', '_', table_name)
+        
+        result[safe_table_name] = {
+            'content': final_txt,
+            'total_hands': len(table_hands),
+            'unmapped_ids': unmapped_ids,
+            'has_unmapped': len(unmapped_ids) > 0
+        }
     
     return result
 

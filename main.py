@@ -19,7 +19,7 @@ from database import init_db, create_job, get_job, get_all_jobs, update_job_stat
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
-from writer import generate_txt_files_by_table, validate_output_format
+from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format
 from models import NameMapping
 
 app = FastAPI(
@@ -172,7 +172,7 @@ async def get_job_status(job_id: int):
 
 @app.get("/api/download/{job_id}")
 async def download_output(job_id: int):
-    """Download the processed ZIP file for a job"""
+    """Download the processed ZIP file for successful files"""
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -202,6 +202,29 @@ async def download_output(job_id: int):
         )
     else:
         raise HTTPException(status_code=404, detail="Output file not found on disk")
+
+
+@app.get("/api/download-fallidos/{job_id}")
+async def download_failed_files(job_id: int):
+    """Download the ZIP file containing failed files (with unmapped IDs)"""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job['status'] != 'completed':
+        raise HTTPException(status_code=400, detail="Job is not completed yet")
+    
+    # Check if fallidos.zip exists
+    fallidos_path = OUTPUTS_PATH / str(job_id) / "fallidos.zip"
+    
+    if not fallidos_path.exists():
+        raise HTTPException(status_code=404, detail="No failed files found for this job")
+    
+    return FileResponse(
+        path=fallidos_path,
+        filename=f"fallidos_{job_id}.zip",
+        media_type="application/zip"
+    )
 
 
 @app.get("/api/jobs")
@@ -380,10 +403,10 @@ def run_processing_pipeline(job_id: int):
         
         matched_hands = [hand for hand in all_hands if hand.hand_id in matched_hand_ids]
         
-        # Generate separate TXT files by table
-        txt_files_by_table = generate_txt_files_by_table(matched_hands, name_mappings)
+        # Generate separate TXT files by table with validation info (ALL HANDS, not just matched)
+        txt_files_info = generate_txt_files_with_validation(all_hands, name_mappings)
         
-        print(f"[JOB {job_id}] Generated {len(txt_files_by_table)} table files")
+        print(f"[JOB {job_id}] Generated {len(txt_files_info)} table files (including all hands)")
         
         # Create output directory
         job_output_path = OUTPUTS_PATH / str(job_id)
@@ -392,10 +415,21 @@ def run_processing_pipeline(job_id: int):
         # Validate all files and write them
         validation_errors_all = []
         validation_warnings_all = []
+        successful_files = []
+        failed_files = []
+        all_unmapped_ids = set()
         
-        for table_name, final_txt in txt_files_by_table.items():
+        for table_name, file_info in txt_files_info.items():
+            final_txt = file_info['content']
+            total_hands = file_info['total_hands']
+            unmapped_ids = file_info['unmapped_ids']
+            has_unmapped = file_info['has_unmapped']
+            
+            # Track all unmapped IDs across all files
+            all_unmapped_ids.update(unmapped_ids)
+            
             # Get original txt for this table to validate
-            table_hands_raw = [h.raw_text for h in matched_hands if table_name in h.raw_text or 'Unknown' in table_name]
+            table_hands_raw = [h.raw_text for h in all_hands if table_name in h.raw_text or 'Unknown' in table_name]
             original_txt = '\n\n'.join(table_hands_raw)
             
             validation = validate_output_format(original_txt, final_txt)
@@ -403,18 +437,43 @@ def run_processing_pipeline(job_id: int):
                 validation_errors_all.extend(validation.errors)
             validation_warnings_all.extend(validation.warnings)
             
-            # Write individual TXT file
-            txt_path = job_output_path / f"{table_name}_resolved.txt"
+            # Determine filename suffix based on unmapped IDs
+            if has_unmapped:
+                filename_suffix = "_fallado"
+                failed_files.append({
+                    'table': table_name,
+                    'total_hands': total_hands,
+                    'unmapped_ids': unmapped_ids
+                })
+            else:
+                filename_suffix = "_resolved"
+                successful_files.append({
+                    'table': table_name,
+                    'total_hands': total_hands
+                })
+            
+            # Write individual TXT file with appropriate suffix
+            txt_path = job_output_path / f"{table_name}{filename_suffix}.txt"
             txt_path.write_text(final_txt, encoding='utf-8')
-            print(f"[JOB {job_id}] ✓ Wrote {table_name}_resolved.txt")
+            print(f"[JOB {job_id}] ✓ Wrote {table_name}{filename_suffix}.txt ({total_hands} hands, {len(unmapped_ids)} unmapped IDs)")
         
-        # Create ZIP file with all TXT files
-        zip_path = job_output_path / "resolved_hands.zip"
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for txt_file in job_output_path.glob("*_resolved.txt"):
-                zipf.write(txt_file, txt_file.name)
+        # Create ZIP file for successful files
+        zip_path = None
+        if successful_files:
+            zip_path = job_output_path / "resolved_hands.zip"
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for txt_file in job_output_path.glob("*_resolved.txt"):
+                    zipf.write(txt_file, txt_file.name)
+            print(f"[JOB {job_id}] ✓ Created resolved_hands.zip with {len(successful_files)} files")
         
-        print(f"[JOB {job_id}] ✓ Created ZIP with {len(txt_files_by_table)} files")
+        # Create ZIP file for failed files
+        zip_path_failed = None
+        if failed_files:
+            zip_path_failed = job_output_path / "fallidos.zip"
+            with zipfile.ZipFile(zip_path_failed, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for txt_file in job_output_path.glob("*_fallado.txt"):
+                    zipf.write(txt_file, txt_file.name)
+            print(f"[JOB {job_id}] ✓ Created fallidos.zip with {len(failed_files)} files")
         
         # Get screenshot results for stats
         screenshot_results = get_screenshot_results(job_id)
@@ -423,19 +482,11 @@ def run_processing_pipeline(job_id: int):
             status = sr.get('status', 'error')
             screenshots_by_status[status] = screenshots_by_status.get(status, 0) + 1
         
-        # Extract unmapped players from validation warnings
-        unmapped_players = []
-        for warning in validation_warnings_all:
-            if 'unmapped anonymous IDs' in warning:
-                # Extract IDs from warning message
-                parts = warning.split(':')
-                if len(parts) > 1:
-                    ids_part = parts[1].split('.')[0]
-                    unmapped_players = [id.strip() for id in ids_part.split(',')]
-                break
+        # Use unmapped IDs from file analysis (more accurate than validation warnings)
+        unmapped_players = sorted(list(all_unmapped_ids))
         
         # Get list of table names processed
-        tables_processed = list(txt_files_by_table.keys())
+        tables_processed = list(txt_files_info.keys())
         
         stats = {
             'total_hands': len(all_hands),
@@ -452,7 +503,12 @@ def run_processing_pipeline(job_id: int):
             'unmapped_players': unmapped_players,
             'unmapped_players_count': len(unmapped_players),
             'tables_processed': tables_processed,
-            'tables_count': len(tables_processed)
+            'tables_count': len(tables_processed),
+            'successful_files': successful_files,
+            'failed_files': failed_files,
+            'successful_files_count': len(successful_files),
+            'failed_files_count': len(failed_files),
+            'has_failed_files': len(failed_files) > 0
         }
         
         mappings_dict = [
@@ -465,7 +521,9 @@ def run_processing_pipeline(job_id: int):
             for m in name_mappings
         ]
         
-        save_result(job_id, str(zip_path), mappings_dict, stats)
+        # Save result with both ZIP paths
+        output_path = str(zip_path) if zip_path else (str(zip_path_failed) if zip_path_failed else "")
+        save_result(job_id, output_path, mappings_dict, stats)
         
         # Update job statistics and processing time
         update_job_stats(
