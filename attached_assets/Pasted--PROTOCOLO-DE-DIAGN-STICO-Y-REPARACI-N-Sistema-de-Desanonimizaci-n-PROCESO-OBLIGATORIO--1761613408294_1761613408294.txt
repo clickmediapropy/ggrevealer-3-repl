@@ -1,0 +1,332 @@
+# 🔧 PROTOCOLO DE DIAGNÓSTICO Y REPARACIÓN - Sistema de Desanonimización
+
+## ⚠️ PROCESO OBLIGATORIO: Diagnostica → Confirma → Repara
+
+Has recibido un reporte de auditoría que muestra que **5/5 archivos tienen IDs anónimos sin reemplazar**. Antes de modificar código, debes entender **POR QUÉ** fallaron.
+
+---
+
+## PASO 1: Entender el Flujo Completo del Sistema (10 min)
+
+### 1.1 Mapear el Pipeline
+
+Documenta el flujo actual:
+```
+[Screenshots PokerCraft] 
+    ↓
+[Extracción de nombres - ¿Qué componente?]
+    ↓
+[Matching con TXT - ¿Qué componente?]
+    ↓
+[Generación de mappings - ¿Dónde se guardan?]
+    ↓
+[Writer que reemplaza IDs - ¿Archivo actual?]
+    ↓
+[Output: resolved.txt]
+```
+
+**Pregúntate:**
+- ¿Dónde se generan los mappings?
+- ¿En qué formato se almacenan? (JSON, DB, memoria)
+- ¿Cómo llegan al writer?
+
+---
+
+## PASO 2: Localizar y Verificar los Mappings del Job #12 (30 min)
+
+### 2.1 Encuentra los datos del Job #12
+
+Los archivos problemáticos son:
+- `7639_resolved.txt`
+- `8265_resolved.txt` 
+- `10553_resolved.txt`
+- `12253_resolved.txt`
+- `12614_resolved.txt`
+
+**Busca los datos originales de este job:**
+```bash
+# ¿Hay archivos de mappings?
+find . -name "*7639*" -o -name "*8265*" -o -name "*job*12*"
+
+# ¿Hay un directorio de trabajo del job?
+ls -la jobs/ processing/ temp/ outputs/
+
+# ¿Hay base de datos?
+# Si sí, consulta los mappings para estos hand IDs
+```
+
+### 2.2 Extraer los IDs problemáticos y verificarlos
+
+Crea un script de verificación:
+```python
+"""
+PASO 2: Verificador de Mappings
+Ejecutar ANTES de tocar cualquier código
+"""
+
+# IDs anónimos que NO fueron reemplazados (de la auditoría)
+PROBLEMATIC_IDS = {
+    '7639_resolved.txt': {
+        'hand_id': 'SG3260931612',
+        'anon_ids': ['478db80b']  # big blind
+    },
+    '8265_resolved.txt': {
+        'hand_id': 'SG3260934198',
+        'anon_ids': ['cdbe28b6', '89444161']  # SB y BB
+    },
+    '10553_resolved.txt': {
+        'hand_id': 'SG3260947338',
+        'anon_ids': ['3d54adc0']  # big blind
+    },
+    '12253_resolved.txt': {
+        'hand_id': 'SG3261001347',
+        'anon_ids': ['e3efcaed', '5641b4a0']  # SB y BB
+    },
+    '12614_resolved.txt': {
+        'hand_id': 'SG3261002599',
+        'anon_ids': ['9d830e65', '8d2e730f']  # BB y showdown
+    }
+}
+
+def verificar_mappings():
+    """
+    Para CADA ID anónimo, verifica:
+    1. ¿Existe en los mappings originales?
+    2. Si existe, ¿cuál es su nombre resuelto?
+    3. Si existe, ¿cuál es su confidence score?
+    """
+    
+    # TODO: Cargar tus mappings reales aquí
+    # mappings = cargar_mappings_del_job_12()
+    
+    resultados = {
+        'encontrados': [],
+        'faltantes': [],
+        'total': 0
+    }
+    
+    for filename, data in PROBLEMATIC_IDS.items():
+        print(f"\n{'='*60}")
+        print(f"Archivo: {filename}")
+        print(f"Hand ID: {data['hand_id']}")
+        print(f"{'='*60}")
+        
+        for anon_id in data['anon_ids']:
+            resultados['total'] += 1
+            
+            # TODO: Buscar este anon_id en tus mappings
+            # mapping = buscar_mapping(anon_id, data['hand_id'])
+            
+            # if mapping:
+            #     print(f"✅ {anon_id}")
+            #     print(f"   → Nombre: {mapping.resolved_name}")
+            #     print(f"   → Confianza: {mapping.confidence_score}")
+            #     resultados['encontrados'].append({
+            #         'id': anon_id,
+            #         'mapping': mapping
+            #     })
+            # else:
+            #     print(f"❌ {anon_id} - NO ENCONTRADO EN MAPPINGS")
+            #     resultados['faltantes'].append(anon_id)
+    
+    return resultados
+
+if __name__ == '__main__':
+    resultados = verificar_mappings()
+    
+    print(f"\n\n{'='*60}")
+    print("RESUMEN DE DIAGNÓSTICO")
+    print(f"{'='*60}")
+    print(f"Total IDs problemáticos: {resultados['total']}")
+    print(f"Encontrados en mappings: {len(resultados['encontrados'])}")
+    print(f"Faltantes en mappings: {len(resultados['faltantes'])}")
+    
+    # Determinar causa raíz
+    if len(resultados['faltantes']) == 0:
+        print("\n🎯 DIAGNÓSTICO: PROBLEMA DE WRITER")
+        print("Todos los IDs están mapeados pero no se reemplazan en el TXT")
+        print("CAUSA: Bug en los patrones regex del writer")
+    elif len(resultados['faltantes']) == resultados['total']:
+        print("\n🎯 DIAGNÓSTICO: PROBLEMA DE MATCHING")
+        print("Ningún ID fue mapeado correctamente")
+        print("CAUSA: Fallo en la extracción/matching con screenshots")
+    else:
+        print("\n🎯 DIAGNÓSTICO: PROBLEMA MIXTO")
+        print("Algunos IDs están mapeados, otros no")
+        print("CAUSA: Problemas en matching Y en writer")
+```
+
+---
+
+## PASO 3: Interpretar Resultados y Tomar Acción
+
+### 📊 ESCENARIO A: Todos los IDs están en mappings (100%)
+
+**Diagnóstico:** El matching con Gemini Vision funcionó correctamente. El problema es solo en el writer.
+
+**Causa más probable:** Patrones regex incorrectos.
+
+**Acción:**
+
+1. Revisa los patrones regex en tu writer
+2. Busca específicamente patrones para:
+   - `posts small blind`
+   - `posts big blind`
+   - `shows [cards]`
+3. Verifica si están usando formato correcto (con/sin `$`, espacios, etc.)
+4. Compara con el formato real de los archivos TXT originales
+5. Implementa los fixes necesarios
+6. Re-procesa el Job #12
+
+---
+
+### 📊 ESCENARIO B: Ningún ID está en mappings (0%)
+
+**Diagnóstico:** El matching falló completamente. El writer no tiene la culpa.
+
+**Causa más probable:** Problema con Gemini Vision o el proceso de matching.
+
+**Acción:**
+
+1. **NO toques el writer todavía**
+2. Revisa las screenshots del Job #12:
+   - ¿Se capturaron correctamente?
+   - ¿Tienen buena calidad/resolución?
+   - ¿Son del formato correcto (PokerCraft)?
+3. Revisa los prompts a Gemini Vision:
+   - ¿Están pidiendo extraer nombres de jugadores?
+   - ¿Están pidiendo extraer IDs anónimos?
+4. Revisa el proceso de matching:
+   - ¿Cómo se correlacionan screenshots con manos del TXT?
+   - ¿Se está usando timestamp, cartas, posiciones?
+5. Implementa fixes en el matching
+6. Re-procesa el Job #12
+
+---
+
+### 📊 ESCENARIO C: Algunos IDs están, otros no (mixto)
+
+**Diagnóstico:** Tienes problemas en AMBOS lados del sistema.
+
+**Acción:**
+
+1. Separa los IDs en dos categorías:
+   - **Grupo A:** IDs que SÍ están en mappings → Fix writer
+   - **Grupo B:** IDs que NO están en mappings → Fix matching
+2. Analiza patrones:
+   - ¿Los IDs faltantes tienen algo en común?
+   - ¿Son todos de blind posts? ¿De shows?
+   - ¿Son de manos específicas o screenshots específicas?
+3. Prioriza el fix más impactante primero
+4. Implementa ambos fixes
+5. Re-procesa el Job #12
+
+---
+
+## PASO 4: Implementar Fix Correcto Según Diagnóstico
+
+**No implementes un fix hasta completar el diagnóstico de los pasos 1-3.**
+
+### Si el problema es el Writer:
+
+1. Identifica todos los patrones regex que están fallando
+2. Compara con el formato real de los archivos GGPoker
+3. Corrige los patrones
+4. Agrega los patrones faltantes (ej: shows cards)
+5. Agrega validación que detecte IDs residuales
+
+### Si el problema es el Matching:
+
+1. Revisa el pipeline de Gemini Vision
+2. Mejora los prompts si es necesario
+3. Agrega más validación en el matching
+4. Mejora el algoritmo de correlación screenshot-TXT
+
+### Si es problema mixto:
+
+1. Arregla primero el matching (más crítico)
+2. Luego arregla el writer
+3. Valida que ambos funcionen juntos
+
+---
+
+## PASO 5: Validación Post-Fix
+
+Después de implementar el fix:
+```python
+"""
+Validador post-fix
+"""
+def validar_fix():
+    # 1. Re-procesar Job #12 con código corregido
+    nuevos_archivos = procesar_job_12()
+    
+    # 2. Ejecutar el validador de auditoría
+    resultados = validar_archivos_resolved(nuevos_archivos)
+    
+    # 3. Verificar métricas de éxito
+    assert resultados['archivos_validos'] == 5, "Todos deben ser válidos"
+    assert resultados['total_errores'] == 0, "Cero errores esperados"
+    assert resultados['ids_anonimos'] == 0, "Cero IDs anónimos residuales"
+    
+    print("✅ FIX VALIDADO - Sistema funcionando correctamente")
+```
+
+---
+
+## ✅ CHECKLIST DE PROCESO
+
+Marca cada paso al completarlo:
+
+- [ ] **PASO 1:** Documenté el flujo completo del sistema
+- [ ] **PASO 2:** Localicé los mappings del Job #12
+- [ ] **PASO 2:** Verifiqué cada ID anónimo problemático
+- [ ] **PASO 3:** Calculé % de IDs en mappings
+- [ ] **PASO 3:** Determiné escenario (A, B, o C)
+- [ ] **PASO 3:** Identifiqué causa raíz correcta
+- [ ] **PASO 4:** Implementé fix apropiado al diagnóstico
+- [ ] **PASO 5:** Re-procesé Job #12
+- [ ] **PASO 5:** Validé que archivos son 100% correctos
+- [ ] **PASO 5:** Confirmé importación exitosa a PokerTracker
+
+---
+
+## 🚨 REGLAS CRÍTICAS
+
+1. **NO modifiques código sin completar el diagnóstico**
+2. **NO asumas que conoces la causa sin verificar mappings**
+3. **NO arregles solo el writer si el matching está fallando**
+4. **SÍ documenta tus hallazgos en cada paso**
+5. **SÍ valida el fix antes de marcarlo como completo**
+
+---
+
+## 📤 REPORTE QUE DEBES ENTREGAR
+
+Al finalizar, reporta:
+```
+DIAGNÓSTICO COMPLETADO - JOB #12
+
+Escenario encontrado: [A/B/C]
+Causa raíz: [Descripción]
+
+Mappings verificados:
+- Total IDs problemáticos: X
+- Encontrados en mappings: Y
+- Faltantes en mappings: Z
+
+Fixes implementados:
+1. [Descripción del fix]
+2. [Descripción del fix]
+
+Resultados post-fix:
+- Archivos válidos: 5/5
+- Errores: 0
+- IDs anónimos residuales: 0
+
+Estado: ✅ RESUELTO / ⚠️ EN PROCESO / ❌ REQUIERE INVESTIGACIÓN ADICIONAL
+```
+
+---
+
+**COMIENZA POR EL PASO 1 Y NO TE SALTES NINGÚN PASO.**
