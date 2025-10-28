@@ -144,6 +144,38 @@ def generate_txt_files_with_validation(
     return result
 
 
+def remove_dealt_to_without_cards(text: str) -> str:
+    """
+    Remove 'Dealt to PlayerID' lines that don't have cards
+    
+    GGPoker includes lines like "Dealt to 9d830e65 " for opponents without showing cards.
+    These lines cause PokerTracker to reject hands as "1 card Hold'em is not supported".
+    We remove them completely before applying name mappings.
+    
+    Args:
+        text: Hand history text
+        
+    Returns:
+        Text with cardless "Dealt to" lines removed
+    """
+    # Pattern: "Dealt to PlayerID " (with trailing space, no cards)
+    # We remove the entire line including the newline
+    # This matches lines "Dealt to <anything>" that do NOT contain "[" (no cards)
+    pattern = r'^Dealt to [^\[]+$'
+    
+    lines = text.split('\n')
+    cleaned_lines = []
+    
+    for line in lines:
+        # Keep line if it's NOT a "Dealt to" line without cards
+        if re.match(pattern, line.strip()):
+            # Skip this line (it's "Dealt to PlayerID" without cards)
+            continue
+        cleaned_lines.append(line)
+    
+    return '\n'.join(cleaned_lines)
+
+
 def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
     """
     Generate final TXT with resolved player names
@@ -155,9 +187,10 @@ def generate_final_txt(original_txt: str, mappings: List[NameMapping]) -> str:
     Returns:
         Modified text with real names
     """
-    output = original_txt
+    # STEP 1: Remove "Dealt to PlayerID" lines without cards (causes PT4 errors)
+    output = remove_dealt_to_without_cards(original_txt)
     
-    # Apply mappings in specific order to avoid conflicts
+    # STEP 2: Apply mappings in specific order to avoid conflicts
     # Order matters: most specific patterns first
     
     for mapping in mappings:
