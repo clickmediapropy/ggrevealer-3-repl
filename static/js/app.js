@@ -1025,6 +1025,120 @@ async function exportDebugData(jobId, debugData) {
     }
 }
 
+// ============================================================================
+// DEVELOPMENT MODE - REPROCESS JOB
+// ============================================================================
+
+async function loadDevJobInfo(jobId) {
+    const devJobInfo = document.getElementById('dev-job-info');
+
+    if (!jobId || jobId < 1) {
+        devJobInfo.innerHTML = '<span class="text-danger">Job ID inválido</span>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/status/${jobId}`);
+
+        if (!response.ok) {
+            devJobInfo.innerHTML = '<span class="text-danger">Job no encontrado</span>';
+            return;
+        }
+
+        const job = await response.json();
+        const stats = job.statistics || {};
+
+        devJobInfo.innerHTML = `
+            <strong>Status:</strong> <span class="badge bg-${getStatusBadgeColor(job.status)}">${job.status}</span><br>
+            <strong>Archivos:</strong> ${stats.txt_files || 0} TXT, ${stats.screenshots || 0} screenshots<br>
+            <strong>Hands:</strong> ${stats.hands_parsed || 0} parseadas, ${stats.matched_hands || 0} matched
+        `;
+    } catch (error) {
+        console.error('Error loading dev job info:', error);
+        devJobInfo.innerHTML = '<span class="text-danger">Error al cargar info del job</span>';
+    }
+}
+
+function getStatusBadgeColor(status) {
+    const colors = {
+        'pending': 'secondary',
+        'processing': 'primary',
+        'completed': 'success',
+        'failed': 'danger'
+    };
+    return colors[status] || 'secondary';
+}
+
+async function reprocessDevJob() {
+    const jobIdInput = document.getElementById('dev-job-id');
+    const reprocessBtn = document.getElementById('reprocess-job-btn');
+    const jobId = parseInt(jobIdInput.value);
+
+    if (!jobId || jobId < 1) {
+        alert('Por favor ingresa un Job ID válido');
+        return;
+    }
+
+    reprocessBtn.disabled = true;
+    reprocessBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Iniciando...';
+
+    try {
+        // Call the existing /api/process endpoint (it now handles reprocessing)
+        const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to start processing');
+        }
+
+        const data = await response.json();
+        currentJobId = jobId;
+
+        // Show processing section and start monitoring
+        showProcessing();
+        startTimer();
+        startStatusPolling();
+
+        console.log(`✅ ${data.is_reprocess ? 'Reprocesando' : 'Procesando'} job ${jobId}`);
+
+    } catch (error) {
+        console.error('Error reprocessing job:', error);
+        alert('Error al reprocesar job: ' + error.message);
+
+        reprocessBtn.disabled = false;
+        reprocessBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Reprocesar Job';
+    }
+}
+
+// Dev mode toggle
+document.getElementById('toggle-dev-mode').addEventListener('click', () => {
+    const devModeBody = document.getElementById('dev-mode-body');
+    const toggleBtn = document.getElementById('toggle-dev-mode');
+
+    if (devModeBody.style.display === 'none') {
+        devModeBody.style.display = 'block';
+        toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+    } else {
+        devModeBody.style.display = 'none';
+        toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+    }
+});
+
+// Load job info when job ID changes
+document.getElementById('dev-job-id').addEventListener('input', (e) => {
+    const jobId = parseInt(e.target.value);
+    if (jobId && jobId > 0) {
+        loadDevJobInfo(jobId);
+    }
+});
+
+// Reprocess job button
+document.getElementById('reprocess-job-btn').addEventListener('click', reprocessDevJob);
+
 document.addEventListener('DOMContentLoaded', () => {
     loadJobs();
+    // Load initial dev job info (job 3 by default)
+    loadDevJobInfo(3);
 });

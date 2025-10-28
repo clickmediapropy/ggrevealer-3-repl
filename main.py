@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import List
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results
 from parser import GGPokerParser
 from ocr import ocr_screenshot
 from matcher import find_best_matches
@@ -120,18 +120,32 @@ async def upload_files(
 
 @app.post("/api/process/{job_id}")
 async def process_job(job_id: int, background_tasks: BackgroundTasks):
-    """Start processing a job in the background"""
+    """Start processing a job in the background (supports reprocessing)"""
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     if job['status'] == 'processing':
         raise HTTPException(status_code=400, detail="Job is already processing")
-    
+
+    # Check if this is a reprocess (job already completed or failed)
+    is_reprocess = job['status'] in ['completed', 'failed']
+
+    if is_reprocess:
+        # Clear previous results from database
+        clear_job_results(job_id)
+
+        # Clear output files from filesystem
+        job_output_path = OUTPUTS_PATH / str(job_id)
+        if job_output_path.exists():
+            shutil.rmtree(job_output_path)
+
+        print(f"[JOB {job_id}] Reprocessing: cleared previous results")
+
     background_tasks.add_task(run_processing_pipeline, job_id)
     update_job_status(job_id, 'processing')
-    
-    return {"job_id": job_id, "status": "processing"}
+
+    return {"job_id": job_id, "status": "processing", "is_reprocess": is_reprocess}
 
 
 @app.get("/api/status/{job_id}")
@@ -421,19 +435,76 @@ async def generate_claude_prompt(job_id: int):
     # Get failed screenshots
     failed_screenshots = [s for s in screenshot_results if s.get('status') == 'error']
 
+    # Calculate metrics
+    stats = {
+        "txt_files": job.get('txt_files_count', 0),
+        "screenshots": job.get('screenshot_files_count', 0),
+        "hands_parsed": job.get('hands_parsed', 0),
+        "matched_hands": job.get('matched_hands', 0),
+        "name_mappings": job.get('name_mappings_count', 0),
+        "ocr_processed": job.get('ocr_processed_count', 0),
+        "ocr_total": job.get('ocr_total_count', 0)
+    }
+
+    # Calculate key metrics
+    match_rate = (stats['matched_hands'] / stats['hands_parsed'] * 100) if stats['hands_parsed'] > 0 else 0
+    ocr_success_rate = (stats['ocr_processed'] / stats['ocr_total'] * 100) if stats['ocr_total'] > 0 else 0
+
+    screenshot_summary = {
+        "total": len(screenshot_results),
+        "success": len([s for s in screenshot_results if s.get('status') == 'success']),
+        "warning": len([s for s in screenshot_results if s.get('status') == 'warning']),
+        "error": len([s for s in screenshot_results if s.get('status') == 'error'])
+    }
+
+    screenshot_success_rate = (screenshot_summary['success'] / screenshot_summary['total'] * 100) if screenshot_summary['total'] > 0 else 0
+
+    # Identify problem type
+    problem_indicators = []
+
+    if job.get('status') == 'failed':
+        problem_indicators.append("JOB_FAILED")
+
+    if match_rate < 10:
+        problem_indicators.append("VERY_LOW_MATCH_RATE")
+    elif match_rate < 30:
+        problem_indicators.append("LOW_MATCH_RATE")
+
+    if screenshot_success_rate < 50:
+        problem_indicators.append("LOW_OCR_SUCCESS")
+
+    if ocr_success_rate < 100:
+        problem_indicators.append("INCOMPLETE_OCR")
+
+    if len(error_logs) > 0:
+        problem_indicators.append("HAS_ERROR_LOGS")
+
+    if len(warning_logs) > 5:
+        problem_indicators.append("MANY_WARNINGS")
+
+    if screenshot_summary['error'] > screenshot_summary['total'] * 0.3:
+        problem_indicators.append("HIGH_SCREENSHOT_FAILURE_RATE")
+
+    # Get failed screenshots with errors
+    failed_screenshots_with_details = []
+    for fs in failed_screenshots[:10]:
+        failed_screenshots_with_details.append({
+            "filename": fs.get('screenshot_filename'),
+            "error": fs.get('ocr_error'),
+            "ocr_success": fs.get('ocr_success')
+        })
+
     # Build context for Gemini
     context = {
         "job_id": job_id,
         "status": job.get('status'),
         "error_message": job.get('error_message'),
-        "statistics": {
-            "txt_files": job.get('txt_files_count', 0),
-            "screenshots": job.get('screenshot_files_count', 0),
-            "hands_parsed": job.get('hands_parsed', 0),
-            "matched_hands": job.get('matched_hands', 0),
-            "name_mappings": job.get('name_mappings_count', 0),
-            "ocr_processed": job.get('ocr_processed_count', 0),
-            "ocr_total": job.get('ocr_total_count', 0)
+        "problem_indicators": problem_indicators,
+        "statistics": stats,
+        "calculated_metrics": {
+            "match_rate_percent": round(match_rate, 2),
+            "ocr_success_rate_percent": round(ocr_success_rate, 2),
+            "screenshot_success_rate_percent": round(screenshot_success_rate, 2)
         },
         "timestamps": {
             "created_at": job.get('created_at'),
@@ -441,15 +512,10 @@ async def generate_claude_prompt(job_id: int):
             "completed_at": job.get('completed_at'),
             "processing_time_seconds": job.get('processing_time_seconds')
         },
-        "error_logs": error_logs[:10],  # Last 10 errors
-        "warning_logs": warning_logs[:10],  # Last 10 warnings
-        "failed_screenshots": failed_screenshots[:5],  # First 5 failed screenshots
-        "screenshot_summary": {
-            "total": len(screenshot_results),
-            "success": len([s for s in screenshot_results if s.get('status') == 'success']),
-            "warning": len([s for s in screenshot_results if s.get('status') == 'warning']),
-            "error": len([s for s in screenshot_results if s.get('status') == 'error'])
-        }
+        "error_logs": error_logs[:10],
+        "warning_logs": warning_logs[:10],
+        "failed_screenshots": failed_screenshots_with_details,
+        "screenshot_summary": screenshot_summary
     }
 
     # If job has result with detailed stats, include them
@@ -472,40 +538,75 @@ async def generate_claude_prompt(job_id: int):
         model = genai.GenerativeModel('gemini-2.5-flash')
 
         # Create prompt for Gemini
-        gemini_prompt = f"""Eres un experto en debugging de aplicaciones Python y análisis de errores.
+        gemini_prompt = f"""Eres un experto en debugging de aplicaciones Python, análisis de errores y detección de problemas en pipelines de procesamiento de datos.
 
-Tu tarea es generar un prompt claro, detallado y accionable para Claude Code que le ayude a debuggear un error en GGRevealer (una aplicación FastAPI que desanonimiza hand histories de poker usando OCR con Gemini Vision).
+Tu tarea es analizar la información de un job de GGRevealer y generar un prompt ÚTIL y ACCIONABLE para Claude Code.
 
-**INFORMACIÓN DEL ERROR:**
+**CONTEXTO DE GGREVEALER:**
+GGRevealer es una aplicación FastAPI que desanonimiza hand histories de poker usando OCR con Gemini Vision:
+- Pipeline: Upload → Parse TXT → OCR Screenshots → Match Hands → Generate Mappings → Write Outputs
+- El objetivo es HACER MATCH de manos con screenshots para identificar jugadores anónimos
+- Un BUEN resultado tiene >80% match rate (manos matched / manos parseadas)
+- Un MAL resultado tiene <30% match rate
+
+**INFORMACIÓN DEL JOB A ANALIZAR:**
 
 {json.dumps(context, indent=2, ensure_ascii=False)}
 
-**ARQUITECTURA DE GGREVEALER:**
-- Backend: FastAPI + SQLite + Google Gemini Vision API
-- Pipeline: Upload → Parse TXT files → OCR Screenshots → Match Hands → Generate Mappings → Write Outputs
-- Archivos clave:
-  - main.py: Pipeline principal y API endpoints
-  - parser.py: Parsing de GGPoker hand histories
-  - ocr.py: OCR con Gemini 2.5 Flash Vision
-  - matcher.py: Matching inteligente de hands con screenshots
-  - writer.py: Generación de outputs con validaciones PokerTracker
-  - database.py: SQLite con tablas jobs, files, results, screenshot_results, logs
-  - logger.py: Sistema de logging estructurado
+**INDICADORES DE PROBLEMAS DETECTADOS:**
+{', '.join(problem_indicators) if problem_indicators else 'Ninguno detectado automáticamente'}
 
-**TU TAREA:**
-Genera un prompt en español para Claude Code que:
+**TU ANÁLISIS DEBE IDENTIFICAR:**
 
-1. **Explique el problema claramente**: Resume el error principal y su contexto
-2. **Proporcione estadísticas clave**: Qué funcionó y qué falló (OCR, matching, parsing, etc.)
-3. **Liste los errores específicos**: Extrae los mensajes de error más relevantes de los logs
-4. **Sugiera áreas a investigar**: Basándote en los errores, indica qué archivos o funciones revisar
-5. **Incluya pasos de debugging**: Qué debería hacer Claude Code primero
-6. **Sea accionable**: Que Claude Code pueda empezar a debuggear inmediatamente con esa información
+1. **¿Cuál es el problema REAL?**
+   - Si match_rate es bajo (<30%): El problema es en el MATCHING (matcher.py o calidad de screenshots)
+   - Si OCR success rate es bajo: El problema es en OCR (ocr.py o calidad de imágenes)
+   - Si hay error_message: Analiza el error específico
+   - Si no hay errores pero resultados malos: Identifica qué métrica está mal
 
-**FORMATO DEL PROMPT:**
-Usa markdown con secciones claras. Sé conciso pero completo. Prioriza la información más relevante.
+2. **¿Por qué está fallando?**
+   - Analiza error_logs para patrones
+   - Revisa failed_screenshots para errores comunes
+   - Considera warning_logs si son relevantes
 
-Genera SOLO el prompt para Claude Code, sin explicaciones adicionales ni metadatos."""
+3. **¿Dónde buscar?**
+   - main.py (líneas 400-800): Pipeline y OCR paralelo
+   - matcher.py: Algoritmo de matching (Hand ID, scoring)
+   - ocr.py: Llamadas a Gemini Vision
+   - parser.py: Parsing de TXT files
+
+**GENERA UN PROMPT que:**
+
+1. **Identifique el problema de forma ESPECÍFICA** (no genérico)
+   - Ejemplo BUENO: "Match rate de 3.4% indica que el algoritmo de matching no está funcionando"
+   - Ejemplo MALO: "Hay un error en el procesamiento"
+
+2. **Proporcione MÉTRICAS CLAVE**
+   - Match rate, OCR success rate, screenshots procesados
+   - Comparar con lo esperado
+
+3. **Liste ERRORES ESPECÍFICOS** (si los hay)
+   - Con nombre de archivo, línea si es posible
+   - Patrones detectados
+
+4. **Sugiera ARCHIVOS Y FUNCIONES CONCRETAS** a revisar
+   - No solo "revisa matcher.py" sino "revisa la función find_best_matches() en matcher.py:37"
+
+5. **Proponga PASOS CONCRETOS de debugging**
+   - Qué logs revisar, qué agregar, qué cambiar
+
+6. **Sea ACCIONABLE**
+   - Claude Code debe poder empezar a trabajar inmediatamente
+
+**FORMATO:**
+Usa markdown, secciones claras, bullets. Máximo 400 palabras. ENFÓCATE en lo más importante.
+
+**IMPORTANTE:**
+- NO generes prompt genérico si el problema es obvio (ej: match rate bajo = problema de matching)
+- Si no hay errores explícitos, ANALIZA las métricas y encuentra el problema real
+- Sé ESPECÍFICO y TÉCNICO
+
+Genera SOLO el prompt para Claude Code:"""
 
         # Call Gemini
         response = await asyncio.to_thread(
@@ -538,34 +639,80 @@ Genera SOLO el prompt para Claude Code, sin explicaciones adicionales ni metadat
 
 def _generate_fallback_prompt(context: dict) -> str:
     """Generate a basic prompt when Gemini is not available"""
-    error_msg = context.get('error_message', 'Error desconocido')
+    error_msg = context.get('error_message') or 'No hay mensaje de error explícito'
     stats = context.get('statistics', {})
+    metrics = context.get('calculated_metrics', {})
     error_logs = context.get('error_logs', [])
+    problem_indicators = context.get('problem_indicators', [])
+    screenshot_summary = context.get('screenshot_summary', {})
 
-    prompt = f"""Tengo un error en GGRevealer (Job #{context.get('job_id')}) y necesito ayuda para debuggearlo.
+    # Identify main problem
+    main_problem = "Job completado con resultados subóptimos"
 
-## Error Principal
-{error_msg}
+    if 'JOB_FAILED' in problem_indicators:
+        main_problem = f"Job falló: {error_msg}"
+    elif 'VERY_LOW_MATCH_RATE' in problem_indicators:
+        main_problem = f"Match rate muy bajo ({metrics.get('match_rate_percent', 0):.1f}%) - Problema de matching"
+    elif 'LOW_MATCH_RATE' in problem_indicators:
+        main_problem = f"Match rate bajo ({metrics.get('match_rate_percent', 0):.1f}%) - Revisar algoritmo de matching"
+    elif 'LOW_OCR_SUCCESS' in problem_indicators:
+        main_problem = f"OCR con baja tasa de éxito ({metrics.get('screenshot_success_rate_percent', 0):.1f}%)"
 
-## Estadísticas del Job
-- Archivos TXT: {stats.get('txt_files', 0)}
-- Screenshots: {stats.get('screenshots', 0)}
-- Manos parseadas: {stats.get('hands_parsed', 0)}
-- Manos matched: {stats.get('matched_hands', 0)}
-- OCR procesados: {stats.get('ocr_processed', 0)}/{stats.get('ocr_total', 0)}
+    prompt = f"""# Problema en GGRevealer - Job #{context.get('job_id')}
 
-## Logs de Error
+## Problema Identificado
+{main_problem}
+
+## Métricas Clave
+- **Match Rate:** {metrics.get('match_rate_percent', 0):.1f}% ({stats.get('matched_hands', 0)}/{stats.get('hands_parsed', 0)} manos)
+- **OCR Success:** {metrics.get('screenshot_success_rate_percent', 0):.1f}% ({screenshot_summary.get('success', 0)}/{screenshot_summary.get('total', 0)} screenshots)
+- **Archivos:** {stats.get('txt_files', 0)} TXT, {stats.get('screenshots', 0)} screenshots
+
+## Análisis
+
+"""
+
+    # Add specific analysis based on problem
+    if metrics.get('match_rate_percent', 0) < 30:
+        prompt += """### Problema: Match Rate Bajo
+El problema principal es que muy pocas manos están siendo matched con screenshots.
+
+**Posibles causas:**
+1. Hand IDs no coinciden entre TXT y screenshots
+2. Algoritmo de scoring en matcher.py no funciona bien
+3. Screenshots de calidad pobre o formato diferente
+4. OCR no extrae Hand IDs correctamente
+
+**Archivos a revisar:**
+- `matcher.py:37-76` - Función find_best_matches()
+- `ocr.py:46-117` - Extracción de Hand ID
+- Logs de matching para ver scores
+
+"""
+
+    if screenshot_summary.get('error', 0) > 0:
+        prompt += f"""### Screenshots Fallidos: {screenshot_summary.get('error', 0)}
+Hay screenshots que fallaron en OCR. Revisa los errores específicos.
+
 """
 
     if error_logs:
+        prompt += "## Logs de Error\n"
         for log in error_logs[:5]:
             prompt += f"\n[{log.get('level')}] {log.get('message')}"
             if log.get('extra_data'):
-                prompt += f"\n  Datos: {json.dumps(log.get('extra_data'))}"
-    else:
-        prompt += "\nNo hay logs de error específicos disponibles."
+                prompt += f"\n  Extra: {json.dumps(log.get('extra_data'))}"
+        prompt += "\n"
 
-    prompt += "\n\nPor favor, ayúdame a debuggear este problema. Los archivos principales están en main.py, parser.py, ocr.py, matcher.py, writer.py y database.py."
+    prompt += """
+## Pasos de Debugging
+
+1. Revisa los logs del job en la sección de debugging
+2. Verifica qué está retornando el OCR (Hand IDs, player names)
+3. Chequea el algoritmo de matching y sus scores
+4. Exporta el debug JSON para análisis detallado
+
+**Archivos principales:** main.py, parser.py, ocr.py, matcher.py, writer.py"""
 
     return prompt
 

@@ -469,3 +469,33 @@ def get_system_logs(level: Optional[str] = None, limit: Optional[int] = None) ->
                 result['extra_data'] = json.loads(result['extra_data'])
             results.append(result)
         return results
+
+
+def clear_job_results(job_id: int):
+    """
+    Clear all processing results for a job to allow reprocessing
+    Deletes: screenshot_results, results, logs
+    Resets: job stats and timestamps
+    Keeps: files table (uploaded files remain)
+    """
+    with get_db() as conn:
+        # Delete related data from other tables
+        conn.execute("DELETE FROM screenshot_results WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM results WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM logs WHERE job_id = ?", (job_id,))
+
+        # Reset job stats and timestamps
+        conn.execute("""
+            UPDATE jobs
+            SET matched_hands = 0,
+                name_mappings_count = 0,
+                hands_parsed = 0,
+                ocr_processed_count = 0,
+                ocr_total_count = 0,
+                started_at = NULL,
+                completed_at = NULL,
+                processing_time_seconds = NULL,
+                error_message = NULL,
+                status = 'pending'
+            WHERE id = ?
+        """, (job_id,))

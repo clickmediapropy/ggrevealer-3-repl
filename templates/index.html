@@ -21,6 +21,47 @@
     </nav>
 
     <div class="container my-5">
+        <!-- Development Mode Section -->
+        <div id="dev-mode-section" class="row mb-4">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-code-slash"></i> <strong>Modo Desarrollo</strong>
+                                <span class="badge bg-dark ms-2">DEV</span>
+                            </div>
+                            <button id="toggle-dev-mode" class="btn btn-sm btn-dark">
+                                <i class="bi bi-chevron-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body" id="dev-mode-body">
+                        <p class="text-muted small mb-3">
+                            <i class="bi bi-info-circle"></i>
+                            Reprocesa un job existente sin necesidad de subir archivos nuevamente. Los archivos ya subidos permanecen en el servidor.
+                        </p>
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label for="dev-job-id" class="form-label">Job ID</label>
+                                <input type="number" class="form-control" id="dev-job-id" value="3" min="1">
+                            </div>
+                            <div class="col-md-6">
+                                <div id="dev-job-info" class="small text-muted">
+                                    Cargando información del job...
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <button id="reprocess-job-btn" class="btn btn-warning w-100">
+                                    <i class="bi bi-arrow-clockwise"></i> Reprocesar Job
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="welcome-section" class="row">
             <div class="col-12 text-center mb-4">
                 <h1>GGRevealer</h1>
