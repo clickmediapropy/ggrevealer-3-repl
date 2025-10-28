@@ -1,0 +1,815 @@
+Poker Hand #SG3261008249: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level4(30/60) - 2025/10/27 11:39:21
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (656 in chips)
+Seat 2: v1[nn]1 (740 in chips)
+Seat 3: TuichAAreko (104 in chips)
+TuichAAreko: posts small blind 30
+TuichAAreko: posts big blind 60
+*** HOLE CARDS ***
+Dealt to TuichAAreko [8c Ac]
+v1[nn]1: folds
+TuichAAreko: raises 44 to 104 and is all-in
+TuichAAreko: calls 44
+TuichAAreko: shows [8c Ac]
+TuichAAreko: shows [Td 3c]
+*** FLOP *** [Qd 5s 7h]
+*** TURN *** [Qd 5s 7h] [9d]
+*** RIVER *** [Qd 5s 7h 9d] [3d]
+*** SHOWDOWN ***
+TuichAAreko collected 208 from pot
+*** SUMMARY ***
+Total pot 208 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [Qd 5s 7h 9d 3d]
+Seat 1: TuichAAreko (big blind) showed [Td 3c] and won (208) with a pair of Threes
+Seat 2: v1[nn]1 (button) folded before Flop (didn't bet)
+Seat 3: TuichAAreko (small blind) showed [8c Ac] and lost with Ace high
+
+Poker Hand #SG3261007915: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level4(30/60) - 2025/10/27 11:38:48
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (656 in chips)
+Seat 2: v1[nn]1 (370 in chips)
+Seat 3: TuichAAreko (474 in chips)
+v1[nn]1: posts small blind 30
+TuichAAreko: posts big blind 60
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Ts Jd]
+TuichAAreko: folds
+v1[nn]1: raises 310 to 370 and is all-in
+TuichAAreko: calls 310
+v1[nn]1: shows [6d Kh]
+TuichAAreko: shows [Ts Jd]
+*** FLOP *** [3d 7c 5s]
+*** TURN *** [3d 7c 5s] [3s]
+*** RIVER *** [3d 7c 5s 3s] [6s]
+*** SHOWDOWN ***
+v1[nn]1 collected 740 from pot
+*** SUMMARY ***
+Total pot 740 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [3d 7c 5s 3s 6s]
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) showed [6d Kh] and won (740) with two pair, Sixes and Threes
+Seat 3: TuichAAreko (big blind) showed [Ts Jd] and lost with a pair of Threes
+
+Poker Hand #SG3261007802: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level4(30/60) - 2025/10/27 11:38:35
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (686 in chips)
+Seat 2: v1[nn]1 (340 in chips)
+Seat 3: TuichAAreko (474 in chips)
+TuichAAreko: posts small blind 30
+v1[nn]1: posts big blind 60
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Qs 8d]
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (30) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 60 from pot
+*** SUMMARY ***
+Total pot 60 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) collected (60)
+Seat 3: TuichAAreko (button) folded before Flop (didn't bet)
+
+Poker Hand #SG3261007577: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level4(30/60) - 2025/10/27 11:38:12
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (746 in chips)
+Seat 2: v1[nn]1 (250 in chips)
+Seat 3: TuichAAreko (504 in chips)
+TuichAAreko: posts small blind 30
+TuichAAreko: posts big blind 60
+*** HOLE CARDS ***
+Dealt to TuichAAreko [5h 7s]
+v1[nn]1: raises 190 to 250 and is all-in
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (190) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 150 from pot
+*** SUMMARY ***
+Total pot 150 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) collected (150)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261007517: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level4(30/60) - 2025/10/27 11:38:06
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (746 in chips)
+Seat 2: v1[nn]1 (280 in chips)
+Seat 3: TuichAAreko (474 in chips)
+v1[nn]1: posts small blind 30
+TuichAAreko: posts big blind 60
+*** HOLE CARDS ***
+Dealt to TuichAAreko [6d 7d]
+TuichAAreko: folds
+v1[nn]1: folds
+Uncalled bet (30) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 60 from pot
+*** SUMMARY ***
+Total pot 60 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) collected (60)
+
+Poker Hand #SG3261007296: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level4(30/60) - 2025/10/27 11:37:44
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (373 in chips)
+Seat 2: v1[nn]1 (653 in chips)
+Seat 3: TuichAAreko (474 in chips)
+TuichAAreko: posts small blind 30
+v1[nn]1: posts big blind 60
+*** HOLE CARDS ***
+Dealt to TuichAAreko [5d 9c]
+TuichAAreko: folds
+TuichAAreko: raises 313 to 373 and is all-in
+v1[nn]1: calls 313
+TuichAAreko: shows [9s 8d]
+v1[nn]1: shows [Ad 9d]
+*** FLOP *** [2c Kh 8h]
+*** TURN *** [2c Kh 8h] [Jc]
+*** RIVER *** [2c Kh 8h Jc] [Ks]
+*** SHOWDOWN ***
+TuichAAreko collected 746 from pot
+*** SUMMARY ***
+Total pot 746 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [2c Kh 8h Jc Ks]
+Seat 1: TuichAAreko (small blind) showed [9s 8d] and won (746) with two pair, Kings and Eights
+Seat 2: v1[nn]1 (big blind) showed [Ad 9d] and lost with a pair of Kings
+Seat 3: TuichAAreko (button) folded before Flop (didn't bet)
+
+Poker Hand #SG3261007090: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:37:26
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (413 in chips)
+Seat 2: v1[nn]1 (593 in chips)
+Seat 3: TuichAAreko (494 in chips)
+TuichAAreko: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [4c 7h]
+v1[nn]1: raises 40 to 80
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (40) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 100 from pot
+*** SUMMARY ***
+Total pot 100 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) collected (100)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261006911: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:37:09
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (353 in chips)
+Seat 2: v1[nn]1 (613 in chips)
+Seat 3: TuichAAreko (534 in chips)
+v1[nn]1: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [6c Ts]
+TuichAAreko: raises 313 to 353 and is all-in
+v1[nn]1: folds
+TuichAAreko: folds
+Uncalled bet (313) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 100 from pot
+*** SUMMARY ***
+Total pot 100 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) collected (100)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) folded before Flop
+
+Poker Hand #SG3261006526: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:36:33
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (600 in chips)
+Seat 2: v1[nn]1 (653 in chips)
+Seat 3: TuichAAreko (247 in chips)
+TuichAAreko: posts small blind 20
+v1[nn]1: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Ts 7s]
+TuichAAreko: raises 207 to 247 and is all-in
+TuichAAreko: raises 353 to 600 and is all-in
+v1[nn]1: folds
+Uncalled bet (353) returned to TuichAAreko
+TuichAAreko: shows [7d As]
+TuichAAreko: shows [Ts 7s]
+*** FLOP *** [Td 7h Kc]
+*** TURN *** [Td 7h Kc] [3s]
+*** RIVER *** [Td 7h Kc 3s] [Kd]
+*** SHOWDOWN ***
+TuichAAreko collected 534 from pot
+*** SUMMARY ***
+Total pot 534 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [Td 7h Kc 3s Kd]
+Seat 1: TuichAAreko (small blind) showed [7d As] and lost with two pair, Kings and Sevens
+Seat 2: v1[nn]1 (big blind) folded before Flop
+Seat 3: TuichAAreko (button) showed [Ts 7s] and won (534) with two pair, Kings and Tens
+
+Poker Hand #SG3261006386: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:36:19
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (580 in chips)
+Seat 2: v1[nn]1 (653 in chips)
+Seat 3: TuichAAreko (267 in chips)
+TuichAAreko: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [8c 3h]
+v1[nn]1: folds
+TuichAAreko: folds
+Uncalled bet (20) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 40 from pot
+*** SUMMARY ***
+Total pot 40 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) collected (40)
+Seat 2: v1[nn]1 (button) folded before Flop (didn't bet)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261006313: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:36:11
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (580 in chips)
+Seat 2: v1[nn]1 (673 in chips)
+Seat 3: TuichAAreko (247 in chips)
+v1[nn]1: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [5c Th]
+TuichAAreko: folds
+v1[nn]1: folds
+Uncalled bet (20) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 40 from pot
+*** SUMMARY ***
+Total pot 40 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) collected (40)
+
+Poker Hand #SG3261006032: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:35:41
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (270 in chips)
+Seat 2: v1[nn]1 (713 in chips)
+Seat 3: TuichAAreko (517 in chips)
+TuichAAreko: posts small blind 20
+v1[nn]1: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Qc Ac]
+TuichAAreko: raises 40 to 80
+TuichAAreko: raises 190 to 270 and is all-in
+v1[nn]1: folds
+TuichAAreko: calls 190
+TuichAAreko: shows [As 8s]
+TuichAAreko: shows [Qc Ac]
+*** FLOP *** [Ah 8h Th]
+*** TURN *** [Ah 8h Th] [6d]
+*** RIVER *** [Ah 8h Th 6d] [Ks]
+v1[nn]1: shows [Kh 2h] (a flush Ace high)
+*** SHOWDOWN ***
+TuichAAreko collected 580 from pot
+*** SUMMARY ***
+Total pot 580 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [Ah 8h Th 6d Ks]
+Seat 1: TuichAAreko (small blind) showed [As 8s] and won (580) with two pair, Aces and Eights
+Seat 2: v1[nn]1 (big blind) folded before Flop
+Seat 3: TuichAAreko (button) showed [Qc Ac] and lost with a pair of Aces
+
+Poker Hand #SG3261005779: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:35:15
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (350 in chips)
+Seat 2: v1[nn]1 (613 in chips)
+Seat 3: TuichAAreko (537 in chips)
+TuichAAreko: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [2c Qc]
+v1[nn]1: raises 40 to 80
+TuichAAreko: folds
+TuichAAreko: calls 40
+*** FLOP *** [Ts 3h 4d]
+TuichAAreko: checks
+v1[nn]1: bets 90
+TuichAAreko: folds
+Uncalled bet (90) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 180 from pot
+*** SUMMARY ***
+Total pot 180 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [Ts 3h 4d]
+Seat 1: TuichAAreko (big blind) folded on the Flop
+Seat 2: v1[nn]1 (button) won (180)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261005592: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:34:58
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (350 in chips)
+Seat 2: v1[nn]1 (573 in chips)
+Seat 3: TuichAAreko (577 in chips)
+v1[nn]1: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [7s Js]
+TuichAAreko: folds
+v1[nn]1: raises 533 to 573 and is all-in
+TuichAAreko: folds
+Uncalled bet (533) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 80 from pot
+*** SUMMARY ***
+Total pot 80 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) collected (80)
+Seat 3: TuichAAreko (big blind) folded before Flop
+
+Poker Hand #SG3261005501: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:34:49
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (370 in chips)
+Seat 2: v1[nn]1 (613 in chips)
+Seat 3: TuichAAreko (517 in chips)
+TuichAAreko: posts small blind 20
+v1[nn]1: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Kh Js]
+TuichAAreko: raises 477 to 517 and is all-in
+TuichAAreko: folds
+v1[nn]1: folds
+Uncalled bet (477) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 100 from pot
+*** SUMMARY ***
+Total pot 100 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) folded before Flop
+Seat 3: TuichAAreko (button) collected (100)
+
+Poker Hand #SG3261005402: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level3(20/40) - 2025/10/27 11:34:38
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (410 in chips)
+Seat 2: v1[nn]1 (613 in chips)
+Seat 3: TuichAAreko (477 in chips)
+TuichAAreko: posts small blind 20
+TuichAAreko: posts big blind 40
+*** HOLE CARDS ***
+Dealt to TuichAAreko [8c 9c]
+v1[nn]1: folds
+TuichAAreko: raises 437 to 477 and is all-in
+TuichAAreko: folds
+Uncalled bet (437) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 80 from pot
+*** SUMMARY ***
+Total pot 80 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) folded before Flop (didn't bet)
+Seat 3: TuichAAreko (small blind) collected (80)
+
+Poker Hand #SG3261005272: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:34:26
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (365 in chips)
+Seat 2: v1[nn]1 (628 in chips)
+Seat 3: TuichAAreko (507 in chips)
+v1[nn]1: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [5s 2s]
+TuichAAreko: raises 335 to 365 and is all-in
+v1[nn]1: folds
+TuichAAreko: folds
+Uncalled bet (335) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 75 from pot
+*** SUMMARY ***
+Total pot 75 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) collected (75)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) folded before Flop
+
+Poker Hand #SG3261005033: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:34:02
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (380 in chips)
+Seat 2: v1[nn]1 (688 in chips)
+Seat 3: TuichAAreko (432 in chips)
+TuichAAreko: posts small blind 15
+v1[nn]1: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Jd Jh]
+TuichAAreko: raises 30 to 60
+TuichAAreko: folds
+v1[nn]1: calls 30
+*** FLOP *** [6h 4c 7s]
+v1[nn]1: checks
+TuichAAreko: bets 150
+v1[nn]1: folds
+Uncalled bet (150) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 135 from pot
+*** SUMMARY ***
+Total pot 135 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [6h 4c 7s]
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) folded on the Flop
+Seat 3: TuichAAreko (button) won (135)
+
+Poker Hand #SG3261004943: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:33:52
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (410 in chips)
+Seat 2: v1[nn]1 (643 in chips)
+Seat 3: TuichAAreko (447 in chips)
+TuichAAreko: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [2c Js]
+v1[nn]1: raises 30 to 60
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (30) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 75 from pot
+*** SUMMARY ***
+Total pot 75 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) collected (75)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261004866: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:33:45
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (410 in chips)
+Seat 2: v1[nn]1 (658 in chips)
+Seat 3: TuichAAreko (432 in chips)
+v1[nn]1: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Ah 3h]
+TuichAAreko: folds
+v1[nn]1: folds
+Uncalled bet (15) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 30 from pot
+*** SUMMARY ***
+Total pot 30 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) collected (30)
+
+Poker Hand #SG3261004767: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:33:35
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (425 in chips)
+Seat 2: v1[nn]1 (643 in chips)
+Seat 3: TuichAAreko (432 in chips)
+TuichAAreko: posts small blind 15
+v1[nn]1: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Qs 7c]
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (15) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 30 from pot
+*** SUMMARY ***
+Total pot 30 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) collected (30)
+Seat 3: TuichAAreko (button) folded before Flop (didn't bet)
+
+Poker Hand #SG3261004602: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:33:17
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (455 in chips)
+Seat 2: v1[nn]1 (598 in chips)
+Seat 3: TuichAAreko (447 in chips)
+TuichAAreko: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [2h As]
+v1[nn]1: raises 30 to 60
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (30) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 75 from pot
+*** SUMMARY ***
+Total pot 75 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) collected (75)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261004449: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:33:03
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (410 in chips)
+Seat 2: v1[nn]1 (613 in chips)
+Seat 3: TuichAAreko (477 in chips)
+v1[nn]1: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [3h 4h]
+TuichAAreko: raises 380 to 410 and is all-in
+v1[nn]1: folds
+TuichAAreko: folds
+Uncalled bet (380) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 75 from pot
+*** SUMMARY ***
+Total pot 75 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) collected (75)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) folded before Flop
+
+Poker Hand #SG3261004230: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:32:41
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (440 in chips)
+Seat 2: v1[nn]1 (583 in chips)
+Seat 3: TuichAAreko (477 in chips)
+TuichAAreko: posts small blind 15
+v1[nn]1: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Js 9d]
+TuichAAreko: folds
+TuichAAreko: calls 15
+v1[nn]1: raises 553 to 583 and is all-in
+TuichAAreko: folds
+Uncalled bet (553) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 60 from pot
+*** SUMMARY ***
+Total pot 60 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) collected (60)
+Seat 3: TuichAAreko (button) folded before Flop (didn't bet)
+
+Poker Hand #SG3261004122: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:32:30
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (470 in chips)
+Seat 2: v1[nn]1 (583 in chips)
+Seat 3: TuichAAreko (447 in chips)
+TuichAAreko: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [8d Ac]
+v1[nn]1: folds
+TuichAAreko: raises 417 to 447 and is all-in
+TuichAAreko: folds
+Uncalled bet (417) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 60 from pot
+*** SUMMARY ***
+Total pot 60 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) folded before Flop (didn't bet)
+Seat 3: TuichAAreko (small blind) collected (60)
+
+Poker Hand #SG3261003848: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level2(15/30) - 2025/10/27 11:32:04
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (470 in chips)
+Seat 2: v1[nn]1 (523 in chips)
+Seat 3: TuichAAreko (507 in chips)
+v1[nn]1: posts small blind 15
+TuichAAreko: posts big blind 30
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Ad 4h]
+TuichAAreko: folds
+v1[nn]1: raises 30 to 60
+TuichAAreko: calls 30
+*** FLOP *** [7s Tc Jd]
+v1[nn]1: bets 40
+TuichAAreko: folds
+Uncalled bet (40) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 120 from pot
+*** SUMMARY ***
+Total pot 120 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [7s Tc Jd]
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) won (120)
+Seat 3: TuichAAreko (big blind) folded on the Flop
+
+Poker Hand #SG3261003653: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:31:46
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (480 in chips)
+Seat 2: v1[nn]1 (543 in chips)
+Seat 3: TuichAAreko (477 in chips)
+TuichAAreko: posts small blind 10
+v1[nn]1: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Kh Qs]
+TuichAAreko: raises 20 to 40
+TuichAAreko: folds
+v1[nn]1: folds
+Uncalled bet (20) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 50 from pot
+*** SUMMARY ***
+Total pot 50 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) folded before Flop
+Seat 3: TuichAAreko (button) collected (50)
+
+Poker Hand #SG3261003353: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:31:17
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (530 in chips)
+Seat 2: v1[nn]1 (543 in chips)
+Seat 3: TuichAAreko (427 in chips)
+TuichAAreko: posts small blind 10
+TuichAAreko: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [4s As]
+v1[nn]1: folds
+TuichAAreko: raises 30 to 50
+TuichAAreko: calls 30
+*** FLOP *** [7s 7d 6d]
+TuichAAreko: bets 40
+TuichAAreko: folds
+Uncalled bet (40) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 100 from pot
+*** SUMMARY ***
+Total pot 100 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [7s 7d 6d]
+Seat 1: TuichAAreko (big blind) folded on the Flop
+Seat 2: v1[nn]1 (button) folded before Flop (didn't bet)
+Seat 3: TuichAAreko (small blind) won (100)
+
+Poker Hand #SG3261002859: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:30:30
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (530 in chips)
+Seat 2: v1[nn]1 (583 in chips)
+Seat 3: TuichAAreko (387 in chips)
+v1[nn]1: posts small blind 10
+TuichAAreko: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [Th 8c]
+TuichAAreko: folds
+v1[nn]1: raises 20 to 40
+TuichAAreko: calls 20
+*** FLOP *** [6c 9c Kh]
+v1[nn]1: checks
+TuichAAreko: checks
+*** TURN *** [6c 9c Kh] [6d]
+v1[nn]1: checks
+TuichAAreko: bets 40
+v1[nn]1: folds
+Uncalled bet (40) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 80 from pot
+*** SUMMARY ***
+Total pot 80 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [6c 9c Kh 6d]
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) folded on the Turn
+Seat 3: TuichAAreko (big blind) won (80)
+
+Poker Hand #SG3261002514: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:29:54
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (540 in chips)
+Seat 2: v1[nn]1 (623 in chips)
+Seat 3: TuichAAreko (337 in chips)
+TuichAAreko: posts small blind 10
+v1[nn]1: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [7d As]
+TuichAAreko: raises 20 to 40
+TuichAAreko: folds
+v1[nn]1: calls 20
+*** FLOP *** [4c Ts Kh]
+v1[nn]1: checks
+TuichAAreko: bets 30
+v1[nn]1: folds
+Uncalled bet (30) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 90 from pot
+*** SUMMARY ***
+Total pot 90 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [4c Ts Kh]
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) folded on the Flop
+Seat 3: TuichAAreko (button) won (90)
+
+Poker Hand #SG3261002266: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:29:28
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (560 in chips)
+Seat 2: v1[nn]1 (593 in chips)
+Seat 3: TuichAAreko (347 in chips)
+TuichAAreko: posts small blind 10
+TuichAAreko: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [7s 3s]
+v1[nn]1: raises 20 to 40
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (20) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 50 from pot
+*** SUMMARY ***
+Total pot 50 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) folded before Flop
+Seat 2: v1[nn]1 (button) collected (50)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261002064: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:29:07
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (560 in chips)
+Seat 2: v1[nn]1 (573 in chips)
+Seat 3: TuichAAreko (367 in chips)
+v1[nn]1: posts small blind 10
+TuichAAreko: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [3c Jd]
+TuichAAreko: folds
+v1[nn]1: raises 20 to 40
+TuichAAreko: folds
+Uncalled bet (20) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 40 from pot
+*** SUMMARY ***
+Total pot 40 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) folded before Flop (didn't bet)
+Seat 2: v1[nn]1 (small blind) collected (40)
+Seat 3: TuichAAreko (big blind) folded before Flop
+
+Poker Hand #SG3261001805: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:28:40
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (570 in chips)
+Seat 2: v1[nn]1 (500 in chips)
+Seat 3: TuichAAreko (430 in chips)
+TuichAAreko: posts small blind 10
+v1[nn]1: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [9s Kc]
+TuichAAreko: raises 20 to 40
+TuichAAreko: folds
+v1[nn]1: calls 20
+*** FLOP *** [Jc 4h 3s]
+v1[nn]1: checks
+TuichAAreko: bets 23
+v1[nn]1: raises 68 to 91
+TuichAAreko: folds
+Uncalled bet (68) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 136 from pot
+*** SUMMARY ***
+Total pot 136 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Board [Jc 4h 3s]
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) won (136)
+Seat 3: TuichAAreko (button) folded on the Flop
+
+Poker Hand #SG3261001655: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:28:24
+Table '12253' 3-max Seat #2 is the button
+Seat 1: TuichAAreko (520 in chips)
+Seat 2: v1[nn]1 (500 in chips)
+Seat 3: TuichAAreko (480 in chips)
+TuichAAreko: posts small blind 10
+TuichAAreko: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [5d Ac]
+v1[nn]1: folds
+TuichAAreko: raises 30 to 50
+TuichAAreko: raises 470 to 520 and is all-in
+TuichAAreko: folds
+Uncalled bet (470) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 100 from pot
+*** SUMMARY ***
+Total pot 100 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (big blind) collected (100)
+Seat 2: v1[nn]1 (button) folded before Flop (didn't bet)
+Seat 3: TuichAAreko (small blind) folded before Flop
+
+Poker Hand #SG3261001487: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:28:04
+Table '12253' 3-max Seat #1 is the button
+Seat 1: TuichAAreko (490 in chips)
+Seat 2: v1[nn]1 (510 in chips)
+Seat 3: TuichAAreko (500 in chips)
+v1[nn]1: posts small blind 10
+TuichAAreko: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [4s 7h]
+TuichAAreko: raises 20 to 40
+v1[nn]1: folds
+TuichAAreko: folds
+Uncalled bet (20) returned to TuichAAreko
+*** SHOWDOWN ***
+TuichAAreko collected 50 from pot
+*** SUMMARY ***
+Total pot 50 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (button) collected (50)
+Seat 2: v1[nn]1 (small blind) folded before Flop
+Seat 3: TuichAAreko (big blind) folded before Flop
+
+Poker Hand #SG3261001347: Tournament #239882288, Spin&Gold #5 Hold'em No Limit - Level1(10/20) - 2025/10/27 11:27:49
+Table '12253' 3-max Seat #3 is the button
+Seat 1: TuichAAreko (500 in chips)
+Seat 2: v1[nn]1 (500 in chips)
+Seat 3: TuichAAreko (500 in chips)
+TuichAAreko: posts small blind 10
+v1[nn]1: posts big blind 20
+*** HOLE CARDS ***
+Dealt to TuichAAreko [6d 4d]
+TuichAAreko: folds
+TuichAAreko: folds
+Uncalled bet (10) returned to v1[nn]1
+*** SHOWDOWN ***
+v1[nn]1 collected 20 from pot
+*** SUMMARY ***
+Total pot 20 | Rake 0 | Jackpot 0 | Bingo 0 | Fortune 0 | Tax 0
+Seat 1: TuichAAreko (small blind) folded before Flop
+Seat 2: v1[nn]1 (big blind) collected (20)
+Seat 3: TuichAAreko (button) folded before Flop (didn't bet)
