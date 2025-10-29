@@ -78,6 +78,8 @@ Get API key from: https://makersuite.google.com/app/apikey
 **matcher.py** - Intelligent hand-to-screenshot matching
 - **PRIMARY**: Hand ID matching from OCR (99.9% accuracy) - `screenshot.hand_id == hand.hand_id`
 - **FALLBACK**: 100-point scoring system (hero cards 40pts, board 30pts, timestamp 20pts, position 15pts, names 10pts, stack 5pts)
+- **VALIDATION GATES**: Pre-match quality checks prevent incorrect matches (player count, hero stack ±25%, general stack alignment ≥50%)
+- **Confidence threshold**: Increased to 70.0 for fallback matches (from 50.0)
 - Prevents duplicate matches with `matched_screenshots` tracking
 - Returns `HandMatch` objects with auto-generated seat mappings
 
@@ -163,12 +165,16 @@ async def process_single_screenshot(screenshot_file):
 ```
 Prevents API rate limit violations while maximizing throughput.
 
-### Hand ID Matching Strategy (matcher.py:11-162)
+### Hand ID Matching Strategy (matcher.py:11-240)
 1. **Normalize Hand IDs** → Remove prefixes like "SG", "HH", "MT", "TT" (handles OCR/parser differences)
 2. **PRIMARY**: Check `_normalize_hand_id(screenshot.hand_id) == _normalize_hand_id(hand.hand_id)` (OCR extracted) → 100 points
 3. **LEGACY**: Check `hand.hand_id in screenshot.screenshot_id` (filename) → 100 points
-4. **FALLBACK**: Multi-criteria scoring → 0-100 points (hero cards 40pts, board 30pts, hero position 15pts, player names 10pts, stack 5pts)
-5. **Duplicate Prevention**: `_build_seat_mapping()` validates mappings and returns empty dict if duplicate names detected within same hand
+4. **FALLBACK**: Multi-criteria scoring → 0-100 points (hero cards 40pts, board 30pts, hero position 15pts, player names 10pts, stack 5pts), threshold: 70.0
+5. **VALIDATION GATES** (applied BEFORE accepting any match):
+   - Player count match (hand seats vs screenshot players)
+   - Hero stack similarity (±25% tolerance, accounts for blinds/antes)
+   - General stack alignment (≥50% of stacks within ±30%)
+6. **Duplicate Prevention**: `_build_seat_mapping()` validates mappings and returns empty dict if duplicate names detected within same hand
 
 ## Common Development Patterns
 
@@ -359,6 +365,43 @@ The auto-exported file is named: `debug_job_{id}_{timestamp}.json`
 - Each screenshot now provides ALL player names at the table, not just the matched hand's players
 
 **Key Insight**: The screenshots were always sufficient to de-anonymize entire tables. The issue was that the system only used player names that appeared in the specific matched hand, ignoring other players visible in the screenshot. Now it extracts ALL visible players and applies them to ALL hands at that table.
+
+### Match Quality Validation Enhancement (Oct 2025 - FIXED) 🆕
+**Problem**: Analysis of Job #26 revealed ~21% of screenshots (57 of 265) were matched to incorrect hands, resulting in failed mappings and 58 tables with unmapped IDs. System matched 265 screenshots but only 208 tables (78.5%) were fully de-anonymized.
+
+**Root Cause Analysis**:
+- **Hand ID matches** (197): Generally reliable when OCR extracts Hand ID correctly
+- **Filename matches** (5): Reliable
+- **Fallback matches** (63): ~90% of incorrect matches originated here due to weak validation
+  - Screenshots matched to hands with different player counts (e.g., 2-player hand → 3-player screenshot)
+  - Hero stack mismatches (e.g., $260 in hand vs $100 in screenshot)
+  - Screenshots from completely different hands accepted based on superficial similarities
+
+**Evidence from Logs**:
+```
+Hand: 2 players (Hero + 869d60cc)
+Screenshot: 3 players (TheKingOfVe..., TuichAAreko, Rareseanu)
+Result: Player count mismatch → match accepted → mapping fails
+```
+
+**Solution**: Added `validate_match_quality()` function in `matcher.py:32-88` with three validation gates applied BEFORE accepting any match:
+
+1. **Player Count Validation**: Hand and screenshot must have same number of players
+2. **Hero Stack Validation**: Hero stack must match within ±25% tolerance (accounts for blinds/antes)
+3. **Stack Alignment Validation**: At least 50% of player stacks must align within ±30% tolerance
+
+**Additional Changes**:
+- Increased fallback matching confidence threshold from 50.0 to 70.0 points
+- Enhanced logging to show rejection reasons for debugging
+- Validation applied to all three matching paths: Hand ID, Filename, and Fallback
+
+**Expected Impact**:
+- Reduce incorrect matches from ~57 (21%) to <10 (4%)
+- Improve fully de-anonymized table rate from 78.5% to >95%
+- Prevent mapping failures caused by mismatched hands
+- Better diagnostic logging for rejected matches
+
+**Implementation**: `matcher.py:32-88` (`validate_match_quality()`), applied in `matcher.py:90-240` (`find_best_matches()`)
 
 ## Recent Features & Enhancements
 
