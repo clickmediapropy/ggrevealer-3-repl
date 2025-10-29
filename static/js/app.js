@@ -778,6 +778,12 @@ function resetToWelcome() {
 newJobBtn.addEventListener('click', resetToWelcome);
 retryBtn.addEventListener('click', resetToWelcome);
 
+// Wire up top new job button
+const newJobBtnTop = document.getElementById('new-job-btn-top');
+if (newJobBtnTop) {
+    newJobBtnTop.addEventListener('click', resetToWelcome);
+}
+
 async function downloadResult(jobId) {
     window.location.href = `${API_BASE}/api/download/${jobId}`;
 }
