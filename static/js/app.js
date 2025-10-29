@@ -62,6 +62,21 @@ function handleTxtFiles(files) {
 }
 
 function renderTxtFiles() {
+    const summary = document.getElementById('txt-summary');
+    const countSpan = document.getElementById('txt-count');
+    const sizeSpan = document.getElementById('txt-size');
+
+    if (txtFiles.length > 0) {
+        const totalSize = txtFiles.reduce((sum, file) => sum + file.size, 0);
+        const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+        countSpan.textContent = txtFiles.length;
+        sizeSpan.textContent = sizeMB;
+        summary.classList.remove('d-none');
+    } else {
+        summary.classList.add('d-none');
+    }
+
     txtFilesList.innerHTML = '';
     txtFiles.forEach((file, index) => {
         const div = document.createElement('div');
@@ -111,6 +126,21 @@ function handleScreenshotFiles(files) {
 }
 
 function renderScreenshotFiles() {
+    const summary = document.getElementById('screenshot-summary');
+    const countSpan = document.getElementById('screenshot-count');
+    const sizeSpan = document.getElementById('screenshot-size');
+
+    if (screenshotFiles.length > 0) {
+        const totalSize = screenshotFiles.reduce((sum, file) => sum + file.size, 0);
+        const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+        countSpan.textContent = screenshotFiles.length;
+        sizeSpan.textContent = sizeMB;
+        summary.classList.remove('d-none');
+    } else {
+        summary.classList.add('d-none');
+    }
+
     screenshotFilesList.innerHTML = '';
     screenshotFiles.forEach((file, index) => {
         const div = document.createElement('div');

@@ -55,6 +55,11 @@ body {
     color: #bb2d3b;
 }
 
+.file-item-container {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
 .card {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transition: box-shadow 0.3s ease;
