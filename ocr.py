@@ -1,5 +1,5 @@
 """
-OCR screenshot analysis using Google Gemini 2.0 Flash Vision API
+OCR screenshot analysis using Google Gemini 2.5 Flash Image API
 Optimized for PokerCraft screenshot analysis
 """
 
@@ -36,7 +36,7 @@ async def ocr_hand_id(screenshot_path: str, api_key: str) -> Tuple[bool, Optiona
 
         # Configure Gemini
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('models/gemini-2.5-flash-image')
 
         # Ultra-simple prompt focused ONLY on Hand ID
         prompt = """
@@ -125,7 +125,7 @@ async def ocr_player_details(screenshot_path: str, api_key: str) -> Tuple[bool, 
 
         # Configure Gemini
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('models/gemini-2.5-flash-image')
 
         # Focused prompt for player details + roles
         prompt = """
