@@ -5,11 +5,86 @@ Optimized for PokerCraft screenshot analysis
 
 import os
 import json
+import re
 import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 import google.generativeai as genai
 from models import ScreenshotAnalysis, PlayerStack
+
+
+async def ocr_hand_id(screenshot_path: str, api_key: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    First OCR: Extract ONLY Hand ID from screenshot
+    Ultra-simple prompt for maximum reliability (99.9% accuracy expected)
+
+    Args:
+        screenshot_path: Path to screenshot image
+        api_key: Gemini API key
+
+    Returns:
+        Tuple of (success, hand_id, error_message)
+    """
+    try:
+        # Check if API key is configured
+        if not api_key or api_key == "DUMMY_API_KEY_FOR_TESTING":
+            return (False, None, "Gemini API key not configured")
+
+        # Read image
+        with open(screenshot_path, 'rb') as f:
+            image_data = f.read()
+
+        # Configure Gemini
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+
+        # Ultra-simple prompt focused ONLY on Hand ID
+        prompt = """
+EXTRACT ONLY THE HAND ID from this poker screenshot.
+
+The Hand ID is visible in the top-right corner or top section of the screenshot.
+
+FORMAT: The Hand ID is typically:
+- Starts with letters like SG, RC, OM, MT, TT, HD, HH
+- Followed by numbers
+- Examples: "SG3247423387", "RC1234567890", "MT9876543210"
+
+INSTRUCTIONS:
+1. Look for the Hand ID text (usually top-right corner)
+2. Extract the COMPLETE ID including prefix and numbers
+3. Return ONLY the Hand ID, nothing else
+4. If you cannot find it clearly, return "NOT_FOUND"
+
+OUTPUT FORMAT (just the ID, no explanation):
+SG3247423387
+"""
+
+        # Call Gemini API
+        response = await asyncio.to_thread(
+            model.generate_content,
+            [prompt, {"mime_type": "image/png", "data": image_data}]
+        )
+
+        # Extract Hand ID from response
+        hand_id = response.text.strip()
+
+        # Validate format
+        if hand_id == "NOT_FOUND" or not hand_id:
+            return (False, None, "Hand ID not found in screenshot")
+
+        # Basic validation: should start with letters and contain numbers
+        if not re.match(r'^[A-Z]{2,4}\d+$', hand_id, re.IGNORECASE):
+            # Try to clean up response (sometimes has extra text)
+            match = re.search(r'([A-Z]{2,4}\d+)', hand_id, re.IGNORECASE)
+            if match:
+                hand_id = match.group(1)
+            else:
+                return (False, hand_id, f"Invalid Hand ID format: {hand_id}")
+
+        return (True, hand_id, None)
+
+    except Exception as e:
+        return (False, None, f"OCR1 error: {str(e)}")
 
 
 async def ocr_screenshot(image_path: str, screenshot_id: str, semaphore: Optional[asyncio.Semaphore] = None) -> ScreenshotAnalysis:
