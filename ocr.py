@@ -137,17 +137,30 @@ REQUIRED INFORMATION:
 3. Hero cards (2 cards dealt to hero, format: "Kh Kd")
 4. Board cards (community cards, format: "Qh Jd Ts 4c 2s")
 5. Player stacks (chip amounts for each player)
-6. Role indicators:
-   - DEALER: Player with "D" or "B" button indicator (yellow/white circle)
-   - SMALL BLIND: Player with "SB" indicator
-   - BIG BLIND: Player with "BB" indicator
+6. Role indicators (CRITICAL - READ FROM TABLE LAYOUT ONLY):
+   - DEALER: Player with "D" or "B" button indicator (yellow/white circle) ON THE POKER TABLE near player avatar
+   - SMALL BLIND: Player with "SB" indicator badge ON THE POKER TABLE near player avatar
+   - BIG BLIND: Player with "BB" indicator badge ON THE POKER TABLE near player avatar
 
-CRITICAL INSTRUCTIONS:
+CRITICAL INSTRUCTIONS FOR ROLE EXTRACTION:
+- Extract role indicators from the POKER TABLE VISUAL LAYOUT (top portion with player avatars)
+- DO NOT extract roles from the action history panel at the bottom of the screen
+- Each role (Dealer/SB/BB) MUST be assigned to a DIFFERENT player name
+- If you see the same player name for multiple roles, re-check the visual table layout
+
+EXAMPLES:
+✅ CORRECT - Each role has a different player:
+   "roles": {"dealer": "PlayerA", "small_blind": "PlayerB", "big_blind": "PlayerC"}
+
+❌ WRONG - Same player assigned to multiple roles:
+   "roles": {"dealer": "PlayerA", "small_blind": "PlayerA", "big_blind": "PlayerB"}
+   This happens when reading from action history instead of visual indicators!
+
+OTHER CRITICAL INSTRUCTIONS:
 - Extract player names EXACTLY as shown (preserve special characters: [], _, etc.)
-- Identify which player has the DEALER button (D indicator)
-- Identify which player has SB and BB indicators
 - Board cards may be empty if screenshot is pre-flop
 - Return valid JSON only
+- If you cannot identify distinct visual role indicators on the table, use null for ambiguous roles
 
 OUTPUT FORMAT (valid JSON):
 {
