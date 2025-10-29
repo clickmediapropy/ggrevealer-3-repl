@@ -1401,24 +1401,14 @@ function renderJobs(jobs) {
                     </div>
                 </div>
                 ${job.status === 'completed' ? `
-                    <div class="job-stats-grid mt-3">
-                        <div class="job-stat">
-                            <div class="job-stat-value">${job.hands_parsed || 0}</div>
-                            <div class="job-stat-label">Manos Parseadas</div>
-                        </div>
-                        <div class="job-stat">
-                            <div class="job-stat-value">${job.matched_hands || 0}</div>
-                            <div class="job-stat-label">Manos Matched</div>
-                        </div>
-                        <div class="job-stat">
-                            <div class="job-stat-value">${job.name_mappings_count || 0}</div>
-                            <div class="job-stat-label">Nombres Resueltos</div>
-                        </div>
-                        <div class="job-stat">
-                            <div class="job-stat-value">${job.screenshot_files_count > 0 ? Math.round((job.matched_hands / job.screenshot_files_count) * 100) : 0}%</div>
-                            <div class="job-stat-label">Tasa de Éxito OCR</div>
-                        </div>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-outline-primary btn-sm" onclick="event.stopPropagation(); toggleJobMetrics(${job.id})">
+                            <i class="bi bi-bar-chart-line"></i>
+                            <span id="metrics-btn-text-${job.id}">Ver Estadísticas Detalladas</span>
+                            <span id="metrics-spinner-${job.id}" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
+                        </button>
                     </div>
+                    <div id="detailed-metrics-${job.id}" class="mt-3" style="display: none;"></div>
                 ` : ''}
                 ${job.error_message ? `
                     <div class="alert alert-danger mt-3 mb-0">
@@ -1446,6 +1436,312 @@ function toggleJobCard(jobId) {
         icon.classList.remove('bi-chevron-up');
         icon.classList.add('bi-chevron-down');
     }
+}
+
+// Toggle job detailed metrics
+async function toggleJobMetrics(jobId) {
+    const container = document.getElementById(`detailed-metrics-${jobId}`);
+    const btnText = document.getElementById(`metrics-btn-text-${jobId}`);
+    const spinner = document.getElementById(`metrics-spinner-${jobId}`);
+
+    // If metrics are already loaded, just toggle visibility
+    if (container.innerHTML.trim() !== '') {
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            btnText.textContent = 'Ocultar Estadísticas';
+        } else {
+            container.style.display = 'none';
+            btnText.textContent = 'Ver Estadísticas Detalladas';
+        }
+        return;
+    }
+
+    // Load metrics for the first time
+    try {
+        // Show spinner
+        spinner.style.display = 'inline-block';
+        btnText.textContent = 'Cargando...';
+
+        const response = await fetch(`${API_BASE}/api/status/${jobId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch job metrics');
+        }
+
+        const data = await response.json();
+        const metrics = data.detailed_metrics;
+
+        if (!metrics || Object.keys(metrics).length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">No hay métricas detalladas disponibles</p>';
+            container.style.display = 'block';
+            btnText.textContent = 'Ocultar Estadísticas';
+            spinner.style.display = 'none';
+            return;
+        }
+
+        // Generate detailed metrics HTML
+        const metricsHTML = generateDetailedMetricsHTML(metrics);
+        container.innerHTML = metricsHTML;
+        container.style.display = 'block';
+
+        // Update button text
+        btnText.textContent = 'Ocultar Estadísticas';
+        spinner.style.display = 'none';
+
+    } catch (error) {
+        console.error('Error loading job metrics:', error);
+        container.innerHTML = '<div class="alert alert-danger">Error al cargar las métricas</div>';
+        container.style.display = 'block';
+        btnText.textContent = 'Ocultar Estadísticas';
+        spinner.style.display = 'none';
+    }
+}
+
+// Generate detailed metrics HTML (similar to displayDetailedMetrics but returns HTML string)
+function generateDetailedMetricsHTML(metrics) {
+    let html = '<div class="row">';
+
+    // 1. Hand Coverage Metrics
+    if (metrics.hands) {
+        const hands = metrics.hands;
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="metric-card">
+                    <div class="metric-card-header">
+                        <i class="bi bi-layers-fill"></i> COBERTURA DE MANOS
+                    </div>
+                    <div class="metric-card-body">
+                        <div class="metric-item">
+                            <div class="metric-label">TOTAL</div>
+                            <div class="metric-value">${hands.total || 0}</div>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: ${hands.coverage_percentage || 0}%"></div>
+                        </div>
+                        <div class="metric-breakdown">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-success">
+                                    <i class="bi bi-check-circle-fill"></i> Completamente Mapeado
+                                </small>
+                                <small><strong>${hands.fully_mapped || 0}</strong> (${hands.coverage_percentage || 0}%)</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-warning">
+                                    <i class="bi bi-exclamation-circle-fill"></i> Parcialmente Mapeado
+                                </small>
+                                <small>${hands.partially_mapped || 0}</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-danger">
+                                    <i class="bi bi-x-circle-fill"></i> Sin Mapeos
+                                </small>
+                                <small>${hands.no_mappings || 0}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 2. Player Mapping Metrics
+    if (metrics.players) {
+        const players = metrics.players;
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="metric-card">
+                    <div class="metric-card-header">
+                        <i class="bi bi-people-fill"></i> MAPEO DE JUGADORES
+                    </div>
+                    <div class="metric-card-body">
+                        <div class="metric-item">
+                            <div class="metric-label">TOTAL ÚNICOS</div>
+                            <div class="metric-value">${players.total_unique || 0}</div>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-info" style="width: ${players.mapping_rate || 0}%"></div>
+                        </div>
+                        <div class="metric-breakdown">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-success">
+                                    <i class="bi bi-check-circle-fill"></i> Mapeados
+                                </small>
+                                <small><strong>${players.mapped || 0}</strong> (${players.mapping_rate || 0}%)</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-danger">
+                                    <i class="bi bi-x-circle-fill"></i> Sin Mapear
+                                </small>
+                                <small>${players.unmapped || 0}</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-graph-up"></i> Promedio por Mesa
+                                </small>
+                                <small>${players.average_per_table || 0}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 3. Table Resolution Metrics
+    if (metrics.tables) {
+        const tables = metrics.tables;
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="metric-card">
+                    <div class="metric-card-header">
+                        <i class="bi bi-table"></i> RESOLUCIÓN DE MESAS
+                    </div>
+                    <div class="metric-card-body">
+                        <div class="metric-item">
+                            <div class="metric-label">TOTAL DE MESAS</div>
+                            <div class="metric-value">${tables.total || 0}</div>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: ${tables.resolution_rate || 0}%"></div>
+                        </div>
+                        <div class="metric-breakdown">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-success">
+                                    <i class="bi bi-check-circle-fill"></i> Completamente Resuelto
+                                </small>
+                                <small><strong>${tables.fully_resolved || 0}</strong> (${tables.resolution_rate || 0}%)</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-warning">
+                                    <i class="bi bi-exclamation-circle-fill"></i> Parcialmente Resuelto
+                                </small>
+                                <small>${tables.partially_resolved || 0}</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-danger">
+                                    <i class="bi bi-x-circle-fill"></i> Fallidos
+                                </small>
+                                <small>${tables.failed || 0}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 4. Screenshot Analysis Metrics
+    if (metrics.screenshots) {
+        const screenshots = metrics.screenshots;
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="metric-card">
+                    <div class="metric-card-header">
+                        <i class="bi bi-camera-fill"></i> ANÁLISIS DE SCREENSHOTS
+                    </div>
+                    <div class="metric-card-body">
+                        <div class="metric-item mb-2">
+                            <div class="metric-label">TOTAL DE SCREENSHOTS</div>
+                            <div class="metric-value">${screenshots.total || 0}</div>
+                        </div>
+                        <div class="metric-breakdown">
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-primary">Éxito OCR1</small>
+                                    <small><strong>${screenshots.ocr1_success || 0}/${screenshots.total || 0}</strong></small>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-primary" style="width: ${screenshots.ocr1_success_rate || 0}%"></div>
+                                </div>
+                                <small class="text-muted">${screenshots.ocr1_success_rate || 0}% tasa de éxito</small>
+                            </div>
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-info">Éxito OCR2</small>
+                                    <small><strong>${screenshots.ocr2_success || 0}/${screenshots.ocr1_success || 0}</strong></small>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-info" style="width: ${screenshots.ocr2_success_rate || 0}%"></div>
+                                </div>
+                                <small class="text-muted">${screenshots.ocr2_success_rate || 0}% tasa de éxito</small>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-success">Coincidencias</small>
+                                    <small><strong>${screenshots.matched || 0}/${screenshots.total || 0}</strong></small>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-success" style="width: ${screenshots.match_rate || 0}%"></div>
+                                </div>
+                                <small class="text-muted">${screenshots.match_rate || 0}% tasa de coincidencias</small>
+                            </div>
+                            ${screenshots.discarded > 0 ? `
+                                <div class="mt-2">
+                                    <small class="text-warning">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> ${screenshots.discarded} descartados
+                                    </small>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 5. Mapping Strategy Metrics
+    if (metrics.mappings) {
+        const mappings = metrics.mappings;
+        const totalMappings = mappings.total || 0;
+        const roleBasedPct = totalMappings > 0 ? Math.round((mappings.role_based / totalMappings) * 100) : 0;
+        const counterClockwisePct = totalMappings > 0 ? Math.round((mappings.counter_clockwise / totalMappings) * 100) : 0;
+
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="metric-card">
+                    <div class="metric-card-header">
+                        <i class="bi bi-shuffle"></i> ESTRATEGIA DE MAPEO
+                    </div>
+                    <div class="metric-card-body">
+                        <div class="metric-item">
+                            <div class="metric-label">TOTAL DE MAPEOS</div>
+                            <div class="metric-value">${totalMappings}</div>
+                        </div>
+                        <div class="metric-breakdown">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-success">
+                                    <i class="bi bi-bookmark-check-fill"></i> Basado en Roles
+                                </small>
+                                <small><strong>${mappings.role_based || 0}</strong> (${roleBasedPct}%)</small>
+                            </div>
+                            <div class="progress mb-2" style="height: 6px;">
+                                <div class="progress-bar bg-success" style="width: ${roleBasedPct}%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-info">
+                                    <i class="bi bi-arrow-clockwise"></i> Sentido Antihorario
+                                </small>
+                                <small><strong>${mappings.counter_clockwise || 0}</strong> (${counterClockwisePct}%)</small>
+                            </div>
+                            <div class="progress mb-2" style="height: 6px;">
+                                <div class="progress-bar bg-info" style="width: ${counterClockwisePct}%"></div>
+                            </div>
+                            ${mappings.conflicts_detected > 0 ? `
+                                <div class="alert alert-warning p-2 mb-0 mt-2">
+                                    <small>
+                                        <i class="bi bi-exclamation-triangle-fill"></i>
+                                        ${mappings.conflicts_detected} conflictos detectados
+                                    </small>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    return html;
 }
 
 // Debug info state
