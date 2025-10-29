@@ -1407,8 +1407,8 @@ def run_processing_pipeline(job_id: int):
         # Get API key
         api_key = os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
 
-        # Semaphore for concurrent OCR (max 10 concurrent)
-        semaphore = asyncio.Semaphore(10)
+        # Semaphore will be created inside each event loop to avoid cross-loop binding
+        semaphore = None
 
         # OCR1: Extract Hand IDs from ALL screenshots
         ocr1_results = {}  # {screenshot_filename: (success, hand_id, error)}
@@ -1427,6 +1427,9 @@ def run_processing_pipeline(job_id: int):
                 return success
 
         async def process_all_ocr1():
+            # Create semaphore inside event loop to avoid cross-loop binding issues
+            nonlocal semaphore
+            semaphore = asyncio.Semaphore(10)
             tasks = [process_ocr1(sf) for sf in screenshot_files]
             return await asyncio.gather(*tasks)
 
@@ -1519,6 +1522,9 @@ def run_processing_pipeline(job_id: int):
                 return success
 
         async def process_all_ocr2():
+            # Create semaphore inside event loop to avoid cross-loop binding issues
+            nonlocal semaphore
+            semaphore = asyncio.Semaphore(10)
             tasks = []
             for screenshot_file in screenshot_files:
                 screenshot_filename = screenshot_file['filename']
