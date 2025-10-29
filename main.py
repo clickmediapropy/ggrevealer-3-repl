@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import List, Optional
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded, update_job_detailed_metrics
 from parser import GGPokerParser
 from ocr import ocr_screenshot, ocr_hand_id, ocr_player_details
 from matcher import find_best_matches, _build_seat_mapping_by_roles
@@ -1596,6 +1596,53 @@ def run_processing_pipeline(job_id: int):
                    tables_count=len(table_mappings),
                    duration_ms=mapping_duration)
 
+        # Step 9: Calculate detailed metrics
+        logger.info("📊 Phase 6: Calculating detailed metrics")
+        step_start = time.time()
+
+        detailed_metrics = _calculate_detailed_metrics(
+            all_hands=all_hands,
+            table_groups=table_groups,
+            table_mappings=table_mappings,
+            ocr1_results=ocr1_results,
+            ocr2_results=ocr2_results,
+            matched_screenshots=matched_screenshots,
+            unmatched_screenshots=unmatched_screenshots
+        )
+
+        # Log key metrics
+        logger.info(f"📈 Hands: {detailed_metrics['hands']['total']} total, "
+                   f"{detailed_metrics['hands']['fully_mapped']} fully mapped "
+                   f"({detailed_metrics['hands']['coverage_percentage']:.1f}%)",
+                   hands_total=detailed_metrics['hands']['total'],
+                   hands_fully_mapped=detailed_metrics['hands']['fully_mapped'],
+                   hands_coverage=detailed_metrics['hands']['coverage_percentage'])
+
+        logger.info(f"📈 Players: {detailed_metrics['players']['total_unique']} unique, "
+                   f"{detailed_metrics['players']['mapped']} mapped "
+                   f"({detailed_metrics['players']['mapping_rate']:.1f}%)",
+                   players_total=detailed_metrics['players']['total_unique'],
+                   players_mapped=detailed_metrics['players']['mapped'],
+                   players_mapping_rate=detailed_metrics['players']['mapping_rate'])
+
+        logger.info(f"📈 Tables: {detailed_metrics['tables']['total']} total, "
+                   f"{detailed_metrics['tables']['fully_resolved']} fully resolved "
+                   f"({detailed_metrics['tables']['resolution_rate']:.1f}%)",
+                   tables_total=detailed_metrics['tables']['total'],
+                   tables_fully_resolved=detailed_metrics['tables']['fully_resolved'],
+                   tables_resolution_rate=detailed_metrics['tables']['resolution_rate'])
+
+        logger.info(f"📈 Screenshots: {detailed_metrics['screenshots']['total']} total, "
+                   f"{detailed_metrics['screenshots']['ocr1_success']} OCR1 success, "
+                   f"{detailed_metrics['screenshots']['matched']} matched",
+                   screenshots_total=detailed_metrics['screenshots']['total'],
+                   screenshots_ocr1_success=detailed_metrics['screenshots']['ocr1_success'],
+                   screenshots_matched=detailed_metrics['screenshots']['matched'])
+
+        metrics_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ Metrics calculated",
+                   duration_ms=metrics_duration)
+
         # Step 7: Generate output files
         step_start = time.time()
         logger.info("📝 Generating output TXT files by table")
@@ -1722,9 +1769,8 @@ def run_processing_pipeline(job_id: int):
         
         stats = {
             'total_hands': len(all_hands),
-            'matched_hands': len(matched_hands),
+            'matched_hands': len(matched_screenshots),  # Number of screenshots matched to hands
             'mappings_count': len(name_mappings),
-            'high_confidence_matches': sum(1 for m in matches if m.confidence >= 80),
             'validation_passed': len(validation_errors_all) == 0,
             'validation_errors': validation_errors_all,
             'validation_warnings': validation_warnings_all,
@@ -1740,7 +1786,9 @@ def run_processing_pipeline(job_id: int):
             'failed_files': failed_files,
             'successful_files_count': len(successful_files),
             'failed_files_count': len(failed_files),
-            'has_failed_files': len(failed_files) > 0
+            'has_failed_files': len(failed_files) > 0,
+            # Add detailed metrics from comprehensive calculation
+            'detailed_metrics': detailed_metrics
         }
         
         mappings_dict = [
@@ -1760,11 +1808,14 @@ def run_processing_pipeline(job_id: int):
         # Update job statistics and processing time
         update_job_stats(
             job_id,
-            matched_hands=len(matched_hands),
+            matched_hands=len(matched_screenshots),
             name_mappings_count=len(name_mappings),
             hands_parsed=len(all_hands)
         )
-        
+
+        # Update detailed metrics in database
+        update_job_detailed_metrics(job_id, detailed_metrics)
+
         update_job_status(job_id, 'completed')
 
         # Final summary
@@ -1773,7 +1824,7 @@ def run_processing_pipeline(job_id: int):
                    total_duration_ms=total_duration,
                    total_duration_sec=round(total_duration / 1000, 2),
                    total_hands=len(all_hands),
-                   matched_hands=len(matched_hands),
+                   matched_screenshots=len(matched_screenshots),
                    name_mappings=len(name_mappings),
                    successful_files=len(successful_files),
                    failed_files=len(failed_files))
@@ -1810,6 +1861,255 @@ def run_processing_pipeline(job_id: int):
                 print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
         except Exception as e:
             logger.warning(f"Failed to export debug JSON: {str(e)}")
+
+
+def _calculate_detailed_metrics(
+    all_hands: List[ParsedHand],
+    table_groups: dict,
+    table_mappings: dict,
+    ocr1_results: dict,
+    ocr2_results: dict,
+    matched_screenshots: dict,
+    unmatched_screenshots: list
+) -> dict:
+    """
+    Calculate comprehensive metrics for the dual OCR pipeline.
+
+    Args:
+        all_hands: All parsed hands
+        table_groups: Dict[table_name, List[ParsedHand]]
+        table_mappings: Dict[table_name, Dict[anon_id, real_name]]
+        ocr1_results: Dict[screenshot_filename, (success, hand_id, error)]
+        ocr2_results: Dict[screenshot_filename, (success, ocr_data, error)]
+        matched_screenshots: Dict[screenshot_filename, hand]
+        unmatched_screenshots: List[(screenshot_filename, reason)]
+
+    Returns:
+        dict with detailed metrics at multiple levels:
+        - hands: hand-level statistics
+        - players: player-level statistics
+        - tables: table-level statistics
+        - screenshots: screenshot-level statistics
+        - mappings: mapping-level statistics
+    """
+
+    # ======================================================================
+    # 1. HAND-LEVEL METRICS
+    # ======================================================================
+
+    total_hands = len(all_hands)
+
+    # Count hands with at least one mapping
+    hands_with_mappings = set()
+    hands_fully_mapped = []
+    hands_partially_mapped = []
+    hands_no_mappings = []
+
+    for table_name, hands in table_groups.items():
+        mapping = table_mappings.get(table_name, {})
+
+        for hand in hands:
+            # Get all unique anonymous IDs in this hand
+            anon_ids = set(seat.player_id for seat in hand.seats if seat.player_id != 'Hero')
+
+            if not anon_ids:
+                # No anonymous IDs to map (e.g., all players are Hero?)
+                hands_fully_mapped.append(hand.hand_id)
+                continue
+
+            # Count how many are mapped
+            mapped_ids = sum(1 for anon_id in anon_ids if anon_id in mapping)
+
+            if mapped_ids > 0:
+                hands_with_mappings.add(hand.hand_id)
+
+            if mapped_ids == len(anon_ids):
+                hands_fully_mapped.append(hand.hand_id)
+            elif mapped_ids > 0:
+                hands_partially_mapped.append(hand.hand_id)
+            else:
+                hands_no_mappings.append(hand.hand_id)
+
+    hands_metrics = {
+        'total': total_hands,
+        'fully_mapped': len(hands_fully_mapped),
+        'partially_mapped': len(hands_partially_mapped),
+        'no_mappings': len(hands_no_mappings),
+        'coverage_percentage': round((len(hands_fully_mapped) / total_hands * 100) if total_hands > 0 else 0, 1)
+    }
+
+    # ======================================================================
+    # 2. PLAYER-LEVEL METRICS
+    # ======================================================================
+
+    # Collect all unique anonymous IDs across all hands
+    all_anon_ids = set()
+    for hand in all_hands:
+        for seat in hand.seats:
+            if seat.player_id != 'Hero':
+                all_anon_ids.add(seat.player_id)
+
+    # Count mapped players (aggregate from all table mappings)
+    all_mapped_ids = set()
+    for mapping in table_mappings.values():
+        all_mapped_ids.update(mapping.keys())
+
+    unmapped_ids = all_anon_ids - all_mapped_ids
+
+    # Calculate average players per table
+    players_per_table = []
+    for hands in table_groups.values():
+        if hands:
+            # Get unique players for this table
+            table_players = set()
+            for hand in hands:
+                for seat in hand.seats:
+                    table_players.add(seat.player_id)
+            players_per_table.append(len(table_players))
+
+    avg_players_per_table = round(sum(players_per_table) / len(players_per_table), 1) if players_per_table else 0
+
+    players_metrics = {
+        'total_unique': len(all_anon_ids),
+        'mapped': len(all_mapped_ids),
+        'unmapped': len(unmapped_ids),
+        'mapping_rate': round((len(all_mapped_ids) / len(all_anon_ids) * 100) if all_anon_ids else 0, 1),
+        'average_per_table': avg_players_per_table
+    }
+
+    # ======================================================================
+    # 3. TABLE-LEVEL METRICS
+    # ======================================================================
+
+    total_tables = len(table_groups)
+    tables_fully_resolved = []
+    tables_partially_resolved = []
+    tables_failed = []
+
+    for table_name, hands in table_groups.items():
+        mapping = table_mappings.get(table_name, {})
+
+        # Get all unique anonymous IDs for this table
+        table_anon_ids = set()
+        for hand in hands:
+            for seat in hand.seats:
+                if seat.player_id != 'Hero':
+                    table_anon_ids.add(seat.player_id)
+
+        if not table_anon_ids:
+            # No anonymous IDs to map
+            tables_fully_resolved.append(table_name)
+            continue
+
+        # Calculate coverage
+        mapped_count = sum(1 for anon_id in table_anon_ids if anon_id in mapping)
+        coverage = (mapped_count / len(table_anon_ids) * 100) if table_anon_ids else 0
+
+        if coverage == 100:
+            tables_fully_resolved.append(table_name)
+        elif coverage >= 50:
+            tables_partially_resolved.append(table_name)
+        else:
+            tables_failed.append(table_name)
+
+    tables_metrics = {
+        'total': total_tables,
+        'fully_resolved': len(tables_fully_resolved),
+        'partially_resolved': len(tables_partially_resolved),
+        'failed': len(tables_failed),
+        'resolution_rate': round((len(tables_fully_resolved) / total_tables * 100) if total_tables > 0 else 0, 1),
+        'average_coverage': round(
+            ((len(tables_fully_resolved) * 100 + len(tables_partially_resolved) * 75) / total_tables) if total_tables > 0 else 0,
+            1
+        )
+    }
+
+    # ======================================================================
+    # 4. SCREENSHOT-LEVEL METRICS
+    # ======================================================================
+
+    total_screenshots = len(ocr1_results)
+    ocr1_success = sum(1 for success, _, _ in ocr1_results.values() if success)
+    ocr1_failure = total_screenshots - ocr1_success
+
+    # OCR1 retry count (from ocr1_results - we count retries in ocr_hand_id_with_retry)
+    # Note: Current implementation doesn't track individual retry counts,
+    # but we can infer from success/failure
+    ocr1_retry_count = 0  # Placeholder - would need to be tracked in ocr_hand_id_with_retry
+
+    ocr2_success = sum(1 for success, _, _ in ocr2_results.values() if success)
+    ocr2_failure = len(ocr2_results) - ocr2_success
+
+    screenshots_discarded = len(unmatched_screenshots)
+    screenshots_matched = len(matched_screenshots)
+
+    screenshots_metrics = {
+        'total': total_screenshots,
+        'ocr1_success': ocr1_success,
+        'ocr1_failure': ocr1_failure,
+        'ocr1_retry_count': ocr1_retry_count,
+        'ocr1_success_rate': round((ocr1_success / total_screenshots * 100) if total_screenshots > 0 else 0, 1),
+        'ocr2_success': ocr2_success,
+        'ocr2_failure': ocr2_failure,
+        'ocr2_success_rate': round((ocr2_success / len(ocr2_results) * 100) if ocr2_results else 0, 1),
+        'matched': screenshots_matched,
+        'discarded': screenshots_discarded,
+        'match_rate': round((screenshots_matched / total_screenshots * 100) if total_screenshots > 0 else 0, 1)
+    }
+
+    # ======================================================================
+    # 5. MAPPING-LEVEL METRICS
+    # ======================================================================
+
+    # Count total mappings
+    total_mappings = sum(len(mapping) for mapping in table_mappings.values())
+
+    # Count role-based vs counter-clockwise mappings
+    # Note: Current implementation doesn't distinguish between these in the mapping dict
+    # Both are stored the same way. We could track this if we added metadata to mappings.
+    # For now, we'll use heuristics based on OCR2 data
+
+    role_based_count = 0
+    counter_clockwise_count = 0
+
+    for screenshot_filename, (success, ocr_data, error) in ocr2_results.items():
+        if success and ocr_data:
+            # If OCR2 extracted role indicators, mappings from this screenshot are role-based
+            has_dealer = ocr_data.get('dealer_player') is not None
+            has_sb = ocr_data.get('small_blind_player') is not None
+            has_bb = ocr_data.get('big_blind_player') is not None
+
+            if has_dealer or has_sb or has_bb:
+                # Estimate: each screenshot contributes ~3 players on average
+                role_based_count += len(ocr_data.get('players', []))
+            else:
+                # Fallback to counter-clockwise
+                counter_clockwise_count += len(ocr_data.get('players', []))
+
+    # Conflicts detected (would need to be tracked in _build_table_mapping)
+    # For now, we can't track this without modifying the mapping function
+    conflicts_detected = 0
+    tables_rejected = 0
+
+    mappings_metrics = {
+        'total': total_mappings,
+        'role_based': role_based_count,
+        'counter_clockwise': counter_clockwise_count,
+        'conflicts_detected': conflicts_detected,
+        'tables_rejected': tables_rejected
+    }
+
+    # ======================================================================
+    # RETURN AGGREGATED METRICS
+    # ======================================================================
+
+    return {
+        'hands': hands_metrics,
+        'players': players_metrics,
+        'tables': tables_metrics,
+        'screenshots': screenshots_metrics,
+        'mappings': mappings_metrics
+    }
 
 
 def _normalize_table_name(table_name: str) -> str:

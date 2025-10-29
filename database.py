@@ -136,6 +136,18 @@ def init_db():
             migrations.append("ALTER TABLE jobs ADD COLUMN ocr_processed_count INTEGER DEFAULT 0")
         if 'ocr_total_count' not in columns:
             migrations.append("ALTER TABLE jobs ADD COLUMN ocr_total_count INTEGER DEFAULT 0")
+        if 'ocr1_success_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr1_success_count INTEGER DEFAULT 0")
+        if 'ocr1_failure_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr1_failure_count INTEGER DEFAULT 0")
+        if 'ocr2_success_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr2_success_count INTEGER DEFAULT 0")
+        if 'ocr2_failure_count' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr2_failure_count INTEGER DEFAULT 0")
+        if 'tables_fully_resolved' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN tables_fully_resolved INTEGER DEFAULT 0")
+        if 'tables_total' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN tables_total INTEGER DEFAULT 0")
 
         for migration in migrations:
             conn.execute(migration)
@@ -301,15 +313,39 @@ def update_job_stats(job_id: int, matched_hands: int, name_mappings_count: int, 
             started = datetime.fromisoformat(row['started_at'])
             completed = datetime.utcnow()
             processing_time = (completed - started).total_seconds()
-        
+
         conn.execute(
-            """UPDATE jobs 
-               SET matched_hands = ?, 
-                   name_mappings_count = ?, 
+            """UPDATE jobs
+               SET matched_hands = ?,
+                   name_mappings_count = ?,
                    hands_parsed = ?,
                    processing_time_seconds = ?
                WHERE id = ?""",
             (matched_hands, name_mappings_count, hands_parsed, processing_time, job_id)
+        )
+
+
+def update_job_detailed_metrics(job_id: int, detailed_metrics: dict):
+    """Update job with detailed metrics from dual OCR pipeline"""
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE jobs
+               SET ocr1_success_count = ?,
+                   ocr1_failure_count = ?,
+                   ocr2_success_count = ?,
+                   ocr2_failure_count = ?,
+                   tables_fully_resolved = ?,
+                   tables_total = ?
+               WHERE id = ?""",
+            (
+                detailed_metrics['screenshots']['ocr1_success'],
+                detailed_metrics['screenshots']['ocr1_failure'],
+                detailed_metrics['screenshots']['ocr2_success'],
+                detailed_metrics['screenshots']['ocr2_failure'],
+                detailed_metrics['tables']['fully_resolved'],
+                detailed_metrics['tables']['total'],
+                job_id
+            )
         )
 
 
