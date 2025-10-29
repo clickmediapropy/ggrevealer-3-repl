@@ -131,36 +131,48 @@ async def ocr_player_details(screenshot_path: str, api_key: str) -> Tuple[bool, 
         prompt = """
 EXTRACT PLAYER DETAILS from this poker screenshot.
 
+VISUAL LAYOUT UNDERSTANDING (3-max poker table):
+In PokerCraft screenshots, players are positioned as follows:
+- Position 1: BOTTOM-CENTER (Hero - the main player you're watching)
+- Position 2: TOP-LEFT (left opponent from Hero's perspective)
+- Position 3: TOP-RIGHT (right opponent from Hero's perspective)
+
 REQUIRED INFORMATION:
-1. Player names (all players visible at the table)
-2. Hero name (the main player, usually at bottom center)
+1. Player names at EACH position (extract ALL visible players)
+2. Hero name (the player at bottom-center, position 1)
 3. Hero cards (2 cards dealt to hero, format: "Kh Kd")
 4. Board cards (community cards, format: "Qh Jd Ts 4c 2s")
-5. Player stacks (chip amounts for each player)
-6. Role indicators (CRITICAL - READ FROM TABLE LAYOUT ONLY):
-   - DEALER: Player with "D" or "B" button indicator (yellow/white circle) ON THE POKER TABLE near player avatar
-   - SMALL BLIND: Player with "SB" indicator badge ON THE POKER TABLE near player avatar
-   - BIG BLIND: Player with "BB" indicator badge ON THE POKER TABLE near player avatar
+5. Player stacks (chip amounts for each player, in same order as positions)
+6. **DEALER BUTTON (MOST CRITICAL):**
+   - Look for a YELLOW/WHITE CIRCULAR BUTTON with letter "D" on the poker table
+   - This button appears NEAR one player's avatar/name
+   - Identify which player name has this D button next to them
+   - This player is the DEALER
+   - ONLY extract the DEALER, do NOT try to identify SB/BB (system will calculate those)
 
-CRITICAL INSTRUCTIONS FOR ROLE EXTRACTION:
-- Extract role indicators from the POKER TABLE VISUAL LAYOUT (top portion with player avatars)
-- DO NOT extract roles from the action history panel at the bottom of the screen
-- Each role (Dealer/SB/BB) MUST be assigned to a DIFFERENT player name
-- If you see the same player name for multiple roles, re-check the visual table layout
-
-EXAMPLES:
-✅ CORRECT - Each role has a different player:
-   "roles": {"dealer": "PlayerA", "small_blind": "PlayerB", "big_blind": "PlayerC"}
-
-❌ WRONG - Same player assigned to multiple roles:
-   "roles": {"dealer": "PlayerA", "small_blind": "PlayerA", "big_blind": "PlayerB"}
-   This happens when reading from action history instead of visual indicators!
-
-OTHER CRITICAL INSTRUCTIONS:
-- Extract player names EXACTLY as shown (preserve special characters: [], _, etc.)
+CRITICAL INSTRUCTIONS:
+- Extract data from POKER TABLE VISUAL LAYOUT (where player avatars and cards are shown)
+- DO NOT use the action history panel at the bottom of the screen
+- Player names must be EXACTLY as shown (preserve special characters: [], _, dots, etc.)
+- Positions array MUST match the visual layout: [position1_name, position2_name, position3_name]
+- Stacks array MUST match the same order: [position1_stack, position2_stack, position3_stack]
+- The DEALER is the player with the yellow/white D button - this is the ONLY role you need to identify
 - Board cards may be empty if screenshot is pre-flop
 - Return valid JSON only
-- If you cannot identify distinct visual role indicators on the table, use null for ambiguous roles
+
+EXAMPLE (3-max table):
+Visual layout:
+- TOP-LEFT: "PlayerA" with stack 500, no D button
+- TOP-RIGHT: "PlayerB" with stack 300, has yellow D button ← DEALER
+- BOTTOM-CENTER: "Hero123" with stack 250, no D button
+
+Correct extraction:
+{
+  "players": ["Hero123", "PlayerA", "PlayerB"],
+  "positions": [1, 2, 3],
+  "stacks": [250.0, 500.0, 300.0],
+  "roles": {"dealer": "PlayerB"}
+}
 
 OUTPUT FORMAT (valid JSON):
 {
@@ -172,12 +184,12 @@ OUTPUT FORMAT (valid JSON):
   "positions": [1, 2, 3],
   "roles": {
     "dealer": "JuGGernaut!",
-    "small_blind": "DOI002",
-    "big_blind": "TuichAAreko"
+    "small_blind": null,
+    "big_blind": null
   }
 }
 
-If you cannot identify a role indicator, use null for that role.
+IMPORTANT: Only identify the DEALER (player with D button). Always set small_blind and big_blind to null - the system will calculate them automatically based on dealer position.
 """
 
         # Call Gemini API

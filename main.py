@@ -2236,19 +2236,53 @@ def _build_table_mapping(
         # Build screenshot analysis object
         from models import ScreenshotAnalysis, PlayerStack
 
+        # Build player stacks from separate lists
+        players_list = ocr_data.get('players', [])
+        stacks_list = ocr_data.get('stacks', [])
+        positions_list = ocr_data.get('positions', [])
+
+        # Calculate SB/BB from dealer position (NEW LOGIC)
+        dealer_player = ocr_data.get('roles', {}).get('dealer')
+        small_blind_player = None
+        big_blind_player = None
+
+        if dealer_player and dealer_player in players_list:
+            # Find dealer index in players list
+            dealer_index = players_list.index(dealer_player)
+            total_players = len(players_list)
+
+            # Calculate SB and BB positions (clockwise from dealer)
+            # In 3-max: Dealer → SB → BB (clockwise order)
+            sb_index = (dealer_index + 1) % total_players
+            bb_index = (dealer_index + 2) % total_players
+
+            small_blind_player = players_list[sb_index]
+            big_blind_player = players_list[bb_index]
+
+            logger.debug(f"Calculated blinds from dealer '{dealer_player}' (index {dealer_index}): SB='{small_blind_player}' (index {sb_index}), BB='{big_blind_player}' (index {bb_index})",
+                        screenshot=screenshot_filename,
+                        dealer=dealer_player,
+                        sb=small_blind_player,
+                        bb=big_blind_player)
+
+        # Ensure all lists have the same length
+        min_length = min(len(players_list), len(stacks_list), len(positions_list)) if positions_list else len(players_list)
+
+        all_player_stacks = [
+            PlayerStack(
+                player_name=players_list[i],
+                stack=stacks_list[i] if i < len(stacks_list) else 0.0,
+                position=positions_list[i] if i < len(positions_list) and positions_list[i] is not None else i+1
+            ) for i in range(min_length)
+        ]
+
         screenshot = ScreenshotAnalysis(
             screenshot_id=screenshot_filename,
             hand_id=ocr_data.get('hand_id'),
-            dealer_player=ocr_data.get('dealer_player'),
-            small_blind_player=ocr_data.get('small_blind_player'),
-            big_blind_player=ocr_data.get('big_blind_player'),
-            all_player_stacks=[
-                PlayerStack(
-                    player_name=p['name'],
-                    stack=p['stack'],
-                    position=p['position']
-                ) for p in ocr_data.get('players', [])
-            ]
+            dealer_player=dealer_player,
+            small_blind_player=small_blind_player,
+            big_blind_player=big_blind_player,
+            all_player_stacks=all_player_stacks
         )
 
         # Use role-based mapping to get mapping for this screenshot
