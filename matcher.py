@@ -30,25 +30,87 @@ def _normalize_hand_id(hand_id: str) -> str:
     return hand_id
 
 
+def validate_match_quality(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> tuple[bool, str]:
+    """
+    Validate that a hand and screenshot actually match before accepting the pairing.
+    This prevents incorrect matches that would result in failed mappings.
+    
+    Validation checks:
+    1. Number of players must match
+    2. Hero stack must be similar (±25% tolerance)
+    3. Player stacks must generally align (allows for antes/blinds posted)
+    
+    Returns:
+        (is_valid, reason) - True if match is valid, False with reason otherwise
+    """
+    # Check 1: Verify player count matches
+    hand_player_count = len(hand.seats)
+    screenshot_player_count = len(screenshot.all_player_stacks)
+    
+    if hand_player_count != screenshot_player_count:
+        return False, f"Player count mismatch: hand has {hand_player_count}, screenshot has {screenshot_player_count}"
+    
+    # Check 2: Verify Hero stack is similar
+    hero_seat = next((s for s in hand.seats if s.player_id == 'Hero'), None)
+    if not hero_seat:
+        return False, "No Hero found in hand"
+    
+    hero_hand_stack = hero_seat.stack
+    hero_screenshot_stack = screenshot.hero_stack
+    
+    if hero_screenshot_stack and hero_hand_stack > 0:
+        # Allow 25% tolerance for stacks (accounts for blinds/antes posted)
+        stack_diff_ratio = abs(hero_hand_stack - hero_screenshot_stack) / hero_hand_stack
+        if stack_diff_ratio > 0.25:
+            return False, f"Hero stack mismatch: hand has ${hero_hand_stack}, screenshot has ${hero_screenshot_stack} ({stack_diff_ratio*100:.1f}% diff)"
+    
+    # Check 3: Verify general stack alignment (at least 50% of stacks should be close)
+    # This is a softer check since stacks change rapidly in poker
+    matching_stacks = 0
+    total_comparisons = 0
+    
+    for hand_seat in hand.seats:
+        # Find corresponding player in screenshot (we don't know mapping yet, so just check if ANY stack is close)
+        for ss_player in screenshot.all_player_stacks:
+            if hand_seat.stack > 0 and ss_player.stack > 0:
+                diff_ratio = abs(hand_seat.stack - ss_player.stack) / hand_seat.stack
+                if diff_ratio <= 0.30:  # 30% tolerance
+                    matching_stacks += 1
+                    break
+        total_comparisons += 1
+    
+    if total_comparisons > 0:
+        match_ratio = matching_stacks / total_comparisons
+        if match_ratio < 0.5:  # At least 50% should match
+            return False, f"Stack alignment too low: only {matching_stacks}/{total_comparisons} players have similar stacks"
+    
+    return True, "Valid match"
+
+
 def find_best_matches(
     hands: List[ParsedHand],
     screenshots: List[ScreenshotAnalysis],
-    confidence_threshold: float = 50.0
+    confidence_threshold: float = 70.0
 ) -> List[HandMatch]:
     """
     Find best matches between hands and screenshots using Hand ID as primary key
 
-    MATCHING STRATEGY (99.9% accuracy):
+    MATCHING STRATEGY (enhanced with validation):
     1. PRIMARY: Direct Hand ID match from OCR (100 points) - most accurate
     2. FALLBACK: Multi-criteria scoring system (max 100 points) - for legacy screenshots
+    
+    VALIDATION GATES (prevents incorrect matches):
+    - Player count must match (hand seats vs screenshot players)
+    - Hero stack must be similar (±25% tolerance)
+    - General stack alignment (≥50% of stacks within ±30%)
 
     Args:
         hands: List of parsed hands
         screenshots: List of OCR analyzed screenshots
-        confidence_threshold: Minimum confidence score (0-100)
+        confidence_threshold: Minimum confidence score (0-100, default: 70.0)
 
     Returns:
-        List of HandMatch objects above threshold
+        List of HandMatch objects above threshold and passing validation
     """
     matches = []
     matched_screenshots = set()  # Track used screenshots to prevent duplicates
@@ -67,13 +129,19 @@ def find_best_matches(
             normalized_hand_id = _normalize_hand_id(hand.hand_id)
 
             if normalized_screenshot_id and normalized_screenshot_id == normalized_hand_id:
+                # Validate match quality before accepting
+                is_valid, reason = validate_match_quality(hand, screenshot)
+                if not is_valid:
+                    print(f"❌ Hand ID match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} ({reason})")
+                    continue  # Try next screenshot
+                
                 score = 100.0
                 breakdown = {"hand_id_match": 100.0}
                 mapping = _build_seat_mapping(hand, screenshot)
                 
                 # Reject match if mapping is empty (indicates validation failure)
                 if not mapping:
-                    print(f"❌ Hand ID match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (validation failed)")
+                    print(f"❌ Hand ID match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (mapping validation failed)")
                     continue  # Try next screenshot
                 
                 matches.append(HandMatch(
@@ -90,13 +158,19 @@ def find_best_matches(
             
             # Legacy: Check for hand ID in filename (backward compatibility)
             if hand.hand_id in screenshot.screenshot_id:
+                # Validate match quality before accepting
+                is_valid, reason = validate_match_quality(hand, screenshot)
+                if not is_valid:
+                    print(f"❌ Filename match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} ({reason})")
+                    continue  # Try next screenshot
+                
                 score = 100.0
                 breakdown = {"filename_match": 100.0}
                 mapping = _build_seat_mapping(hand, screenshot)
                 
                 # Reject match if mapping is empty (indicates validation failure)
                 if not mapping:
-                    print(f"❌ Filename match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (validation failed)")
+                    print(f"❌ Filename match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (mapping validation failed)")
                     continue  # Try next screenshot
                 
                 matches.append(HandMatch(
@@ -126,6 +200,12 @@ def find_best_matches(
                 score, breakdown = _calculate_match_score(hand, screenshot)
                 
                 if score > best_score:
+                    # Validate match quality FIRST (prevents bad matches from even being considered)
+                    is_valid, reason = validate_match_quality(hand, screenshot)
+                    if not is_valid:
+                        print(f"❌ Fallback candidate rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} ({reason}, score: {score:.1f})")
+                        continue
+                    
                     # Build mapping and validate BEFORE accepting as best candidate
                     mapping = _build_seat_mapping(hand, screenshot)
                     
@@ -137,7 +217,7 @@ def find_best_matches(
                         best_mapping = mapping
                     else:
                         # Log rejected candidate
-                        print(f"❌ Fallback candidate rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (validation failed, score: {score:.1f})")
+                        print(f"❌ Fallback candidate rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (mapping validation failed, score: {score:.1f})")
             
             # Add best match if above threshold
             if best_match and best_score >= confidence_threshold:

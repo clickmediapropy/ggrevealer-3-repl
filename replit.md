@@ -67,6 +67,43 @@ The system employs a modular architecture with distinct components for parsing, 
 
 **Impact**: Prevents duplicate player names within the same hand by rejecting incorrect screenshot matches at the source. PokerTracker can now import all hands successfully. Rejected matches are logged with warnings including hand_id for diagnostics.
 
+#### Incorrect Match Validation Enhancement (Oct 2025 - IMPLEMENTED)
+**Problem**: Analysis of Job #26 revealed that ~21% of screenshots (57 of 265) were being matched to incorrect hands, resulting in failed mappings and 58 tables with unmapped player IDs. The system matched 265 screenshots but only 208 tables (78.5%) were fully de-anonymized.
+
+**Root Cause Analysis**:
+- **Hand ID matches** (197): Generally reliable when OCR correctly extracts Hand ID
+- **Filename matches** (5): Reliable
+- **Fallback matches** (63): ~90% of incorrect matches originated here due to weak validation
+  - Screenshots matched to hands with different player counts (e.g., 2-player hand matched to 3-player screenshot)
+  - Hero stack mismatches (e.g., $260 in hand vs $100 in screenshot)
+  - Screenshots from completely different hands accepted based on superficial similarities
+
+**Evidence from Logs**:
+```
+Hand: 2 players (Hero + 869d60cc)
+Screenshot: 3 players (TheKingOfVe..., TuichAAreko, Rareseanu)
+Result: Player count mismatch → match accepted → mapping fails
+```
+
+**Solution Implemented** (Oct 29, 2025):
+Added `validate_match_quality()` function in `matcher.py` with three validation gates applied BEFORE accepting any match:
+
+1. **Player Count Validation**: Hand and screenshot must have same number of players
+2. **Hero Stack Validation**: Hero stack must match within ±25% tolerance (accounts for blinds/antes)
+3. **Stack Alignment Validation**: At least 50% of player stacks must align within ±30% tolerance
+
+**Additional Changes**:
+- Increased fallback matching confidence threshold from 50.0 to 70.0 points
+- Enhanced logging to show rejection reasons for debugging
+- Validation applied to all three matching paths: Hand ID, Filename, and Fallback
+
+**Expected Impact**:
+- Reduce incorrect matches from ~57 (21%) to <10 (4%)
+- Increase fully resolved tables from 208 (78%) to ~255 (96%)
+- Improve total mappings from 420 (53%) to ~750 (95%)
+
+**Validation**: Future re-processing of Job #26 data should demonstrate significantly improved match accuracy and reduced failed files.
+
 ## External Dependencies
 - **Google Gemini Vision API**: Used for OCR capabilities to extract text and hand IDs from PokerCraft screenshots. Requires `GEMINI_API_KEY`.
 - **FastAPI**: Python web framework for building the backend REST API.
