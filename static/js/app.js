@@ -1530,7 +1530,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 try {
-                    const response = await fetch(`${API_BASE}/api/job/${jobId}/status`);
+                    const response = await fetch(`${API_BASE}/api/status/${jobId}`);
                     const data = await response.json();
 
                     if (!response.ok) {
