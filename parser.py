@@ -285,5 +285,40 @@ class GGPokerParser:
                 buy_in=buy_in,
                 level=level
             )
-        
+
         return None
+
+
+def find_seat_by_role(hand: ParsedHand, role: str) -> Optional[Seat]:
+    """
+    Find seat by role (button, small blind, big blind)
+
+    Args:
+        hand: Parsed hand data
+        role: One of "button", "small blind", "big blind"
+
+    Returns:
+        Seat object if found, None otherwise
+    """
+    if role == "button":
+        # Button seat is explicitly marked in hand
+        return next((s for s in hand.seats if s.seat_number == hand.button_seat), None)
+
+    elif role == "small blind":
+        # Find seat that posted small blind
+        # Look for "posts small blind" in raw text
+        sb_match = re.search(r'([^:\n]+): posts small blind', hand.raw_text)
+        if sb_match:
+            player_id = sb_match.group(1).strip()
+            return next((s for s in hand.seats if s.player_id == player_id), None)
+        return None
+
+    elif role == "big blind":
+        # Find seat that posted big blind
+        bb_match = re.search(r'([^:\n]+): posts big blind', hand.raw_text)
+        if bb_match:
+            player_id = bb_match.group(1).strip()
+            return next((s for s in hand.seats if s.player_id == player_id), None)
+        return None
+
+    return None
