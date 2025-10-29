@@ -97,6 +97,11 @@ class ScreenshotAnalysis:
     confidence: int = 0
     warnings: List[str] = field(default_factory=list)
 
+    # NEW: Role-based indicators (Phase 2)
+    dealer_player: Optional[str] = None  # Player with "D" indicator
+    small_blind_player: Optional[str] = None  # Player with "SB" indicator
+    big_blind_player: Optional[str] = None  # Player with "BB" indicator
+
 
 # ============================================================================
 # MATCHER TYPES
