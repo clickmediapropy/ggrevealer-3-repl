@@ -18,12 +18,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result
 from parser import GGPokerParser
-from ocr import ocr_screenshot
+from ocr import ocr_screenshot, ocr_hand_id
 from matcher import find_best_matches
 from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format
 from models import NameMapping
@@ -99,6 +99,72 @@ async def startup_event():
     init_db()
     print("✅ FastAPI app started")
 
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+async def ocr_hand_id_with_retry(
+    screenshot_path: str,
+    screenshot_filename: str,
+    job_id: int,
+    api_key: str,
+    logger,
+    max_retries: int = 1
+) -> tuple[bool, Optional[str], Optional[str]]:
+    """
+    OCR1 with retry logic for transient failures
+
+    Args:
+        screenshot_path: Path to screenshot
+        screenshot_filename: Filename for DB tracking
+        job_id: Job ID for DB tracking
+        api_key: Gemini API key
+        logger: Job logger
+        max_retries: Maximum retry attempts (default 1)
+
+    Returns:
+        Tuple of (success, hand_id, error)
+    """
+    retry_count = 0
+    last_error = None
+
+    # Initial attempt
+    success, hand_id, error = await ocr_hand_id(screenshot_path, api_key)
+    save_ocr1_result(job_id, screenshot_filename, success, hand_id, error, retry_count=0)
+
+    if success:
+        logger.info(f"OCR1 success (first attempt): {screenshot_filename} → {hand_id}")
+        return (True, hand_id, None)
+
+    logger.warning(f"OCR1 failed (attempt 1): {screenshot_filename} - {error}")
+    last_error = error
+
+    # Retry logic
+    for retry_count in range(1, max_retries + 1):
+        logger.info(f"Retrying OCR1 (attempt {retry_count + 1}): {screenshot_filename}")
+
+        # Wait 1 second before retry (avoid rate limits)
+        await asyncio.sleep(1)
+
+        success, hand_id, error = await ocr_hand_id(screenshot_path, api_key)
+        save_ocr1_result(job_id, screenshot_filename, success, hand_id, error, retry_count=retry_count)
+
+        if success:
+            logger.info(f"OCR1 success (retry {retry_count}): {screenshot_filename} → {hand_id}")
+            return (True, hand_id, None)
+
+        logger.warning(f"OCR1 failed (attempt {retry_count + 1}): {screenshot_filename} - {error}")
+        last_error = error
+
+    # All attempts failed
+    logger.error(f"OCR1 failed after {max_retries + 1} attempts: {screenshot_filename}")
+    return (False, None, last_error)
+
+
+# ============================================================================
+# API ROUTES
+# ============================================================================
 
 @app.get("/")
 async def root():
