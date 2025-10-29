@@ -588,8 +588,8 @@ def _analyze_debug_data(debug_json_path: str) -> dict:
     }
 
     # 1. Extraer unmapped players de result.stats
-    result = debug_data.get('result', {})
-    stats = result.get('stats', {})
+    result = debug_data.get('result') or {}
+    stats = result.get('stats', {}) if result else {}
 
     if stats.get('unmapped_players'):
         for unmapped_id in stats['unmapped_players']:
