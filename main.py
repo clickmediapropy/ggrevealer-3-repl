@@ -80,7 +80,17 @@ DEBUG_PATH.mkdir(parents=True, exist_ok=True)
 Path("static").mkdir(exist_ok=True)
 Path("static/css").mkdir(exist_ok=True)
 Path("static/js").mkdir(exist_ok=True)
+Path("static/images").mkdir(exist_ok=True)
 Path("templates").mkdir(exist_ok=True)
+
+# Verify critical static files exist (for debugging Replit deployments)
+import os
+if not os.path.exists("static/css/styles.css"):
+    print("⚠️  WARNING: static/css/styles.css not found!")
+if not os.path.exists("static/js/app.js"):
+    print("⚠️  WARNING: static/js/app.js not found!")
+if not os.path.exists("static/images/logo-icon.png"):
+    print("⚠️  WARNING: static/images/logo-icon.png not found!")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -91,6 +101,8 @@ async def startup_event():
     """Initialize database on startup"""
     init_db()
     print("✅ FastAPI app started")
+    print(f"📁 Current directory: {os.getcwd()}")
+    print(f"📁 Static files: {os.path.exists('static/css/styles.css')}, {os.path.exists('static/js/app.js')}")
 
 
 @app.get("/")
@@ -103,6 +115,38 @@ async def root():
 async def serve_app(request: Request):
     """Serve the main application page"""
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/debug/static-files")
+async def debug_static_files():
+    """Debug endpoint to verify static files exist (for Replit troubleshooting)"""
+    import os
+
+    def get_dir_contents(path):
+        """Get contents of a directory if it exists"""
+        if os.path.exists(path):
+            return os.listdir(path)
+        return None
+
+    debug_info = {
+        "current_directory": os.getcwd(),
+        "static_dir_exists": os.path.exists("static"),
+        "static_contents": get_dir_contents("static"),
+        "static_css_exists": os.path.exists("static/css"),
+        "static_css_contents": get_dir_contents("static/css"),
+        "static_js_exists": os.path.exists("static/js"),
+        "static_js_contents": get_dir_contents("static/js"),
+        "static_images_exists": os.path.exists("static/images"),
+        "static_images_contents": get_dir_contents("static/images"),
+        "files_check": {
+            "styles.css": os.path.exists("static/css/styles.css"),
+            "app.js": os.path.exists("static/js/app.js"),
+            "logo-icon.png": os.path.exists("static/images/logo-icon.png"),
+            "favicon.ico": os.path.exists("static/images/favicon.ico")
+        }
+    }
+
+    return debug_info
 
 
 @app.post("/api/upload")
