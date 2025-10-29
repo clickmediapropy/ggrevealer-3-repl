@@ -30,6 +30,12 @@ from models import NameMapping
 from logger import get_job_logger
 import google.generativeai as genai
 
+# File upload limits
+MAX_TXT_FILES = 300
+MAX_SCREENSHOT_FILES = 300
+MAX_UPLOAD_SIZE_MB = 300
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024  # 300 MB in bytes
+
 app = FastAPI(
     title="GGRevealer API",
     description="De-anonymize GGPoker hand histories using screenshot OCR",
@@ -43,6 +49,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Custom middleware to enforce upload size limit
+@app.middleware("http")
+async def limit_upload_size(request: Request, call_next):
+    """Enforce maximum upload size"""
+    if request.method == "POST" and request.url.path == "/api/upload":
+        content_length = request.headers.get("content-length")
+        if content_length:
+            content_length = int(content_length)
+            if content_length > MAX_UPLOAD_SIZE_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": f"El tamaño total de los archivos excede el límite de {MAX_UPLOAD_SIZE_MB} MB. Tamaño recibido: {content_length / (1024 * 1024):.1f} MB"
+                    }
+                )
+    response = await call_next(request)
+    return response
 
 STORAGE_PATH = Path("storage")
 UPLOADS_PATH = STORAGE_PATH / "uploads"
@@ -87,8 +111,21 @@ async def upload_files(
     screenshots: List[UploadFile] = File(...)
 ):
     """Upload TXT files and screenshots for a new job"""
+    # Validate file count limits
+    if len(txt_files) > MAX_TXT_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Excede el límite de archivos TXT. Máximo: {MAX_TXT_FILES}, Recibidos: {len(txt_files)}"
+        )
+
+    if len(screenshots) > MAX_SCREENSHOT_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Excede el límite de screenshots. Máximo: {MAX_SCREENSHOT_FILES}, Recibidos: {len(screenshots)}"
+        )
+
     job_id = create_job()
-    
+
     job_upload_path = UPLOADS_PATH / str(job_id)
     job_upload_path.mkdir(exist_ok=True)
     

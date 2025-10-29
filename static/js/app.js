@@ -1,5 +1,11 @@
 const API_BASE = window.location.origin;
 
+// File upload limits (must match backend limits in main.py)
+const MAX_TXT_FILES = 300;
+const MAX_SCREENSHOT_FILES = 300;
+const MAX_UPLOAD_SIZE_MB = 300;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
 let txtFiles = [];
 let screenshotFiles = [];
 let currentJobId = null;
@@ -57,6 +63,12 @@ function handleTxtFiles(files) {
             txtFiles.push(file);
         }
     }
+
+    // Check if limit exceeded
+    if (txtFiles.length > MAX_TXT_FILES) {
+        showWarning(`Has agregado ${txtFiles.length} archivos TXT. El límite es ${MAX_TXT_FILES}. Por favor, elimina algunos archivos.`);
+    }
+
     renderTxtFiles();
     updateUploadButton();
 }
@@ -74,16 +86,28 @@ function renderTxtFiles() {
             txtFiles.splice(index, 1);
             renderTxtFiles();
             updateUploadButton();
+            updateSizeIndicator();
         });
         txtFilesList.appendChild(div);
     });
 
-    // Update counter badge
+    // Update counter badge with warning if exceeds limit
     const txtCountBadge = document.getElementById('txt-count-badge');
     if (txtCountBadge) {
         const count = txtFiles.length;
         txtCountBadge.textContent = count === 1 ? '1 archivo' : `${count} archivos`;
+
+        // Add visual warning if exceeds limit
+        if (count > MAX_TXT_FILES) {
+            txtCountBadge.classList.remove('bg-secondary');
+            txtCountBadge.classList.add('bg-danger');
+        } else {
+            txtCountBadge.classList.remove('bg-danger');
+            txtCountBadge.classList.add('bg-secondary');
+        }
     }
+
+    updateSizeIndicator();
 }
 
 screenshotDropzone.addEventListener('click', () => screenshotInput.click());
@@ -113,6 +137,12 @@ function handleScreenshotFiles(files) {
             screenshotFiles.push(file);
         }
     }
+
+    // Check if limit exceeded
+    if (screenshotFiles.length > MAX_SCREENSHOT_FILES) {
+        showWarning(`Has agregado ${screenshotFiles.length} screenshots. El límite es ${MAX_SCREENSHOT_FILES}. Por favor, elimina algunos archivos.`);
+    }
+
     renderScreenshotFiles();
     updateUploadButton();
 }
@@ -130,23 +160,140 @@ function renderScreenshotFiles() {
             screenshotFiles.splice(index, 1);
             renderScreenshotFiles();
             updateUploadButton();
+            updateSizeIndicator();
         });
         screenshotFilesList.appendChild(div);
     });
 
-    // Update counter badge
+    // Update counter badge with warning if exceeds limit
     const screenshotCountBadge = document.getElementById('screenshot-count-badge');
     if (screenshotCountBadge) {
         const count = screenshotFiles.length;
         screenshotCountBadge.textContent = count === 1 ? '1 archivo' : `${count} archivos`;
+
+        // Add visual warning if exceeds limit
+        if (count > MAX_SCREENSHOT_FILES) {
+            screenshotCountBadge.classList.remove('bg-secondary');
+            screenshotCountBadge.classList.add('bg-danger');
+        } else {
+            screenshotCountBadge.classList.remove('bg-danger');
+            screenshotCountBadge.classList.add('bg-secondary');
+        }
     }
+
+    updateSizeIndicator();
+}
+
+function calculateTotalSize() {
+    let total = 0;
+    txtFiles.forEach(file => total += file.size);
+    screenshotFiles.forEach(file => total += file.size);
+    return total;
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+function updateSizeIndicator() {
+    const sizeIndicator = document.getElementById('size-indicator');
+    const totalSizeSpan = document.getElementById('total-size');
+    const totalFilesSpan = document.getElementById('total-files');
+
+    if (!sizeIndicator || !totalSizeSpan || !totalFilesSpan) return;
+
+    const totalFiles = txtFiles.length + screenshotFiles.length;
+    const totalSize = calculateTotalSize();
+
+    if (totalFiles === 0) {
+        sizeIndicator.style.display = 'none';
+        return;
+    }
+
+    sizeIndicator.style.display = 'block';
+
+    // Update total size
+    const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+    totalSizeSpan.textContent = sizeMB + ' MB';
+
+    // Color based on size
+    if (totalSize > MAX_UPLOAD_SIZE_BYTES) {
+        totalSizeSpan.className = 'text-danger fw-bold';
+    } else if (totalSize > MAX_UPLOAD_SIZE_BYTES * 0.9) {
+        totalSizeSpan.className = 'text-warning fw-bold';
+    } else {
+        totalSizeSpan.className = '';
+    }
+
+    // Update total files count
+    totalFilesSpan.textContent = totalFiles;
+
+    // Color based on file count
+    if (txtFiles.length > MAX_TXT_FILES || screenshotFiles.length > MAX_SCREENSHOT_FILES) {
+        totalFilesSpan.className = 'text-danger fw-bold';
+    } else if (txtFiles.length > MAX_TXT_FILES * 0.9 || screenshotFiles.length > MAX_SCREENSHOT_FILES * 0.9) {
+        totalFilesSpan.className = 'text-warning fw-bold';
+    } else {
+        totalFilesSpan.className = '';
+    }
+}
+
+function showWarning(message) {
+    // Create a warning toast/alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-warning alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.minWidth = '400px';
+    alertDiv.innerHTML = `
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
 }
 
 function updateUploadButton() {
     uploadBtn.disabled = txtFiles.length === 0 || screenshotFiles.length === 0;
+
+    // Show warnings if limits are exceeded
+    if (txtFiles.length > MAX_TXT_FILES) {
+        uploadBtn.disabled = true;
+    }
+    if (screenshotFiles.length > MAX_SCREENSHOT_FILES) {
+        uploadBtn.disabled = true;
+    }
+    if (calculateTotalSize() > MAX_UPLOAD_SIZE_BYTES) {
+        uploadBtn.disabled = true;
+    }
 }
 
 uploadBtn.addEventListener('click', async () => {
+    // Validate limits before upload
+    if (txtFiles.length > MAX_TXT_FILES) {
+        showWarning(`Excede el límite de archivos TXT (${txtFiles.length}/${MAX_TXT_FILES})`);
+        return;
+    }
+
+    if (screenshotFiles.length > MAX_SCREENSHOT_FILES) {
+        showWarning(`Excede el límite de screenshots (${screenshotFiles.length}/${MAX_SCREENSHOT_FILES})`);
+        return;
+    }
+
+    const totalSize = calculateTotalSize();
+    if (totalSize > MAX_UPLOAD_SIZE_BYTES) {
+        showWarning(`El tamaño total excede el límite de ${MAX_UPLOAD_SIZE_MB} MB (actual: ${formatBytes(totalSize)})`);
+        return;
+    }
+
     uploadBtn.disabled = true;
     uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Subiendo...';
 
@@ -161,7 +308,8 @@ uploadBtn.addEventListener('click', async () => {
         });
 
         if (!uploadResponse.ok) {
-            throw new Error('Upload failed');
+            const errorData = await uploadResponse.json().catch(() => ({ detail: 'Upload failed' }));
+            throw new Error(errorData.detail || 'Upload failed');
         }
 
         const uploadData = await uploadResponse.json();
