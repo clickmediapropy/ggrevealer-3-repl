@@ -942,7 +942,7 @@ function renderJobs(jobs) {
 
         const statusIcon = {
             'completed': 'bi-check-circle-fill text-success',
-            'processing': 'bi-arrow-repeat text-primary spinning',
+            'processing': 'bi-arrow-repeat text-brand spinning',
             'failed': 'bi-x-circle-fill text-danger',
             'pending': 'bi-clock-fill text-warning'
         }[job.status] || 'bi-question-circle-fill';

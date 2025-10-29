@@ -7,16 +7,21 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/images/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png">
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-dark">
+    <nav class="navbar navbar-dark bg-brand">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <i class="bi bi-puzzle"></i> GGRevealer
+            <a class="navbar-brand d-flex align-items-center" href="/app">
+                <img src="/static/images/logo-horizontal.png" alt="GGRevealer" height="40" class="me-3">
+                <span class="navbar-divider">|</span>
+                <span class="navbar-tagline">Poker Hand De-anonymizer</span>
             </a>
-            <span class="navbar-text">
-                Poker Hand De-anonymizer
-            </span>
         </div>
     </nav>
 
@@ -65,18 +70,18 @@
             </div>
 
             <div class="col-12 text-center mb-4">
-                <button id="upload-btn" class="btn btn-primary btn-lg" disabled>
+                <button id="upload-btn" class="btn btn-brand btn-lg" disabled>
                     <i class="bi bi-upload"></i> Subir y Procesar
                 </button>
             </div>
 
             <div class="col-md-6 mb-4">
                 <div class="card">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <div class="card-header bg-brand text-white d-flex justify-content-between align-items-center">
                         <span>
                             <i class="bi bi-file-text"></i> Archivos TXT
                         </span>
-                        <span class="badge bg-light text-primary" id="txt-count-badge">0 archivos</span>
+                        <span class="badge bg-light text-brand" id="txt-count-badge">0 archivos</span>
                     </div>
                     <div class="card-body">
                         <div id="txt-dropzone" class="dropzone">
@@ -365,7 +370,7 @@
                             </div>
                         </div>
 
-                        <button id="retry-btn" class="btn btn-primary">
+                        <button id="retry-btn" class="btn btn-brand">
                             <i class="bi bi-arrow-clockwise"></i> Reintentar
                         </button>
                     </div>
@@ -400,7 +405,7 @@
                         <label for="modal-job-id" class="form-label">Job ID</label>
                         <div class="input-group">
                             <input type="number" class="form-control" id="modal-job-id" placeholder="Ej: 3" min="1">
-                            <button class="btn btn-outline-primary" type="button" id="load-job-info-btn">
+                            <button class="btn btn-outline-brand" type="button" id="load-job-info-btn">
                                 <i class="bi bi-search"></i> Cargar Info
                             </button>
                         </div>

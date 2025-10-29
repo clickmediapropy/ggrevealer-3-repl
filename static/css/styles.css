@@ -1,3 +1,13 @@
+/* CSS Variables for Brand Colors */
+:root {
+    --brand-green: #10b981;
+    --brand-green-hover: #059669;
+    --brand-green-light: #d1fae5;
+    --brand-green-dark: #065f46;
+    --action-blue: #0d6efd;
+    --action-blue-hover: #0a58ca;
+}
+
 body {
     background-color: #f8f9fa;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -10,6 +20,67 @@ body {
 .navbar-brand {
     font-weight: 600;
     font-size: 1.5rem;
+}
+
+/* Brand Color Classes */
+.navbar.bg-brand {
+    background-color: var(--brand-green) !important;
+}
+
+.navbar.bg-brand .navbar-brand {
+    color: white;
+}
+
+.navbar-divider {
+    color: rgba(255, 255, 255, 0.3);
+    margin: 0 15px;
+    font-weight: 300;
+}
+
+.navbar-tagline {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.5px;
+}
+
+.bg-brand {
+    background-color: var(--brand-green) !important;
+    color: white;
+}
+
+.text-brand {
+    color: var(--brand-green) !important;
+}
+
+.bg-light.text-brand {
+    color: var(--brand-green) !important;
+}
+
+/* Brand Buttons */
+.btn-brand {
+    background-color: var(--brand-green);
+    border-color: var(--brand-green);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn-brand:hover {
+    background-color: var(--brand-green-hover);
+    border-color: var(--brand-green-hover);
+    color: white;
+}
+
+.btn-outline-brand {
+    color: var(--brand-green);
+    border-color: var(--brand-green);
+    background-color: transparent;
+}
+
+.btn-outline-brand:hover {
+    background-color: var(--brand-green);
+    border-color: var(--brand-green);
+    color: white;
 }
 
 .dropzone {
@@ -172,7 +243,7 @@ body {
 .stat-card .stat-value {
     font-size: 2.5rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -438,8 +509,8 @@ body {
 }
 
 .sidebar-link.active {
-    background-color: rgba(52, 152, 219, 0.2);
-    border-left-color: #3498db;
+    background-color: rgba(16, 185, 129, 0.2);
+    border-left-color: #10b981;
     color: #fff;
 }
 
@@ -494,7 +565,7 @@ body {
 }
 
 .recent-job-item.processing {
-    border-left-color: #3498db;
+    border-left-color: #10b981;
 }
 
 .recent-job-header {
@@ -598,6 +669,11 @@ body {
         font-size: 1.5rem;
     }
 
+    .navbar-tagline,
+    .navbar-divider {
+        display: none;
+    }
+
     .sidebar-nav {
         display: flex;
         justify-content: space-around;
@@ -616,7 +692,7 @@ body {
 
     .sidebar-link.active {
         border-left: none;
-        border-bottom-color: #3498db;
+        border-bottom-color: #10b981;
     }
 
     .sidebar-header {
