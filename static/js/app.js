@@ -1263,3 +1263,138 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load initial dev job info (job 3 by default)
     loadDevJobInfo(3);
 });
+
+// ============================================================================
+// SETTINGS PANEL
+// ============================================================================
+
+const settingsBtn = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
+const settingsBackdrop = document.getElementById('settings-backdrop');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const devModeToggle = document.getElementById('dev-mode-toggle');
+
+function openSettings() {
+    settingsPanel.classList.add('open');
+    settingsBackdrop.classList.add('open');
+
+    // Load dev mode state from localStorage
+    const devMode = localStorage.getItem('devMode') === 'on';
+    devModeToggle.checked = devMode;
+
+    // Load job info
+    const jobId = parseInt(document.getElementById('settings-job-id').value);
+    if (jobId && jobId > 0) {
+        loadSettingsJobInfo(jobId);
+    }
+}
+
+function closeSettings() {
+    settingsPanel.classList.remove('open');
+    settingsBackdrop.classList.remove('open');
+}
+
+async function loadSettingsJobInfo(jobId) {
+    const jobInfo = document.getElementById('settings-job-info');
+
+    if (!jobId || jobId < 1) {
+        jobInfo.innerHTML = '<span class="text-danger">Job ID inválido</span>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/status/${jobId}`);
+
+        if (!response.ok) {
+            jobInfo.innerHTML = '<span class="text-danger">Job no encontrado</span>';
+            return;
+        }
+
+        const job = await response.json();
+        const stats = job.statistics || {};
+
+        jobInfo.innerHTML = `
+            <strong>Status:</strong> <span class="badge bg-${getStatusBadgeColor(job.status)}">${job.status}</span><br>
+            <strong>Archivos:</strong> ${stats.txt_files || 0} TXT, ${stats.screenshots || 0} screenshots<br>
+            <strong>Hands:</strong> ${stats.hands_parsed || 0} parseadas, ${stats.matched_hands || 0} matched
+        `;
+    } catch (error) {
+        console.error('Error loading settings job info:', error);
+        jobInfo.innerHTML = '<span class="text-danger">Error al cargar info del job</span>';
+    }
+}
+
+// Event listeners
+if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
+if (settingsBackdrop) settingsBackdrop.addEventListener('click', closeSettings);
+
+if (devModeToggle) {
+    devModeToggle.addEventListener('change', (e) => {
+        localStorage.setItem('devMode', e.target.checked ? 'on' : 'off');
+
+        // Toggle dev mode section visibility
+        const devModeSection = document.getElementById('dev-mode-section');
+        if (devModeSection) {
+            if (e.target.checked) {
+                devModeSection.classList.remove('d-none');
+            } else {
+                devModeSection.classList.add('d-none');
+            }
+        }
+    });
+}
+
+const settingsJobIdInput = document.getElementById('settings-job-id');
+if (settingsJobIdInput) {
+    settingsJobIdInput.addEventListener('input', (e) => {
+        const jobId = parseInt(e.target.value);
+        if (jobId && jobId > 0) {
+            loadSettingsJobInfo(jobId);
+        }
+    });
+}
+
+const settingsReprocessBtn = document.getElementById('settings-reprocess-btn');
+if (settingsReprocessBtn) {
+    settingsReprocessBtn.addEventListener('click', async () => {
+        const jobId = parseInt(document.getElementById('settings-job-id').value);
+
+        if (!jobId || jobId < 1) {
+            alert('Por favor ingresa un Job ID válido');
+            return;
+        }
+
+        settingsReprocessBtn.disabled = true;
+        settingsReprocessBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Iniciando...';
+
+        try {
+            const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to start processing');
+            }
+
+            const data = await response.json();
+            currentJobId = jobId;
+
+            // Close settings and show processing
+            closeSettings();
+            showProcessing();
+            startTimer();
+            startStatusPolling();
+
+            console.log(`✅ ${data.is_reprocess ? 'Reprocesando' : 'Procesando'} job ${jobId}`);
+
+        } catch (error) {
+            console.error('Error reprocessing job:', error);
+            alert('Error al reprocesar job: ' + error.message);
+
+            settingsReprocessBtn.disabled = false;
+            settingsReprocessBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Reprocesar Job';
+        }
+    });
+}
