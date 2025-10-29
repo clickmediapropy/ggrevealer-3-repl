@@ -1541,8 +1541,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     modalJobIdDisplay.textContent = jobId;
                     modalJobDetails.innerHTML = `
                         <div class="mb-2"><strong>Estado:</strong> ${formatStatus(data.status)}</div>
-                        <div class="mb-2"><strong>Archivos TXT:</strong> ${data.txt_count || 0}</div>
-                        <div class="mb-2"><strong>Screenshots:</strong> ${data.screenshot_count || 0}</div>
+                        <div class="mb-2"><strong>Archivos TXT:</strong> ${data.txt_files_count || 0}</div>
+                        <div class="mb-2"><strong>Screenshots:</strong> ${data.screenshot_files_count || 0}</div>
                         ${data.created_at ? `<div class="mb-2"><strong>Creado:</strong> ${new Date(data.created_at).toLocaleString('es-ES')}</div>` : ''}
                         ${data.match_rate !== null && data.match_rate !== undefined ? `<div class="mb-2"><strong>Match Rate:</strong> ${(data.match_rate * 100).toFixed(1)}%</div>` : ''}
                     `;
