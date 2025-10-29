@@ -36,26 +36,32 @@ const retryBtn = document.getElementById('retry-btn');
 const errorMessage = document.getElementById('error-message');
 const jobsList = document.getElementById('jobs-list');
 
-txtDropzone.addEventListener('click', () => txtInput.click());
+if (txtDropzone && txtInput) {
+    txtDropzone.addEventListener('click', () => txtInput.click());
+}
 
-txtDropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    txtDropzone.classList.add('active');
-});
+if (txtDropzone) {
+    txtDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        txtDropzone.classList.add('active');
+    });
 
-txtDropzone.addEventListener('dragleave', () => {
-    txtDropzone.classList.remove('active');
-});
+    txtDropzone.addEventListener('dragleave', () => {
+        txtDropzone.classList.remove('active');
+    });
 
-txtDropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    txtDropzone.classList.remove('active');
-    handleTxtFiles(e.dataTransfer.files);
-});
+    txtDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        txtDropzone.classList.remove('active');
+        handleTxtFiles(e.dataTransfer.files);
+    });
+}
 
-txtInput.addEventListener('change', (e) => {
-    handleTxtFiles(e.target.files);
-});
+if (txtInput) {
+    txtInput.addEventListener('change', (e) => {
+        handleTxtFiles(e.target.files);
+    });
+}
 
 function handleTxtFiles(files) {
     for (let file of files) {
@@ -110,26 +116,32 @@ function renderTxtFiles() {
     updateSizeIndicator();
 }
 
-screenshotDropzone.addEventListener('click', () => screenshotInput.click());
+if (screenshotDropzone && screenshotInput) {
+    screenshotDropzone.addEventListener('click', () => screenshotInput.click());
+}
 
-screenshotDropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    screenshotDropzone.classList.add('active');
-});
+if (screenshotDropzone) {
+    screenshotDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        screenshotDropzone.classList.add('active');
+    });
 
-screenshotDropzone.addEventListener('dragleave', () => {
-    screenshotDropzone.classList.remove('active');
-});
+    screenshotDropzone.addEventListener('dragleave', () => {
+        screenshotDropzone.classList.remove('active');
+    });
 
-screenshotDropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    screenshotDropzone.classList.remove('active');
-    handleScreenshotFiles(e.dataTransfer.files);
-});
+    screenshotDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        screenshotDropzone.classList.remove('active');
+        handleScreenshotFiles(e.dataTransfer.files);
+    });
+}
 
-screenshotInput.addEventListener('change', (e) => {
-    handleScreenshotFiles(e.target.files);
-});
+if (screenshotInput) {
+    screenshotInput.addEventListener('change', (e) => {
+        handleScreenshotFiles(e.target.files);
+    });
+}
 
 function handleScreenshotFiles(files) {
     for (let file of files) {
@@ -262,6 +274,8 @@ function showWarning(message) {
 }
 
 function updateUploadButton() {
+    if (!uploadBtn) return;
+    
     uploadBtn.disabled = txtFiles.length === 0 || screenshotFiles.length === 0;
 
     // Show warnings if limits are exceeded
@@ -276,7 +290,8 @@ function updateUploadButton() {
     }
 }
 
-uploadBtn.addEventListener('click', async () => {
+if (uploadBtn) {
+    uploadBtn.addEventListener('click', async () => {
     // Validate limits before upload
     if (txtFiles.length > MAX_TXT_FILES) {
         showWarning(`Excede el límite de archivos TXT (${txtFiles.length}/${MAX_TXT_FILES})`);
@@ -1029,10 +1044,10 @@ async function regeneratePartialErrorPrompt(jobId) {
 }
 
 function resetToWelcome() {
-    welcomeSection.classList.remove('d-none');
-    processingSection.classList.add('d-none');
-    resultsSection.classList.add('d-none');
-    errorSection.classList.add('d-none');
+    if (welcomeSection) welcomeSection.classList.remove('d-none');
+    if (processingSection) processingSection.classList.add('d-none');
+    if (resultsSection) resultsSection.classList.add('d-none');
+    if (errorSection) errorSection.classList.add('d-none');
 
     txtFiles = [];
     screenshotFiles = [];
@@ -1041,13 +1056,19 @@ function resetToWelcome() {
     renderTxtFiles();
     renderScreenshotFiles();
     updateUploadButton();
-    uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
+    if (uploadBtn) {
+        uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
+    }
 
     loadJobs();
 }
 
-newJobBtn.addEventListener('click', resetToWelcome);
-retryBtn.addEventListener('click', resetToWelcome);
+if (newJobBtn) {
+    newJobBtn.addEventListener('click', resetToWelcome);
+}
+if (retryBtn) {
+    retryBtn.addEventListener('click', resetToWelcome);
+}
 
 async function downloadResult(jobId) {
     window.location.href = `${API_BASE}/api/download/${jobId}`;
@@ -1072,6 +1093,8 @@ async function loadJobs() {
 }
 
 function renderJobs(jobs) {
+    if (!jobsList) return;
+    
     jobsList.innerHTML = '';
 
     if (jobs.length === 0) {
@@ -1199,7 +1222,10 @@ async function loadDebugInfo(jobId) {
         debugData = await response.json();
 
         // Show debug section
-        document.getElementById('debug-section').classList.remove('d-none');
+        const debugSection = document.getElementById('debug-section');
+        if (debugSection) {
+            debugSection.classList.remove('d-none');
+        }
 
         // Setup log level filter
         const filterRadios = document.querySelectorAll('input[name="logLevel"]');
@@ -1212,7 +1238,9 @@ async function loadDebugInfo(jobId) {
 
         // Setup export button
         const exportBtn = document.getElementById('export-debug-btn');
-        exportBtn.onclick = () => exportDebugData(jobId, debugData);
+        if (exportBtn) {
+            exportBtn.onclick = () => exportDebugData(jobId, debugData);
+        }
 
         // Initial log render
         renderLogs(debugData.logs.entries, currentLogFilter);
@@ -1224,6 +1252,11 @@ async function loadDebugInfo(jobId) {
 
 function renderLogs(logs, levelFilter = '') {
     const logsContainer = document.getElementById('logs-container');
+    
+    if (!logsContainer) {
+        console.warn('Logs container not found');
+        return;
+    }
 
     if (!logs || logs.length === 0) {
         logsContainer.innerHTML = '<div class="text-muted">No hay logs disponibles</div>';
