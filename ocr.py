@@ -8,7 +8,7 @@ import json
 import re
 import asyncio
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 import google.generativeai as genai
 from models import ScreenshotAnalysis, PlayerStack
 
@@ -85,6 +85,117 @@ SG3247423387
 
     except Exception as e:
         return (False, None, f"OCR1 error: {str(e)}")
+
+
+async def ocr_player_details(screenshot_path: str, api_key: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    """
+    Second OCR: Extract player names and role indicators
+    Focused prompt for player details after match confirmed
+
+    Args:
+        screenshot_path: Path to screenshot image
+        api_key: Gemini API key
+
+    Returns:
+        Tuple of (success, ocr_data_dict, error_message)
+
+    ocr_data_dict format:
+    {
+        "players": ["Player1", "Player2", "Player3"],
+        "hero_name": "Player1",
+        "hero_cards": "Kh Kd",
+        "board_cards": "Qh Jd Ts 4c 2s",
+        "stacks": [100.0, 250.0, 625.0],
+        "positions": [1, 2, 3],
+        "roles": {
+            "dealer": "Player3",
+            "small_blind": "Player1",
+            "big_blind": "Player2"
+        }
+    }
+    """
+    try:
+        # Check if API key is configured
+        if not api_key or api_key == "DUMMY_API_KEY_FOR_TESTING":
+            return (False, None, "Gemini API key not configured")
+
+        # Read image
+        with open(screenshot_path, 'rb') as f:
+            image_data = f.read()
+
+        # Configure Gemini
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+
+        # Focused prompt for player details + roles
+        prompt = """
+EXTRACT PLAYER DETAILS from this poker screenshot.
+
+REQUIRED INFORMATION:
+1. Player names (all players visible at the table)
+2. Hero name (the main player, usually at bottom center)
+3. Hero cards (2 cards dealt to hero, format: "Kh Kd")
+4. Board cards (community cards, format: "Qh Jd Ts 4c 2s")
+5. Player stacks (chip amounts for each player)
+6. Role indicators:
+   - DEALER: Player with "D" or "B" button indicator (yellow/white circle)
+   - SMALL BLIND: Player with "SB" indicator
+   - BIG BLIND: Player with "BB" indicator
+
+CRITICAL INSTRUCTIONS:
+- Extract player names EXACTLY as shown (preserve special characters: [], _, etc.)
+- Identify which player has the DEALER button (D indicator)
+- Identify which player has SB and BB indicators
+- Board cards may be empty if screenshot is pre-flop
+- Return valid JSON only
+
+OUTPUT FORMAT (valid JSON):
+{
+  "players": ["TuichAAreko", "DOI002", "JuGGernaut!"],
+  "hero_name": "TuichAAreko",
+  "hero_cards": "8s Tc",
+  "board_cards": "8d 6c Ts 5d Ks",
+  "stacks": [300.0, 300.0, 300.0],
+  "positions": [1, 2, 3],
+  "roles": {
+    "dealer": "JuGGernaut!",
+    "small_blind": "DOI002",
+    "big_blind": "TuichAAreko"
+  }
+}
+
+If you cannot identify a role indicator, use null for that role.
+"""
+
+        # Call Gemini API
+        response = await asyncio.to_thread(
+            model.generate_content,
+            [prompt, {"mime_type": "image/png", "data": image_data}]
+        )
+
+        # Parse JSON response
+        response_text = response.text.strip()
+
+        # Remove markdown code blocks if present
+        if response_text.startswith('```json'):
+            response_text = response_text.replace('```json', '').replace('```', '').strip()
+        elif response_text.startswith('```'):
+            response_text = response_text.replace('```', '').strip()
+
+        ocr_data = json.loads(response_text)
+
+        # Validate required fields
+        required_fields = ['players', 'hero_name']
+        for field in required_fields:
+            if field not in ocr_data:
+                return (False, None, f"Missing required field: {field}")
+
+        return (True, ocr_data, None)
+
+    except json.JSONDecodeError as e:
+        return (False, None, f"JSON parse error: {str(e)}")
+    except Exception as e:
+        return (False, None, f"OCR2 error: {str(e)}")
 
 
 async def ocr_screenshot(image_path: str, screenshot_id: str, semaphore: Optional[asyncio.Semaphore] = None) -> ScreenshotAnalysis:
