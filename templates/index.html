@@ -10,7 +10,7 @@
 </head>
 <body>
     <nav class="navbar navbar-dark bg-dark">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand" href="#">
                 <i class="bi bi-puzzle"></i> GGRevealer
             </a>
@@ -20,49 +20,45 @@
         </div>
     </nav>
 
-    <div class="container my-5">
-        <!-- Development Mode Section -->
-        <div id="dev-mode-section" class="row mb-4">
-            <div class="col-12">
-                <div class="card border-warning">
-                    <div class="card-header bg-warning text-dark">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="bi bi-code-slash"></i> <strong>Modo Desarrollo</strong>
-                                <span class="badge bg-dark ms-2">DEV</span>
-                            </div>
-                            <button id="toggle-dev-mode" class="btn btn-sm btn-dark">
-                                <i class="bi bi-chevron-up"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body" id="dev-mode-body">
-                        <p class="text-muted small mb-3">
-                            <i class="bi bi-info-circle"></i>
-                            Reprocesa un job existente sin necesidad de subir archivos nuevamente. Los archivos ya subidos permanecen en el servidor.
-                        </p>
-                        <div class="row align-items-end">
-                            <div class="col-md-3">
-                                <label for="dev-job-id" class="form-label">Job ID</label>
-                                <input type="number" class="form-control" id="dev-job-id" value="3" min="1">
-                            </div>
-                            <div class="col-md-6">
-                                <div id="dev-job-info" class="small text-muted">
-                                    Cargando información del job...
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <button id="reprocess-job-btn" class="btn btn-warning w-100">
-                                    <i class="bi bi-arrow-clockwise"></i> Reprocesar Job
-                                </button>
-                            </div>
-                        </div>
+    <!-- Main Layout Container with Sidebar -->
+    <div class="main-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h5>Navegación</h5>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-link active" id="nav-new-job">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>Nuevo Job</span>
+                </a>
+                <a href="#" class="sidebar-link" id="nav-reprocess">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    <span>Reprocesar</span>
+                </a>
+                <a href="#" class="sidebar-link" id="nav-history">
+                    <i class="bi bi-clock-history"></i>
+                    <span>Historial</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-divider"></div>
+
+            <div class="sidebar-section">
+                <h6 class="sidebar-section-title">Jobs Recientes</h6>
+                <div id="recent-jobs-list" class="recent-jobs">
+                    <div class="text-muted small text-center py-3">
+                        Cargando...
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
 
-        <div id="welcome-section" class="row">
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <div class="container-fluid py-4">
+                <div id="welcome-section" class="row">
             <div class="col-12 text-center mb-4">
                 <h1>GGRevealer</h1>
                 <p class="lead">Desanonimiza tus hand histories de GGPoker usando screenshots de PokerCraft</p>
@@ -137,123 +133,182 @@
                         <i class="bi bi-check-circle"></i> Procesamiento Completado
                     </div>
                     <div class="card-body">
-                        <div id="results-stats" class="mb-3"></div>
-                        
-                        <!-- Screenshot Status -->
-                        <div id="screenshots-status" class="alert alert-info d-none">
-                            <h6><i class="bi bi-images"></i> Estado de Screenshots</h6>
-                            <div id="screenshots-summary"></div>
-                            <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#screenshotsDetail">
-                                <i class="bi bi-list"></i> Ver Detalles
-                            </button>
-                            <div class="collapse mt-2" id="screenshotsDetail">
-                                <div id="screenshots-list"></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Unmapped Players Warning -->
-                        <div id="unmapped-players-warning" class="alert alert-warning d-none">
-                            <h6><i class="bi bi-exclamation-triangle"></i> Jugadores Sin Mapear</h6>
-                            <p class="mb-2">Los siguientes jugadores no pudieron ser identificados:</p>
-                            <div id="unmapped-players-list"></div>
-                        </div>
-                        
-                        <!-- Failed Files Section -->
-                        <div id="failed-files-section" class="alert alert-danger d-none">
-                            <h6><i class="bi bi-x-circle"></i> Archivos Fallados</h6>
-                            <p class="mb-2">Los siguientes archivos contienen IDs anónimos sin desanonimizar:</p>
-                            <div id="failed-files-list"></div>
-                            <div class="mt-2">
-                                <small class="text-muted">
-                                    <i class="bi bi-info-circle"></i> 
-                                    Estos archivos NO son compatibles con PokerTracker. Agrega más screenshots para completar el mapeo.
-                                </small>
-                            </div>
-                        </div>
-                        
-                        <!-- Successful Files Section -->
-                        <div id="successful-files-section" class="alert alert-success d-none">
-                            <h6><i class="bi bi-check-circle"></i> Archivos Exitosos</h6>
-                            <p class="mb-0">Archivos completamente desanonimizados y listos para PokerTracker:</p>
-                            <div id="successful-files-list"></div>
-                        </div>
-                        
-                        <!-- Claude Code Prompt for Partial Errors -->
-                        <div id="partial-error-claude-prompt" class="alert alert-warning mt-3 d-none">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6><i class="bi bi-chat-left-text"></i> Prompt para Claude Code - Ayuda con Errores</h6>
-                                <div>
-                                    <button id="regenerate-partial-error-prompt-btn" class="btn btn-sm btn-outline-primary me-2">
-                                        <i class="bi bi-arrow-clockwise"></i> Regenerar
-                                    </button>
-                                    <button id="copy-partial-error-prompt-btn" class="btn btn-sm btn-outline-dark">
-                                        <i class="bi bi-clipboard"></i> Copiar
-                                    </button>
-                                </div>
-                            </div>
-                            <p class="small mb-2">Se detectaron errores durante el procesamiento. Copia este prompt para obtener ayuda de Claude Code:</p>
-                            <div class="border rounded p-3 bg-white" style="font-family: monospace; font-size: 0.875rem; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">
-                                <div id="partial-error-prompt-text"></div>
-                            </div>
-                        </div>
+                        <!-- Stats Grid (Always Visible) -->
+                        <div id="results-stats" class="mb-4"></div>
 
-                        <!-- Debug Section -->
-                        <div id="debug-section" class="alert alert-info mt-3 d-none">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6><i class="bi bi-bug"></i> Debugging Info</h6>
-                                <div>
-                                    <button id="export-debug-btn" class="btn btn-sm btn-outline-primary me-2">
-                                        <i class="bi bi-download"></i> Exportar Debug JSON
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#debugDetail">
-                                        <i class="bi bi-list"></i> Ver Logs
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Export notification -->
-                            <div id="export-notification" class="alert alert-success d-none mb-3" role="alert">
-                                <i class="bi bi-check-circle-fill"></i>
-                                <strong>Archivo guardado en servidor:</strong>
-                                <span id="export-filepath"></span>
-                            </div>
-
-                            <div class="collapse" id="debugDetail">
-                                <!-- Log level filter -->
-                                <div class="mb-3">
-                                    <label class="form-label">Filtrar por nivel:</label>
-                                    <div class="btn-group btn-group-sm" role="group" id="log-level-filter">
-                                        <input type="radio" class="btn-check" name="logLevel" id="log-all" value="" checked autocomplete="off">
-                                        <label class="btn btn-outline-secondary" for="log-all">Todos</label>
-
-                                        <input type="radio" class="btn-check" name="logLevel" id="log-debug" value="DEBUG" autocomplete="off">
-                                        <label class="btn btn-outline-info" for="log-debug">DEBUG</label>
-
-                                        <input type="radio" class="btn-check" name="logLevel" id="log-info" value="INFO" autocomplete="off">
-                                        <label class="btn btn-outline-success" for="log-info">INFO</label>
-
-                                        <input type="radio" class="btn-check" name="logLevel" id="log-warning" value="WARNING" autocomplete="off">
-                                        <label class="btn btn-outline-warning" for="log-warning">WARNING</label>
-
-                                        <input type="radio" class="btn-check" name="logLevel" id="log-error" value="ERROR" autocomplete="off">
-                                        <label class="btn btn-outline-danger" for="log-error">ERROR</label>
-                                    </div>
-                                </div>
-
-                                <!-- Logs display -->
-                                <div id="logs-container" class="border rounded p-3 bg-white" style="max-height: 500px; overflow-y: auto; font-family: monospace; font-size: 0.875rem;">
-                                    <div class="text-muted">Cargando logs...</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex">
+                        <!-- Download Buttons (Always Visible) -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
                             <button id="download-btn" class="btn btn-success btn-lg d-none">
                                 <i class="bi bi-file-earmark-zip"></i> <span id="download-btn-text">Descargar Exitosos</span>
                             </button>
                             <button id="download-fallidos-btn" class="btn btn-warning btn-lg d-none">
                                 <i class="bi bi-file-earmark-zip"></i> Descargar Fallados
                             </button>
+                        </div>
+
+                        <hr>
+
+                        <!-- Tabs Navigation -->
+                        <ul class="nav nav-tabs" id="resultsTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="files-tab" data-bs-toggle="tab" data-bs-target="#files-tab-pane" type="button" role="tab" aria-controls="files-tab-pane" aria-selected="true">
+                                    <i class="bi bi-file-earmark-text"></i> Archivos
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="screenshots-tab" data-bs-toggle="tab" data-bs-target="#screenshots-tab-pane" type="button" role="tab" aria-controls="screenshots-tab-pane" aria-selected="false">
+                                    <i class="bi bi-images"></i> Screenshots
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="debug-tab" data-bs-toggle="tab" data-bs-target="#debug-tab-pane" type="button" role="tab" aria-controls="debug-tab-pane" aria-selected="false">
+                                    <i class="bi bi-bug"></i> Debug
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Tabs Content -->
+                        <div class="tab-content" id="resultsTabContent">
+                            <!-- Tab 1: Archivos -->
+                            <div class="tab-pane fade show active" id="files-tab-pane" role="tabpanel" aria-labelledby="files-tab" tabindex="0">
+                                <div class="pt-3">
+                                    <!-- Successful Files Section -->
+                                    <div id="successful-files-section" class="alert alert-success d-none">
+                                        <h6><i class="bi bi-check-circle"></i> Archivos Exitosos</h6>
+                                        <p class="mb-2">Archivos completamente desanonimizados y listos para PokerTracker:</p>
+                                        <div id="successful-files-list"></div>
+                                    </div>
+
+                                    <!-- Failed Files Section -->
+                                    <div id="failed-files-section" class="alert alert-danger d-none">
+                                        <h6><i class="bi bi-x-circle"></i> Archivos Fallados</h6>
+                                        <p class="mb-2">Los siguientes archivos contienen IDs anónimos sin desanonimizar:</p>
+                                        <div id="failed-files-list"></div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-info-circle"></i>
+                                                Estos archivos NO son compatibles con PokerTracker. Agrega más screenshots para completar el mapeo.
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Unmapped Players Warning -->
+                                    <div id="unmapped-players-warning" class="alert alert-warning d-none">
+                                        <h6><i class="bi bi-exclamation-triangle"></i> Jugadores Sin Mapear</h6>
+                                        <p class="mb-2">Los siguientes jugadores no pudieron ser identificados:</p>
+                                        <div id="unmapped-players-list"></div>
+                                    </div>
+
+                                    <div class="text-muted text-center py-3" id="no-files-message">
+                                        <i class="bi bi-inbox"></i> No hay información de archivos disponible
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tab 2: Screenshots -->
+                            <div class="tab-pane fade" id="screenshots-tab-pane" role="tabpanel" aria-labelledby="screenshots-tab" tabindex="0">
+                                <div class="pt-3">
+                                    <!-- Screenshot Status -->
+                                    <div id="screenshots-status" class="alert alert-info d-none">
+                                        <h6><i class="bi bi-images"></i> Estado de Screenshots</h6>
+                                        <div id="screenshots-summary"></div>
+                                        <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#screenshotsDetail">
+                                            <i class="bi bi-list"></i> Ver Detalles
+                                        </button>
+                                        <div class="collapse mt-2" id="screenshotsDetail">
+                                            <div id="screenshots-list"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-muted text-center py-3" id="no-screenshots-message">
+                                        <i class="bi bi-inbox"></i> No hay información de screenshots disponible
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tab 3: Debug -->
+                            <div class="tab-pane fade" id="debug-tab-pane" role="tabpanel" aria-labelledby="debug-tab" tabindex="0">
+                                <div class="pt-3">
+                                    <!-- Claude Code Prompt for Partial Errors -->
+                                    <div id="partial-error-claude-prompt" class="alert alert-warning d-none">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6><i class="bi bi-chat-left-text"></i> Prompt para Claude Code - Ayuda con Errores</h6>
+                                            <div>
+                                                <button id="regenerate-partial-error-prompt-btn" class="btn btn-sm btn-outline-primary me-2">
+                                                    <i class="bi bi-arrow-clockwise"></i> Regenerar
+                                                </button>
+                                                <button id="copy-partial-error-prompt-btn" class="btn btn-sm btn-outline-dark">
+                                                    <i class="bi bi-clipboard"></i> Copiar
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="small mb-2">Se detectaron errores durante el procesamiento. Copia este prompt para obtener ayuda de Claude Code:</p>
+                                        <div class="border rounded p-3 bg-white" style="font-family: monospace; font-size: 0.875rem; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">
+                                            <div id="partial-error-prompt-text"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Debug Section -->
+                                    <div id="debug-section" class="alert alert-info d-none">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6><i class="bi bi-bug"></i> Debugging Info</h6>
+                                            <div>
+                                                <button id="export-debug-btn" class="btn btn-sm btn-outline-primary me-2">
+                                                    <i class="bi bi-download"></i> Exportar Debug JSON
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#debugDetail">
+                                                    <i class="bi bi-list"></i> Ver Logs
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Export notification -->
+                                        <div id="export-notification" class="alert alert-success d-none mb-3" role="alert">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <strong>Archivo guardado en servidor:</strong>
+                                            <span id="export-filepath"></span>
+                                        </div>
+
+                                        <div class="collapse" id="debugDetail">
+                                            <!-- Log level filter -->
+                                            <div class="mb-3">
+                                                <label class="form-label">Filtrar por nivel:</label>
+                                                <div class="btn-group btn-group-sm" role="group" id="log-level-filter">
+                                                    <input type="radio" class="btn-check" name="logLevel" id="log-all" value="" checked autocomplete="off">
+                                                    <label class="btn btn-outline-secondary" for="log-all">Todos</label>
+
+                                                    <input type="radio" class="btn-check" name="logLevel" id="log-debug" value="DEBUG" autocomplete="off">
+                                                    <label class="btn btn-outline-info" for="log-debug">DEBUG</label>
+
+                                                    <input type="radio" class="btn-check" name="logLevel" id="log-info" value="INFO" autocomplete="off">
+                                                    <label class="btn btn-outline-success" for="log-info">INFO</label>
+
+                                                    <input type="radio" class="btn-check" name="logLevel" id="log-warning" value="WARNING" autocomplete="off">
+                                                    <label class="btn btn-outline-warning" for="log-warning">WARNING</label>
+
+                                                    <input type="radio" class="btn-check" name="logLevel" id="log-error" value="ERROR" autocomplete="off">
+                                                    <label class="btn btn-outline-danger" for="log-error">ERROR</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Logs display -->
+                                            <div id="logs-container" class="border rounded p-3 bg-white" style="max-height: 500px; overflow-y: auto; font-family: monospace; font-size: 0.875rem;">
+                                                <div class="text-muted">Cargando logs...</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-muted text-center py-3" id="no-debug-message">
+                                        <i class="bi bi-inbox"></i> No hay información de debug disponible
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="mt-4">
+
+                        <!-- Actions -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <button id="new-job-btn" class="btn btn-secondary">
                                 <i class="bi bi-plus-circle"></i> Nuevo Job
                             </button>
@@ -299,10 +354,66 @@
             </div>
         </div>
 
-        <div class="row mt-5">
-            <div class="col-12">
-                <h3>Historial de Jobs</h3>
-                <div id="jobs-list"></div>
+                <div class="row mt-5" id="history-section">
+                    <div class="col-12">
+                        <h3>Historial de Jobs</h3>
+                        <div id="jobs-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- End Main Content -->
+    </div>
+    <!-- End Main Layout -->
+
+    <!-- Reprocess Modal -->
+    <div class="modal fade" id="reprocessModal" tabindex="-1" aria-labelledby="reprocessModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="reprocessModalLabel">
+                        <i class="bi bi-arrow-clockwise"></i> Reprocesar Job
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="modal-job-id" class="form-label">Job ID</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="modal-job-id" placeholder="Ej: 3" min="1">
+                            <button class="btn btn-outline-primary" type="button" id="load-job-info-btn">
+                                <i class="bi bi-search"></i> Cargar Info
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="modal-job-info" class="d-none">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-info-circle"></i> Información del Job #<span id="modal-job-id-display"></span>
+                            </h6>
+                            <hr>
+                            <div id="modal-job-details">
+                                <!-- Job details will be populated here -->
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Advertencia:</strong> Esto limpiará los resultados anteriores y reprocesará el job desde cero.
+                        </div>
+                    </div>
+
+                    <div id="modal-job-error" class="alert alert-danger d-none">
+                        <!-- Error message will be shown here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" id="modal-reprocess-btn" disabled>
+                        <i class="bi bi-arrow-clockwise"></i> Reprocesar Job
+                    </button>
+                </div>
             </div>
         </div>
     </div>

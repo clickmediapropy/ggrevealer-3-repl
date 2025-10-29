@@ -398,6 +398,9 @@ async function showResults(job) {
     // Load debugging info
     await loadDebugInfo(currentJobId);
 
+    // Update tab visibility based on content
+    updateTabVisibility();
+
     // Setup download buttons
     downloadBtn.onclick = () => downloadResult(currentJobId);
     const downloadFallidosBtn = document.getElementById('download-fallidos-btn');
@@ -1201,33 +1204,268 @@ async function reprocessDevJob() {
     }
 }
 
-// Dev mode toggle
-document.getElementById('toggle-dev-mode').addEventListener('click', () => {
-    const devModeBody = document.getElementById('dev-mode-body');
-    const toggleBtn = document.getElementById('toggle-dev-mode');
+// ========================================
+// SIDEBAR NAVIGATION
+// ========================================
 
-    if (devModeBody.style.display === 'none') {
-        devModeBody.style.display = 'block';
-        toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
-    } else {
-        devModeBody.style.display = 'none';
-        toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+// Sidebar navigation links
+document.getElementById('nav-new-job').addEventListener('click', (e) => {
+    e.preventDefault();
+    showWelcomeSection();
+    updateSidebarActiveState('nav-new-job');
+    scrollToTop();
+});
+
+document.getElementById('nav-reprocess').addEventListener('click', (e) => {
+    e.preventDefault();
+    openReprocessModal();
+});
+
+document.getElementById('nav-history').addEventListener('click', (e) => {
+    e.preventDefault();
+    const historySection = document.getElementById('history-section');
+    historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    updateSidebarActiveState('nav-history');
+});
+
+function updateSidebarActiveState(activeId) {
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    document.getElementById(activeId)?.classList.add('active');
+}
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showWelcomeSection() {
+    hideAllSections();
+    welcomeSection.classList.remove('d-none');
+}
+
+// ========================================
+// REPROCESS MODAL
+// ========================================
+
+const reprocessModal = new bootstrap.Modal(document.getElementById('reprocessModal'));
+const modalJobIdInput = document.getElementById('modal-job-id');
+const loadJobInfoBtn = document.getElementById('load-job-info-btn');
+const modalJobInfo = document.getElementById('modal-job-info');
+const modalJobError = document.getElementById('modal-job-error');
+const modalReprocessBtn = document.getElementById('modal-reprocess-btn');
+const modalJobIdDisplay = document.getElementById('modal-job-id-display');
+const modalJobDetails = document.getElementById('modal-job-details');
+
+function openReprocessModal() {
+    // Reset modal state
+    modalJobIdInput.value = '';
+    modalJobInfo.classList.add('d-none');
+    modalJobError.classList.add('d-none');
+    modalReprocessBtn.disabled = true;
+    reprocessModal.show();
+}
+
+loadJobInfoBtn.addEventListener('click', async () => {
+    const jobId = parseInt(modalJobIdInput.value);
+    if (!jobId || jobId < 1) {
+        showModalError('Por favor ingresa un Job ID válido');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/job/${jobId}/status`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Error al cargar job');
+        }
+
+        // Display job info
+        modalJobIdDisplay.textContent = jobId;
+        modalJobDetails.innerHTML = `
+            <div class="mb-2"><strong>Estado:</strong> ${formatStatus(data.status)}</div>
+            <div class="mb-2"><strong>Archivos TXT:</strong> ${data.txt_count || 0}</div>
+            <div class="mb-2"><strong>Screenshots:</strong> ${data.screenshot_count || 0}</div>
+            ${data.created_at ? `<div class="mb-2"><strong>Creado:</strong> ${new Date(data.created_at).toLocaleString('es-ES')}</div>` : ''}
+            ${data.match_rate !== null && data.match_rate !== undefined ? `<div class="mb-2"><strong>Match Rate:</strong> ${(data.match_rate * 100).toFixed(1)}%</div>` : ''}
+        `;
+
+        modalJobInfo.classList.remove('d-none');
+        modalJobError.classList.add('d-none');
+        modalReprocessBtn.disabled = false;
+        modalReprocessBtn.dataset.jobId = jobId;
+
+    } catch (error) {
+        showModalError(error.message);
+        modalJobInfo.classList.add('d-none');
+        modalReprocessBtn.disabled = true;
     }
 });
 
-// Load job info when job ID changes
-document.getElementById('dev-job-id').addEventListener('input', (e) => {
-    const jobId = parseInt(e.target.value);
-    if (jobId && jobId > 0) {
-        loadDevJobInfo(jobId);
+function showModalError(message) {
+    modalJobError.textContent = message;
+    modalJobError.classList.remove('d-none');
+}
+
+function formatStatus(status) {
+    const statusMap = {
+        'completed': '✅ Completado',
+        'processing': '⏳ Procesando',
+        'failed': '❌ Fallado',
+        'pending': '⏸️ Pendiente'
+    };
+    return statusMap[status] || status;
+}
+
+modalReprocessBtn.addEventListener('click', async () => {
+    const jobId = parseInt(modalReprocessBtn.dataset.jobId);
+    if (!jobId) return;
+
+    modalReprocessBtn.disabled = true;
+    modalReprocessBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reprocesando...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al reprocesar job');
+        }
+
+        // Close modal and show processing
+        reprocessModal.hide();
+        currentJobId = jobId;
+        showProcessing();
+        checkStatus(jobId);
+
+    } catch (error) {
+        showModalError(error.message);
+    } finally {
+        modalReprocessBtn.disabled = false;
+        modalReprocessBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Reprocesar Job';
     }
 });
 
-// Reprocess job button
-document.getElementById('reprocess-job-btn').addEventListener('click', reprocessDevJob);
+// ========================================
+// RECENT JOBS IN SIDEBAR
+// ========================================
+
+async function loadRecentJobs() {
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs`);
+        const jobs = await response.json();
+
+        const recentJobsList = document.getElementById('recent-jobs-list');
+
+        if (jobs.length === 0) {
+            recentJobsList.innerHTML = '<div class="text-muted small text-center py-2">No hay jobs</div>';
+            return;
+        }
+
+        // Show last 5 jobs
+        const recentJobs = jobs.slice(0, 5);
+        recentJobsList.innerHTML = recentJobs.map(job => `
+            <div class="recent-job-item ${job.status}" data-job-id="${job.id}">
+                <div class="recent-job-header">
+                    <span class="recent-job-id">Job #${job.id}</span>
+                    <span class="recent-job-status">${getStatusIcon(job.status)}</span>
+                </div>
+                <div class="recent-job-date">${formatDate(job.created_at)}</div>
+            </div>
+        `).join('');
+
+        // Add click handlers
+        document.querySelectorAll('.recent-job-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const jobId = parseInt(item.dataset.jobId);
+                loadJobDetails(jobId);
+            });
+        });
+
+    } catch (error) {
+        console.error('Error loading recent jobs:', error);
+    }
+}
+
+function getStatusIcon(status) {
+    const icons = {
+        'completed': '✅',
+        'processing': '⏳',
+        'failed': '❌',
+        'pending': '⏸️'
+    };
+    return icons[status] || '❓';
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 60) return `Hace ${diffMins}m`;
+    if (diffHours < 24) return `Hace ${diffHours}h`;
+    if (diffDays < 7) return `Hace ${diffDays}d`;
+    return date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+}
+
+async function loadJobDetails(jobId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/status/${jobId}`);
+        const data = await response.json();
+
+        currentJobId = jobId;
+
+        if (data.status === 'completed') {
+            showResults(data);
+        } else if (data.status === 'processing') {
+            showProcessing();
+            checkStatus(jobId);
+        } else if (data.status === 'failed') {
+            showError(data.error || 'Job falló');
+        }
+
+        scrollToTop();
+
+    } catch (error) {
+        console.error('Error loading job details:', error);
+    }
+}
+
+// ========================================
+// TAB VISIBILITY MANAGEMENT
+// ========================================
+
+function updateTabVisibility() {
+    // Show/hide "no data" messages based on content
+    const hasFiles = !document.getElementById('successful-files-section').classList.contains('d-none') ||
+                     !document.getElementById('failed-files-section').classList.contains('d-none') ||
+                     !document.getElementById('unmapped-players-warning').classList.contains('d-none');
+
+    const hasScreenshots = !document.getElementById('screenshots-status').classList.contains('d-none');
+
+    const hasDebug = !document.getElementById('debug-section').classList.contains('d-none') ||
+                     !document.getElementById('partial-error-claude-prompt').classList.contains('d-none');
+
+    document.getElementById('no-files-message').style.display = hasFiles ? 'none' : 'block';
+    document.getElementById('no-screenshots-message').style.display = hasScreenshots ? 'none' : 'block';
+    document.getElementById('no-debug-message').style.display = hasDebug ? 'none' : 'block';
+}
+
+// ========================================
+// INITIALIZATION
+// ========================================
 
 document.addEventListener('DOMContentLoaded', () => {
     loadJobs();
-    // Load initial dev job info (job 3 by default)
-    loadDevJobInfo(3);
+    loadRecentJobs();
+
+    // Refresh recent jobs every 30 seconds
+    setInterval(loadRecentJobs, 30000);
 });
