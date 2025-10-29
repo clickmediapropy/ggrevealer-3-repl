@@ -9,7 +9,8 @@ import re
 import asyncio
 from pathlib import Path
 from typing import Optional, Tuple, Dict
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from models import ScreenshotAnalysis, PlayerStack
 
 
@@ -34,9 +35,8 @@ async def ocr_hand_id(screenshot_path: str, api_key: str) -> Tuple[bool, Optiona
         with open(screenshot_path, 'rb') as f:
             image_data = f.read()
 
-        # Configure Gemini
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('models/gemini-2.5-flash-image')
+        # Create thread-safe client with user's API key
+        client = genai.Client(api_key=api_key)
 
         # Ultra-simple prompt focused ONLY on Hand ID
         prompt = """
@@ -59,10 +59,13 @@ OUTPUT FORMAT (just the ID, no explanation):
 SG3247423387
 """
 
-        # Call Gemini API
-        response = await asyncio.to_thread(
-            model.generate_content,
-            [prompt, {"mime_type": "image/png", "data": image_data}]
+        # Call Gemini API with thread-safe client
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash-image',
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_data, mime_type='image/png')
+            ]
         )
 
         # Extract Hand ID from response
@@ -123,9 +126,8 @@ async def ocr_player_details(screenshot_path: str, api_key: str) -> Tuple[bool, 
         with open(screenshot_path, 'rb') as f:
             image_data = f.read()
 
-        # Configure Gemini
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('models/gemini-2.5-flash-image')
+        # Create thread-safe client with user's API key
+        client = genai.Client(api_key=api_key)
 
         # Focused prompt for player details + roles
         prompt = """
@@ -192,10 +194,13 @@ OUTPUT FORMAT (valid JSON):
 IMPORTANT: Only identify the DEALER (player with D button). Always set small_blind and big_blind to null - the system will calculate them automatically based on dealer position.
 """
 
-        # Call Gemini API
-        response = await asyncio.to_thread(
-            model.generate_content,
-            [prompt, {"mime_type": "image/png", "data": image_data}]
+        # Call Gemini API with thread-safe client
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash-image',
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_data, mime_type='image/png')
+            ]
         )
 
         # Parse JSON response

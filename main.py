@@ -24,12 +24,13 @@ import shutil
 from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded, update_job_detailed_metrics, update_job_cost, get_budget_config, save_budget_config, get_budget_summary
 from config import GEMINI_COST_PER_IMAGE
 from parser import GGPokerParser
-from ocr import ocr_screenshot, ocr_hand_id, ocr_player_details
+from ocr import ocr_hand_id, ocr_player_details
 from matcher import find_best_matches, _build_seat_mapping_by_roles
 from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format, extract_table_name
 from models import NameMapping, ParsedHand
 from logger import get_job_logger
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # File upload limits
 MAX_TXT_FILES = 300
@@ -462,11 +463,14 @@ async def validate_api_key(request: Request):
             )
 
         # Test the API key with a minimal Gemini request
-        genai.configure(api_key=api_key)
+        # Create thread-safe client with the provided API key
+        client = genai.Client(api_key=api_key)
 
         # Use the simplest possible request to test the key
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        response = model.generate_content("Test")
+        response = client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents='Test'
+        )
 
         # If we got here, the API key is valid
         return {"valid": True, "message": "API key is valid"}
@@ -974,9 +978,8 @@ async def generate_claude_prompt(job_id: int):
         }
 
     try:
-        genai.configure(api_key=api_key)  # type: ignore
-        # Use Gemini 2.5 Flash with thinking mode for better debugging analysis
-        model = genai.GenerativeModel('gemini-2.5-flash')  # type: ignore
+        # Create thread-safe client with API key
+        client = genai.Client(api_key=api_key)
 
         # Build detailed problem summary
         problem_summary = []
@@ -1102,16 +1105,16 @@ El análisis detallado ya extrajo información concreta del JSON:
 
 Genera SOLO el prompt para Claude Code (sin preamble, solo el prompt):"""
 
-        # Call Gemini
-        response = await asyncio.to_thread(
-            model.generate_content,
-            gemini_prompt,
-            generation_config={  # type: ignore
-                "temperature": 0.3,  # Low temperature for consistent, focused output
-                "top_p": 0.8,
-                "top_k": 40,
-                "max_output_tokens": 2048,
-            }
+        # Call Gemini with thread-safe client
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=gemini_prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,  # Low temperature for consistent, focused output
+                top_p=0.8,
+                top_k=40,
+                max_output_tokens=2048,
+            )
         )
 
         generated_prompt = response.text.strip()
