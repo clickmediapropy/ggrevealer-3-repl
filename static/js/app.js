@@ -542,7 +542,9 @@ async function showResults(job) {
 
         const stats = job.statistics || {};
         const detailedStats = job.detailed_stats || {};
+        const detailedMetrics = job.detailed_metrics || {};
         console.log('[DEBUG] Stats loaded:', stats);
+        console.log('[DEBUG] Detailed metrics loaded:', detailedMetrics);
     const processingTime = stats.processing_time ? formatDuration(stats.processing_time) : 'N/A';
 
     const tablesCount = detailedStats.tables_count || 0;
@@ -571,12 +573,15 @@ async function showResults(job) {
 
     // Load and display screenshot details
     await loadScreenshotDetails(currentJobId, detailedStats);
-    
+
     // Display unmapped players warning
     displayUnmappedPlayers(detailedStats);
-    
+
     // Display successful and failed files
     displayFileResults(detailedStats);
+
+    // Display detailed metrics (NEW)
+    displayDetailedMetrics(detailedMetrics);
 
     // Check if there are partial errors (failed files, OCR errors, warnings)
     const hasPartialErrors =
@@ -693,45 +698,45 @@ function displayUnmappedPlayers(stats) {
 function displayFileResults(stats) {
     const successfulFiles = stats.successful_files || [];
     const failedFiles = stats.failed_files || [];
-    
+
     // Show/hide download buttons based on what files exist
     const downloadBtn = document.getElementById('download-btn');
     const downloadFallidosBtn = document.getElementById('download-fallidos-btn');
-    
+
     if (successfulFiles.length > 0) {
         downloadBtn.classList.remove('d-none');
         document.getElementById('successful-files-section').classList.remove('d-none');
-        
-        const filesList = successfulFiles.map(file => 
+
+        const filesList = successfulFiles.map(file =>
             `<div class="mt-1">
-                <i class="bi bi-file-earmark-check text-success"></i> 
+                <i class="bi bi-file-earmark-check text-success"></i>
                 <strong>${file.table}</strong> - ${file.total_hands} manos
             </div>`
         ).join('');
-        
+
         document.getElementById('successful-files-list').innerHTML = filesList;
     } else {
         downloadBtn.classList.add('d-none');
         document.getElementById('successful-files-section').classList.add('d-none');
     }
-    
+
     if (failedFiles.length > 0) {
         downloadFallidosBtn.classList.remove('d-none');
         document.getElementById('failed-files-section').classList.remove('d-none');
-        
+
         const filesList = failedFiles.map(file => {
             const unmappedIds = file.unmapped_ids || [];
-            const unmappedList = unmappedIds.slice(0, 5).map(id => 
+            const unmappedList = unmappedIds.slice(0, 5).map(id =>
                 `<span class="badge bg-danger me-1">${id}</span>`
             ).join('');
-            const moreText = unmappedIds.length > 5 ? 
+            const moreText = unmappedIds.length > 5 ?
                 `<span class="text-muted small">+${unmappedIds.length - 5} más</span>` : '';
-            
+
             return `
                 <div class="card bg-light mb-2">
                     <div class="card-body py-2">
                         <div>
-                            <i class="bi bi-file-earmark-x text-danger"></i> 
+                            <i class="bi bi-file-earmark-x text-danger"></i>
                             <strong>${file.table}</strong> - ${file.total_hands} manos
                         </div>
                         <div class="mt-1">
@@ -742,11 +747,225 @@ function displayFileResults(stats) {
                 </div>
             `;
         }).join('');
-        
+
         document.getElementById('failed-files-list').innerHTML = filesList;
     } else {
         downloadFallidosBtn.classList.add('d-none');
         document.getElementById('failed-files-section').classList.add('d-none');
+    }
+}
+
+function displayDetailedMetrics(metrics) {
+    // Check if detailed metrics exist
+    if (!metrics || Object.keys(metrics).length === 0) {
+        console.log('[DEBUG] No detailed metrics available');
+        document.getElementById('detailed-metrics').style.display = 'none';
+        return;
+    }
+
+    console.log('[DEBUG] Displaying detailed metrics:', metrics);
+
+    // Show detailed metrics section
+    document.getElementById('detailed-metrics').style.display = 'flex';
+
+    // 1. Hand Coverage Metrics
+    if (metrics.hands) {
+        const hands = metrics.hands;
+        const handMetricsHTML = `
+            <div class="metric-item">
+                <div class="metric-label">Total</div>
+                <div class="metric-value">${hands.total || 0}</div>
+            </div>
+            <div class="progress mb-2" style="height: 8px;">
+                <div class="progress-bar bg-success" style="width: ${hands.coverage_percentage || 0}%"></div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-success">
+                        <i class="bi bi-check-circle-fill"></i> Fully Mapped
+                    </small>
+                    <small><strong>${hands.fully_mapped || 0}</strong> (${hands.coverage_percentage || 0}%)</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-warning">
+                        <i class="bi bi-exclamation-circle-fill"></i> Partially Mapped
+                    </small>
+                    <small>${hands.partially_mapped || 0}</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-danger">
+                        <i class="bi bi-x-circle-fill"></i> No Mappings
+                    </small>
+                    <small>${hands.no_mappings || 0}</small>
+                </div>
+            </div>
+        `;
+        document.getElementById('hand-metrics').innerHTML = handMetricsHTML;
+    }
+
+    // 2. Player Mapping Metrics
+    if (metrics.players) {
+        const players = metrics.players;
+        const playerMetricsHTML = `
+            <div class="metric-item">
+                <div class="metric-label">Total Unique</div>
+                <div class="metric-value">${players.total_unique || 0}</div>
+            </div>
+            <div class="progress mb-2" style="height: 8px;">
+                <div class="progress-bar bg-info" style="width: ${players.mapping_rate || 0}%"></div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-success">
+                        <i class="bi bi-check-circle-fill"></i> Mapped
+                    </small>
+                    <small><strong>${players.mapped || 0}</strong> (${players.mapping_rate || 0}%)</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-danger">
+                        <i class="bi bi-x-circle-fill"></i> Unmapped
+                    </small>
+                    <small>${players.unmapped || 0}</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="bi bi-graph-up"></i> Avg per Table
+                    </small>
+                    <small>${players.average_per_table || 0}</small>
+                </div>
+            </div>
+        `;
+        document.getElementById('player-metrics').innerHTML = playerMetricsHTML;
+    }
+
+    // 3. Table Resolution Metrics
+    if (metrics.tables) {
+        const tables = metrics.tables;
+        const tableMetricsHTML = `
+            <div class="metric-item">
+                <div class="metric-label">Total Tables</div>
+                <div class="metric-value">${tables.total || 0}</div>
+            </div>
+            <div class="progress mb-2" style="height: 8px;">
+                <div class="progress-bar bg-success" style="width: ${tables.resolution_rate || 0}%"></div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-success">
+                        <i class="bi bi-check-circle-fill"></i> Fully Resolved
+                    </small>
+                    <small><strong>${tables.fully_resolved || 0}</strong> (${tables.resolution_rate || 0}%)</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-warning">
+                        <i class="bi bi-exclamation-circle-fill"></i> Partially Resolved
+                    </small>
+                    <small>${tables.partially_resolved || 0}</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-danger">
+                        <i class="bi bi-x-circle-fill"></i> Failed
+                    </small>
+                    <small>${tables.failed || 0}</small>
+                </div>
+            </div>
+        `;
+        document.getElementById('table-metrics').innerHTML = tableMetricsHTML;
+    }
+
+    // 4. Screenshot Analysis Metrics
+    if (metrics.screenshots) {
+        const screenshots = metrics.screenshots;
+        const screenshotMetricsHTML = `
+            <div class="metric-item mb-2">
+                <div class="metric-label">Total Screenshots</div>
+                <div class="metric-value">${screenshots.total || 0}</div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-primary">OCR1 Success</small>
+                        <small><strong>${screenshots.ocr1_success || 0}/${screenshots.total || 0}</strong></small>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-primary" style="width: ${screenshots.ocr1_success_rate || 0}%"></div>
+                    </div>
+                    <small class="text-muted">${screenshots.ocr1_success_rate || 0}% success rate</small>
+                </div>
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-info">OCR2 Success</small>
+                        <small><strong>${screenshots.ocr2_success || 0}/${screenshots.ocr1_success || 0}</strong></small>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-info" style="width: ${screenshots.ocr2_success_rate || 0}%"></div>
+                    </div>
+                    <small class="text-muted">${screenshots.ocr2_success_rate || 0}% success rate</small>
+                </div>
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-success">Matched</small>
+                        <small><strong>${screenshots.matched || 0}/${screenshots.total || 0}</strong></small>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-success" style="width: ${screenshots.match_rate || 0}%"></div>
+                    </div>
+                    <small class="text-muted">${screenshots.match_rate || 0}% match rate</small>
+                </div>
+                ${screenshots.discarded > 0 ? `
+                    <div class="mt-2">
+                        <small class="text-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i> ${screenshots.discarded} discarded
+                        </small>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        document.getElementById('screenshot-metrics').innerHTML = screenshotMetricsHTML;
+    }
+
+    // 5. Mapping Strategy Metrics
+    if (metrics.mappings) {
+        const mappings = metrics.mappings;
+        const totalMappings = mappings.total || 0;
+        const roleBasedPct = totalMappings > 0 ? Math.round((mappings.role_based / totalMappings) * 100) : 0;
+        const counterClockwisePct = totalMappings > 0 ? Math.round((mappings.counter_clockwise / totalMappings) * 100) : 0;
+
+        const mappingMetricsHTML = `
+            <div class="metric-item">
+                <div class="metric-label">Total Mappings</div>
+                <div class="metric-value">${totalMappings}</div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-success">
+                        <i class="bi bi-bookmark-check-fill"></i> Role-Based
+                    </small>
+                    <small><strong>${mappings.role_based || 0}</strong> (${roleBasedPct}%)</small>
+                </div>
+                <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar bg-success" style="width: ${roleBasedPct}%"></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-info">
+                        <i class="bi bi-arrow-clockwise"></i> Counter-Clockwise
+                    </small>
+                    <small><strong>${mappings.counter_clockwise || 0}</strong> (${counterClockwisePct}%)</small>
+                </div>
+                <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar bg-info" style="width: ${counterClockwisePct}%"></div>
+                </div>
+                ${mappings.conflicts_detected > 0 ? `
+                    <div class="alert alert-warning p-2 mb-0 mt-2">
+                        <small>
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            ${mappings.conflicts_detected} conflicts detected
+                        </small>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        document.getElementById('mapping-metrics').innerHTML = mappingMetricsHTML;
     }
 }
 

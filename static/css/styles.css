@@ -870,3 +870,80 @@ body {
         gap: 10px;
     }
 }
+
+/* Detailed Metrics Styling */
+#detailed-metrics {
+    margin-top: 2rem;
+}
+
+#detailed-metrics .card {
+    border: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+#detailed-metrics .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+#detailed-metrics .card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-item {
+    margin-bottom: 0.75rem;
+}
+
+.metric-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0d6efd;
+    line-height: 1;
+}
+
+.metric-breakdown {
+    margin-top: 0.5rem;
+}
+
+.metric-breakdown small {
+    font-size: 0.85rem;
+}
+
+/* Progress Bar Enhancements */
+#detailed-metrics .progress {
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #e9ecef;
+}
+
+#detailed-metrics .progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Responsive Grid for Detailed Metrics */
+@media (max-width: 1200px) {
+    #detailed-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    #detailed-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-value {
+        font-size: 1.5rem;
+    }
+}
