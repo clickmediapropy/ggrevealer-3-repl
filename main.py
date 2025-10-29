@@ -298,7 +298,11 @@ async def get_job_status(job_id: int):
         result = get_result(job_id)
         if result and result.get('stats'):
             response['detailed_stats'] = result['stats']
-            
+
+            # EXPOSE DETAILED METRICS directly for frontend use
+            if result['stats'].get('detailed_metrics'):
+                response['detailed_metrics'] = result['stats']['detailed_metrics']
+
             # Calculate OCR success rate
             screenshots = job.get('screenshot_files_count', 0)
             matches = job.get('matched_hands', 0)
@@ -1954,6 +1958,10 @@ def _calculate_detailed_metrics(
     for mapping in table_mappings.values():
         all_mapped_ids.update(mapping.keys())
 
+    # Only count mapped anonymized IDs (exclude Hero from mapped count)
+    # This ensures mapping_rate = (mapped_anon_ids / total_anon_ids) stays <= 100%
+    mapped_anon_ids = all_mapped_ids & all_anon_ids
+
     unmapped_ids = all_anon_ids - all_mapped_ids
 
     # Calculate average players per table
@@ -1971,9 +1979,9 @@ def _calculate_detailed_metrics(
 
     players_metrics = {
         'total_unique': len(all_anon_ids),
-        'mapped': len(all_mapped_ids),
+        'mapped': len(mapped_anon_ids),  # Changed: only count anonymized IDs (exclude Hero)
         'unmapped': len(unmapped_ids),
-        'mapping_rate': round((len(all_mapped_ids) / len(all_anon_ids) * 100) if all_anon_ids else 0, 1),
+        'mapping_rate': round((len(mapped_anon_ids) / len(all_anon_ids) * 100) if all_anon_ids else 0, 1),  # Changed: use mapped_anon_ids
         'average_per_table': avg_players_per_table
     }
 

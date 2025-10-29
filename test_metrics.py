@@ -174,10 +174,10 @@ def test_full_mapping():
     assert metrics['hands']['fully_mapped'] == 2
     assert metrics['hands']['coverage_percentage'] == 100.0
     assert metrics['players']['total_unique'] == 2  # abc123, def456 (Hero excluded from unique count)
-    # Note: 'mapped' includes Hero mapping, so it's 3 (abc123, def456, Hero)
-    assert metrics['players']['mapped'] == 3
-    # mapping_rate > 100% because Hero is mapped but not counted in total_unique
-    assert metrics['players']['mapping_rate'] == 150.0
+    # Note: 'mapped' now only counts anonymous IDs (Hero excluded) - FIXED
+    assert metrics['players']['mapped'] == 2  # Changed from 3 to 2 (Hero excluded)
+    # mapping_rate should be 100% (2 mapped / 2 total) - FIXED from 150%
+    assert metrics['players']['mapping_rate'] == 100.0  # Changed from 150.0 to 100.0
     assert metrics['tables']['fully_resolved'] == 1
     assert metrics['tables']['resolution_rate'] == 100.0
     assert metrics['screenshots']['total'] == 2
@@ -313,6 +313,81 @@ def test_multiple_tables():
     print("✅ Test 5 passed: Multiple tables scenario")
 
 
+def test_hero_mapping_rate():
+    """
+    Test that mapping rate doesn't exceed 100% when Hero is mapped.
+    This validates the fix for the Hero mapping edge case bug.
+
+    Scenario: Hand with Hero + 2 anonymous IDs, all 3 mapped
+    Expected: mapping_rate = 100% (2 anon mapped / 2 anon total)
+    Bug (before fix): mapping_rate = 150% (3 total mapped / 2 anon total)
+    """
+    print("\n=== Test 6: Hero Mapping Rate Edge Case ===")
+
+    # Create hand with Hero + 2 anonymous players
+    hand = ParsedHand(
+        hand_id="RC123456",
+        timestamp=datetime.now(),
+        game_type="Hold'em No Limit",
+        stakes="$0.10/$0.20",
+        table_format="3-max",
+        button_seat=1,
+        seats=[
+            Seat(1, "abc123", 10.0, "BTN"),
+            Seat(2, "def456", 10.0, "SB"),
+            Seat(3, "Hero", 10.0, "BB")
+        ],
+        board_cards=BoardCards(),
+        actions=[],
+        raw_text="Table 'TestTable' 3-max..."
+    )
+
+    table_groups = {"TestTable": [hand]}
+
+    # All 3 players mapped (Hero + 2 anonymous)
+    table_mappings = {
+        "TestTable": {
+            "abc123": "Player1",
+            "def456": "Player2",
+            "Hero": "TuichAAreko"
+        }
+    }
+
+    metrics = _calculate_detailed_metrics(
+        all_hands=[hand],
+        table_groups=table_groups,
+        table_mappings=table_mappings,
+        ocr1_results={},
+        ocr2_results={},
+        matched_screenshots={},
+        unmatched_screenshots=[]
+    )
+
+    print("Players metrics:", metrics['players'])
+
+    # Validate: Hero excluded from total_unique count
+    assert metrics['players']['total_unique'] == 2, \
+        f"Expected 2 unique anonymous IDs, got {metrics['players']['total_unique']}"
+
+    # Validate: mapped should only count anonymous IDs (not Hero)
+    assert metrics['players']['mapped'] == 2, \
+        f"Expected 2 mapped anonymous IDs (Hero excluded), got {metrics['players']['mapped']}"
+
+    # Validate: unmapped should be 0 (all anonymous IDs are mapped)
+    assert metrics['players']['unmapped'] == 0, \
+        f"Expected 0 unmapped IDs, got {metrics['players']['unmapped']}"
+
+    # CRITICAL: Mapping rate must be <= 100%
+    assert metrics['players']['mapping_rate'] == 100.0, \
+        f"Expected mapping_rate = 100.0%, got {metrics['players']['mapping_rate']}%"
+
+    # Additional validation: mapping_rate should never exceed 100%
+    assert metrics['players']['mapping_rate'] <= 100.0, \
+        f"CRITICAL BUG: mapping_rate exceeds 100% ({metrics['players']['mapping_rate']}%)"
+
+    print("✅ Test 6 passed: Hero mapping rate stays at 100% (not 150%)")
+
+
 if __name__ == "__main__":
     print("Testing comprehensive metrics calculation...")
 
@@ -321,6 +396,7 @@ if __name__ == "__main__":
     test_full_mapping()
     test_partial_mapping()
     test_multiple_tables()
+    test_hero_mapping_rate()
 
     print("\n" + "="*50)
     print("✅ All tests passed!")
