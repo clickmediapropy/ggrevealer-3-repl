@@ -415,6 +415,185 @@ def _build_seat_mapping_by_roles(
 - No aumentan mappings incorrectos
 - Tiempo de procesamiento aceptable (<5s por screenshot promedio)
 
+### Fase 4: Cambios de Base de Datos
+
+**Objetivo:** Adaptar el esquema de base de datos para soportar los dos OCRs separados
+
+#### Tabla `screenshot_results` - MODIFICAR ⚠️
+
+**Agregar campos para separar los dos OCRs:**
+
+```sql
+-- Campos nuevos a agregar (database.py):
+ALTER TABLE screenshot_results ADD COLUMN ocr1_success INTEGER DEFAULT 0;
+ALTER TABLE screenshot_results ADD COLUMN ocr1_hand_id TEXT;
+ALTER TABLE screenshot_results ADD COLUMN ocr1_error TEXT;
+ALTER TABLE screenshot_results ADD COLUMN ocr2_success INTEGER DEFAULT 0;
+ALTER TABLE screenshot_results ADD COLUMN ocr2_data TEXT;
+ALTER TABLE screenshot_results ADD COLUMN ocr2_error TEXT;
+```
+
+**Descripción de campos nuevos:**
+- `ocr1_success` - ¿Primer OCR (Hand ID extraction) exitoso? (0/1)
+- `ocr1_hand_id` - Hand ID extraído del screenshot (ej: "SG3247423387")
+- `ocr1_error` - Mensaje de error si primer OCR falla
+- `ocr2_success` - ¿Segundo OCR (player details) exitoso? (0/1)
+- `ocr2_data` - JSON con nombres, roles, stacks extraídos
+- `ocr2_error` - Mensaje de error si segundo OCR falla
+
+**Campos deprecados (mantener por compatibilidad):**
+- `ocr_success` → Reemplazado por `ocr1_success` + `ocr2_success`
+- `ocr_error` → Reemplazado por `ocr1_error` + `ocr2_error`
+- `ocr_data` → Reemplazado por `ocr2_data`
+
+**Nuevo schema de `ocr2_data` (JSON) para Fase 2:**
+```json
+{
+  "players": ["TuichAAreko", "DOI002", "JuGGernaut!"],
+  "hero_name": "TuichAAreko",
+  "hero_cards": "8s Tc",
+  "board_cards": "8d 6c Ts 5d Ks",
+  "stacks": [300, 300, 300],
+  "positions": [1, 2, 3],
+  "roles": {
+    "dealer": "JuGGernaut!",
+    "small_blind": "DOI002",
+    "big_blind": "TuichAAreko"
+  }
+}
+```
+
+**Ejemplo de registro completo:**
+```sql
+id: 1
+job_id: 9
+screenshot_filename: "2025-10-22_11_32_AM_#SG3247423387.png"
+-- Primer OCR (Hand ID)
+ocr1_success: 1
+ocr1_hand_id: "SG3247423387"
+ocr1_error: NULL
+-- Segundo OCR (Detalles)
+ocr2_success: 1
+ocr2_data: '{"players": [...], "roles": {...}}'
+ocr2_error: NULL
+-- Matching
+matches_found: 1
+status: "success"
+```
+
+#### Tabla `results` - MODIFICAR (opcional) 📊
+
+**Agregar nuevas métricas en `stats_json`:**
+
+```json
+{
+  "total_hands": 147,
+  "matched_hands": 208,
+  "match_rate": 0.95,
+  "ocr_success_rate": 0.98,
+  "resolved_files": 5,
+  "failed_files": 0,
+
+  // ===== NUEVAS MÉTRICAS =====
+  "ocr1_success_rate": 0.999,      // Tasa éxito Hand ID extraction
+  "ocr1_failed_count": 1,          // Cuántos screenshots fallaron OCR1
+  "ocr2_success_rate": 0.95,       // Tasa éxito player details extraction
+  "ocr2_failed_count": 13,         // Cuántos screenshots fallaron OCR2
+  "avg_ocr1_time_ms": 800,         // Tiempo promedio OCR1
+  "avg_ocr2_time_ms": 2200,        // Tiempo promedio OCR2
+  "total_ocr_time_seconds": 795.0, // Tiempo total de ambos OCRs
+  "role_mapping_success_rate": 0.92 // Tasa éxito mapeo por roles (Fase 2)
+}
+```
+
+#### Tablas que **NO** cambian
+
+- ✅ `jobs` - Se mantiene igual (los contadores actuales sirven)
+- ✅ `files` - Se mantiene igual
+- ✅ `logs` - Se mantiene igual (solo el contenido de logs cambia)
+
+#### Migración de Base de Datos
+
+**Archivo:** `database.py`
+
+**Agregar a la función `init_db()`:**
+
+```python
+def init_db():
+    """Initialize database with schema"""
+    with get_db() as conn:
+        conn.executescript(SCHEMA)
+
+        # ===== MIGRATION: Add dual OCR support =====
+        cursor = conn.execute("PRAGMA table_info(screenshot_results)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        dual_ocr_migrations = []
+
+        # Fase 1 & 2: Dual OCR fields
+        if 'ocr1_success' not in columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_success INTEGER DEFAULT 0"
+            )
+        if 'ocr1_hand_id' not in columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_hand_id TEXT"
+            )
+        if 'ocr1_error' not in columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_error TEXT"
+            )
+        if 'ocr2_success' not in columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr2_success INTEGER DEFAULT 0"
+            )
+        if 'ocr2_data' not in columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr2_data TEXT"
+            )
+        if 'ocr2_error' not in columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr2_error TEXT"
+            )
+
+        for migration in dual_ocr_migrations:
+            conn.execute(migration)
+
+        if dual_ocr_migrations:
+            print(f"✅ Applied {len(dual_ocr_migrations)} dual OCR migrations")
+```
+
+#### Actualización de funciones DB
+
+**Nuevas funciones en `database.py`:**
+
+```python
+def save_ocr1_result(job_id: int, screenshot_filename: str,
+                     success: bool, hand_id: str = None, error: str = None):
+    """Save first OCR (Hand ID) result"""
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO screenshot_results
+            (job_id, screenshot_filename, ocr1_success, ocr1_hand_id, ocr1_error,
+             status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (job_id, screenshot_filename, int(success), hand_id, error,
+              'ocr1_completed', datetime.utcnow().isoformat()))
+
+
+def save_ocr2_result(screenshot_id: int, success: bool,
+                     ocr_data: dict = None, error: str = None):
+    """Save second OCR (player details) result"""
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE screenshot_results
+            SET ocr2_success = ?, ocr2_data = ?, ocr2_error = ?,
+                status = ?
+            WHERE id = ?
+        """, (int(success), json.dumps(ocr_data) if ocr_data else None,
+              error, 'ocr2_completed', screenshot_id))
+```
+
 ---
 
 ## Preguntas Abiertas
