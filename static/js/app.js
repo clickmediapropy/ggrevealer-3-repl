@@ -331,7 +331,8 @@ if (uploadBtn) {
         currentJobId = uploadData.job_id;
 
         const processResponse = await fetch(`${API_BASE}/api/process/${currentJobId}`, {
-            method: 'POST'
+            method: 'POST',
+            headers: getHeadersWithApiKey()
         });
 
         if (!processResponse.ok) {
@@ -2079,7 +2080,8 @@ async function reprocessDevJob() {
     try {
         // Call the existing /api/process endpoint (it now handles reprocessing)
         const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
-            method: 'POST'
+            method: 'POST',
+            headers: getHeadersWithApiKey()
         });
 
         if (!response.ok) {
@@ -2281,6 +2283,145 @@ function updateTabVisibility() {
 }
 
 // ========================================
+// API KEY MANAGEMENT
+// ========================================
+
+function getApiKey() {
+    return localStorage.getItem('gemini_api_key');
+}
+
+function getHeadersWithApiKey() {
+    const headers = {};
+    const apiKey = getApiKey();
+    if (apiKey) {
+        headers['X-Gemini-API-Key'] = apiKey;
+    }
+    return headers;
+}
+
+function hasApiKey() {
+    const key = getApiKey();
+    return key && key.trim() !== '';
+}
+
+function updateApiKeyStatus() {
+    const statusBadge = document.getElementById('api-key-status');
+    if (!statusBadge) return;
+
+    if (hasApiKey()) {
+        const key = getApiKey();
+        const maskedKey = '***' + key.slice(-4);
+        statusBadge.innerHTML = `<i class="bi bi-check-circle"></i> ${maskedKey}`;
+        statusBadge.className = 'badge bg-success';
+    } else {
+        statusBadge.innerHTML = '<i class="bi bi-x-circle"></i> Sin configurar';
+        statusBadge.className = 'badge bg-danger';
+    }
+}
+
+function checkApiKeyOnStartup() {
+    if (!hasApiKey()) {
+        // Open modal automatically if no API key is configured
+        const apiKeyModal = new bootstrap.Modal(document.getElementById('apiKeyModal'));
+        apiKeyModal.show();
+    }
+    updateApiKeyStatus();
+}
+
+async function validateAndSaveApiKey() {
+    const apiKeyInput = document.getElementById('api-key-input');
+    const apiKey = apiKeyInput.value.trim();
+
+    const errorDiv = document.getElementById('api-key-error');
+    const successDiv = document.getElementById('api-key-success');
+    const validatingDiv = document.getElementById('api-key-validating');
+    const saveBtn = document.getElementById('save-api-key-btn');
+
+    // Hide all messages
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+    validatingDiv.classList.remove('d-none');
+    saveBtn.disabled = true;
+
+    // Validate input
+    if (!apiKey || apiKey.length < 20) {
+        errorDiv.textContent = 'Por favor ingresa una API key válida';
+        errorDiv.classList.remove('d-none');
+        validatingDiv.classList.add('d-none');
+        saveBtn.disabled = false;
+        return;
+    }
+
+    try {
+        // Validate with server
+        const response = await fetch(`${API_BASE}/api/validate-api-key`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.valid) {
+            throw new Error(data.error || 'API key inválida');
+        }
+
+        // Save to localStorage
+        localStorage.setItem('gemini_api_key', apiKey);
+
+        // Show success
+        validatingDiv.classList.add('d-none');
+        successDiv.classList.remove('d-none');
+
+        // Update status badge
+        updateApiKeyStatus();
+
+        // Close modal after 1.5 seconds
+        setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('apiKeyModal'));
+            modal.hide();
+            successDiv.classList.add('d-none');
+            apiKeyInput.value = '';
+        }, 1500);
+
+    } catch (error) {
+        console.error('API key validation failed:', error);
+        errorDiv.textContent = error.message || 'Error al validar la API key. Verifica que sea correcta.';
+        errorDiv.classList.remove('d-none');
+        validatingDiv.classList.add('d-none');
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+
+function clearApiKey() {
+    if (confirm('¿Estás seguro de que quieres eliminar tu API key? Necesitarás configurarla nuevamente para procesar jobs.')) {
+        localStorage.removeItem('gemini_api_key');
+        updateApiKeyStatus();
+        document.getElementById('api-key-input').value = '';
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('apiKeyModal'));
+        modal.hide();
+    }
+}
+
+function toggleApiKeyVisibility() {
+    const input = document.getElementById('api-key-input');
+    const toggleBtn = document.getElementById('toggle-api-key-visibility');
+    const icon = toggleBtn.querySelector('i');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+// ========================================
 // BUDGET MANAGEMENT
 // ========================================
 
@@ -2441,7 +2582,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
-                        method: 'POST'
+                        method: 'POST',
+                        headers: getHeadersWithApiKey()
                     });
 
                     if (!response.ok) {

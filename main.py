@@ -105,6 +105,25 @@ async def startup_event():
 # HELPER FUNCTIONS
 # ============================================================================
 
+def get_api_key_from_request(request: Request) -> str:
+    """
+    Get API key from request header or fallback to environment variable
+
+    Args:
+        request: FastAPI Request object
+
+    Returns:
+        API key string (from header or env)
+    """
+    # Try to get API key from request header
+    user_api_key = request.headers.get('X-Gemini-API-Key')
+    if user_api_key and user_api_key.strip():
+        return user_api_key.strip()
+
+    # Fallback to environment variable
+    return os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
+
+
 async def ocr_hand_id_with_retry(
     screenshot_path: str,
     screenshot_filename: str,
@@ -234,7 +253,7 @@ async def upload_files(
 
 
 @app.post("/api/process/{job_id}")
-async def process_job(job_id: int, background_tasks: BackgroundTasks):
+async def process_job(job_id: int, request: Request, background_tasks: BackgroundTasks):
     """Start processing a job in the background (supports reprocessing)"""
     job = get_job(job_id)
     if not job:
@@ -265,7 +284,11 @@ async def process_job(job_id: int, background_tasks: BackgroundTasks):
 
         print(f"[JOB {job_id}] Reprocessing: cleared previous results")
 
-    background_tasks.add_task(run_processing_pipeline, job_id)
+    # Get API key from request header or fallback to env
+    api_key = get_api_key_from_request(request)
+
+    # Start processing with user's API key
+    background_tasks.add_task(run_processing_pipeline, job_id, api_key)
     update_job_status(job_id, 'processing')
 
     return {"job_id": job_id, "status": "processing", "is_reprocess": is_reprocess}
@@ -418,6 +441,55 @@ async def update_budget(request: Request):
     save_budget_config(monthly_budget, budget_reset_day)
 
     return {"message": "Budget configuration updated", "monthly_budget": monthly_budget, "budget_reset_day": budget_reset_day}
+
+
+@app.post("/api/validate-api-key")
+async def validate_api_key(request: Request):
+    """
+    Validate a Gemini API key by testing it with a simple request
+
+    Expects JSON body: {"api_key": "your-api-key-here"}
+    Returns: {"valid": true/false, "error": "message" (if invalid)}
+    """
+    try:
+        data = await request.json()
+        api_key = data.get('api_key', '').strip()
+
+        if not api_key:
+            return JSONResponse(
+                status_code=400,
+                content={"valid": False, "error": "API key is required"}
+            )
+
+        # Test the API key with a minimal Gemini request
+        genai.configure(api_key=api_key)
+
+        # Use the simplest possible request to test the key
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        response = model.generate_content("Test")
+
+        # If we got here, the API key is valid
+        return {"valid": True, "message": "API key is valid"}
+
+    except Exception as e:
+        error_message = str(e)
+
+        # Check for common error patterns
+        if "API_KEY_INVALID" in error_message or "invalid API key" in error_message.lower():
+            return JSONResponse(
+                status_code=401,
+                content={"valid": False, "error": "API key inválida. Verifica que sea correcta."}
+            )
+        elif "quota" in error_message.lower() or "limit" in error_message.lower():
+            return JSONResponse(
+                status_code=429,
+                content={"valid": False, "error": "Límite de cuota excedido. Verifica tu saldo en Google Cloud."}
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"valid": False, "error": f"Error al validar API key: {error_message}"}
+            )
 
 
 @app.get("/api/job/{job_id}/screenshots")
@@ -1394,8 +1466,14 @@ def calculate_job_cost(ocr1_count: int, ocr2_count: int) -> float:
     return total_images * GEMINI_COST_PER_IMAGE
 
 
-def run_processing_pipeline(job_id: int):
-    """Execute the full processing pipeline for a job"""
+def run_processing_pipeline(job_id: int, api_key: str = None):
+    """
+    Execute the full processing pipeline for a job
+
+    Args:
+        job_id: Job ID to process
+        api_key: Gemini API key (from user or fallback to env)
+    """
     import time
 
     # Initialize logger for this job
@@ -1454,8 +1532,11 @@ def run_processing_pipeline(job_id: int):
                    max_concurrent=10)
         step_start = time.time()
 
-        # Get API key
-        api_key = os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
+        # Use provided API key or fallback to environment
+        if not api_key or not api_key.strip():
+            api_key = os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
+
+        logger.info(f"Using API key: {'User-provided' if api_key != os.getenv('GEMINI_API_KEY') else 'Environment'}")
 
         # Semaphore will be created inside each event loop to avoid cross-loop binding
         semaphore = None

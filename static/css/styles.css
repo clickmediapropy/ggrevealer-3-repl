@@ -999,6 +999,31 @@ body {
     }
 }
 
+/* API Key Component Styles */
+.api-key-card {
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.api-key-card .badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+}
+
+.api-key-card .btn-outline-secondary {
+    font-size: 0.875rem;
+    padding: 6px 12px;
+    color: #495057;
+    border-color: #6c757d;
+}
+
+.api-key-card .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
+
 /* Budget Component Styles */
 .budget-card {
     padding: 12px;

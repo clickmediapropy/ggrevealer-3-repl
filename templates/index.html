@@ -54,6 +54,24 @@
 
             <div class="sidebar-divider"></div>
 
+            <!-- API Key Configuration -->
+            <div class="sidebar-section">
+                <h6 class="sidebar-section-title">Configuración API</h6>
+                <div class="api-key-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="small">Gemini API Key:</span>
+                        <span id="api-key-status" class="badge bg-danger">
+                            <i class="bi bi-x-circle"></i> Sin configurar
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#apiKeyModal">
+                        <i class="bi bi-key"></i> Configurar API Key
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
             <!-- Budget Summary Card -->
             <div class="sidebar-section">
                 <h6 class="sidebar-section-title">Presupuesto Mensual</h6>
@@ -538,6 +556,62 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-warning" id="modal-reprocess-btn" disabled>
                         <i class="bi bi-arrow-clockwise"></i> Reprocesar Job
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Configuration Modal -->
+    <div class="modal fade" id="apiKeyModal" tabindex="-1" aria-labelledby="apiKeyModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="apiKeyModalLabel">
+                        <i class="bi bi-key"></i> Configurar Gemini API Key
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="api-key-modal-close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>¿Por qué necesitas esto?</strong><br>
+                        Ingresa tu propia API key de Google Gemini para que los costos de procesamiento se facturen a tu cuenta.
+                    </div>
+                    <div class="mb-3">
+                        <label for="api-key-input" class="form-label">Google Gemini API Key</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-key"></i></span>
+                            <input type="password" class="form-control" id="api-key-input"
+                                   placeholder="AIzaSy...">
+                            <button class="btn btn-outline-secondary" type="button" id="toggle-api-key-visibility">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Obtén tu API key en: <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a>
+                        </div>
+                    </div>
+                    <div id="api-key-error" class="alert alert-danger d-none">
+                        <!-- Error message will be shown here -->
+                    </div>
+                    <div id="api-key-success" class="alert alert-success d-none">
+                        <i class="bi bi-check-circle"></i> API Key validada correctamente
+                    </div>
+                    <div id="api-key-validating" class="alert alert-warning d-none">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            <span>Validando API Key...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" id="clear-api-key-btn">
+                        <i class="bi bi-trash"></i> Limpiar
+                    </button>
+                    <button type="button" class="btn btn-primary" id="save-api-key-btn">
+                        <i class="bi bi-check-lg"></i> Validar y Guardar
                     </button>
                 </div>
             </div>
