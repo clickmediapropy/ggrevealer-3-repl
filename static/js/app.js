@@ -2281,6 +2281,99 @@ function updateTabVisibility() {
 }
 
 // ========================================
+// BUDGET MANAGEMENT
+// ========================================
+
+async function loadBudgetInfo() {
+    try {
+        const response = await fetch(`${API_BASE}/api/config/budget`);
+        const data = await response.json();
+
+        // Update display values
+        document.getElementById('monthly-spending').textContent = `$${data.monthly_spending.toFixed(2)}`;
+        document.getElementById('monthly-budget').textContent = `$${data.monthly_budget.toFixed(2)}`;
+
+        // Update progress bar
+        const progressBar = document.getElementById('budget-progress');
+        const percentage = data.percentage_used;
+        progressBar.style.width = `${percentage}%`;
+        progressBar.textContent = `${percentage.toFixed(1)}%`;
+        progressBar.setAttribute('aria-valuenow', percentage);
+
+        // Update progress bar color based on percentage
+        progressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+        if (percentage >= 100) {
+            progressBar.classList.add('bg-danger');
+        } else if (percentage >= 80) {
+            progressBar.classList.add('bg-warning');
+        } else {
+            progressBar.classList.add('bg-success');
+        }
+
+        // Update budget modal inputs
+        document.getElementById('budget-input').value = data.monthly_budget.toFixed(2);
+        document.getElementById('reset-day-input').value = data.budget_reset_day;
+
+    } catch (error) {
+        console.error('Failed to load budget info:', error);
+    }
+}
+
+async function saveBudgetConfig() {
+    const budget = parseFloat(document.getElementById('budget-input').value);
+    const resetDay = parseInt(document.getElementById('reset-day-input').value);
+
+    const errorDiv = document.getElementById('budget-error');
+    const successDiv = document.getElementById('budget-success');
+
+    // Hide previous messages
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+
+    // Validate inputs
+    if (isNaN(budget) || budget < 0) {
+        errorDiv.textContent = 'El presupuesto debe ser un número positivo';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/config/budget`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                monthly_budget: budget,
+                budget_reset_day: resetDay
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save budget');
+        }
+
+        // Show success message
+        successDiv.classList.remove('d-none');
+
+        // Reload budget info to update sidebar
+        await loadBudgetInfo();
+
+        // Close modal after 1.5 seconds
+        setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('budgetModal'));
+            modal.hide();
+            // Reset messages on close
+            successDiv.classList.add('d-none');
+        }, 1500);
+
+    } catch (error) {
+        console.error('Failed to save budget:', error);
+        errorDiv.textContent = error.message;
+        errorDiv.classList.remove('d-none');
+    }
+}
+
+// ========================================
 // INITIALIZATION
 // ========================================
 
@@ -2409,10 +2502,20 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelJobBtn.addEventListener('click', cancelJob);
     }
 
+    // Initialize budget save button
+    const saveBudgetBtn = document.getElementById('save-budget-btn');
+    if (saveBudgetBtn) {
+        saveBudgetBtn.addEventListener('click', saveBudgetConfig);
+    }
+
     // Load initial data
     loadJobs();
     loadRecentJobs();
+    loadBudgetInfo();
 
     // Refresh recent jobs every 30 seconds
     setInterval(loadRecentJobs, 30000);
+
+    // Refresh budget info every minute
+    setInterval(loadBudgetInfo, 60000);
 });

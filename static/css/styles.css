@@ -44,8 +44,21 @@ body {
     background: linear-gradient(135deg, var(--navbar-dark) 0%, var(--navbar-dark-alt) 100%) !important;
     box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15), 0 2px 8px rgba(0, 0, 0, 0.3);
     border-bottom: 1px solid rgba(16, 185, 129, 0.2);
-    position: relative;
-    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    overflow: visible;
+    height: 70px;
+    display: flex;
+    align-items: center;
+}
+
+.navbar-premium .container-fluid {
+    height: 100%;
+    display: flex;
+    align-items: center;
 }
 
 .navbar-premium::before {
@@ -583,7 +596,8 @@ body {
 /* Sidebar Layout */
 .main-layout {
     display: flex;
-    min-height: calc(100vh - 56px); /* Subtract navbar height */
+    min-height: 100vh;
+    padding-top: 70px; /* Compensate for fixed navbar */
 }
 
 .sidebar {
@@ -591,12 +605,17 @@ body {
     background: linear-gradient(180deg, var(--navbar-dark) 0%, var(--navbar-dark-alt) 100%);
     color: var(--text-white);
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
-    height: calc(100vh - 56px);
-    overflow-y: auto;
+    position: fixed;
+    top: 70px;
+    left: 0;
+    bottom: 0;
+    height: calc(100vh - 70px);
+    overflow: hidden;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3), -2px 0 20px rgba(16, 185, 129, 0.1);
     border-right: 1px solid rgba(16, 185, 129, 0.15);
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
 }
 
 .sidebar-header {
@@ -652,6 +671,32 @@ body {
 
 .sidebar-section {
     padding: 15px;
+    flex-shrink: 0;
+}
+
+.sidebar-section:last-child {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+/* Scrollbar styling for sidebar section with scroll */
+.sidebar-section:last-child::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-section:last-child::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.sidebar-section:last-child::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-section:last-child::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .sidebar-section-title {
@@ -721,6 +766,7 @@ body {
     background-color: #f8f9fa;
     max-width: 100%;
     width: 100%;
+    margin-left: 240px; /* Compensate for fixed sidebar */
 }
 
 .main-content .container-fluid {
@@ -765,12 +811,16 @@ body {
 @media (max-width: 991px) {
     .main-layout {
         flex-direction: column;
+        padding-top: 70px;
     }
 
     .sidebar {
         width: 100%;
         height: auto;
         position: relative;
+        top: auto;
+        left: auto;
+        bottom: auto;
     }
 
     .sidebar-section {
@@ -779,6 +829,7 @@ body {
 
     .main-content {
         width: 100%;
+        margin-left: 0; /* Remove sidebar margin on mobile */
     }
 
     .nav-tabs .nav-link {
@@ -946,4 +997,45 @@ body {
     .metric-value {
         font-size: 1.5rem;
     }
+}
+
+/* Budget Component Styles */
+.budget-card {
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.budget-card span,
+.budget-card strong {
+    color: #212529 !important;
+}
+
+.budget-card .text-muted {
+    color: #6c757d !important;
+}
+
+.budget-card .progress {
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #e9ecef;
+}
+
+.budget-card .progress-bar {
+    transition: width 0.6s ease, background-color 0.3s ease;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.budget-card .btn-outline-secondary {
+    font-size: 0.875rem;
+    padding: 6px 12px;
+    color: #495057;
+    border-color: #6c757d;
+}
+
+.budget-card .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
 }

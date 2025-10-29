@@ -90,6 +90,15 @@ CREATE TABLE IF NOT EXISTS logs (
 
 CREATE INDEX IF NOT EXISTS idx_logs_job_id ON logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
+
+-- App config table (cost tracking and budget management)
+CREATE TABLE IF NOT EXISTS app_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    monthly_budget REAL DEFAULT 50.0,
+    budget_reset_day INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -148,6 +157,14 @@ def init_db():
             migrations.append("ALTER TABLE jobs ADD COLUMN tables_fully_resolved INTEGER DEFAULT 0")
         if 'tables_total' not in columns:
             migrations.append("ALTER TABLE jobs ADD COLUMN tables_total INTEGER DEFAULT 0")
+        if 'ocr1_images_processed' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr1_images_processed INTEGER DEFAULT 0")
+        if 'ocr2_images_processed' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN ocr2_images_processed INTEGER DEFAULT 0")
+        if 'total_api_cost' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN total_api_cost REAL DEFAULT 0.0")
+        if 'cost_calculated_at' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN cost_calculated_at TEXT")
 
         for migration in migrations:
             conn.execute(migration)
@@ -632,6 +649,10 @@ def clear_job_results(job_id: int):
                 hands_parsed = 0,
                 ocr_processed_count = 0,
                 ocr_total_count = 0,
+                ocr1_images_processed = 0,
+                ocr2_images_processed = 0,
+                total_api_cost = 0.0,
+                cost_calculated_at = NULL,
                 started_at = NULL,
                 completed_at = NULL,
                 processing_time_seconds = NULL,
@@ -695,3 +716,87 @@ def mark_screenshot_discarded(job_id: int, screenshot_filename: str, reason: str
             SET discard_reason = ?, status = ?
             WHERE job_id = ? AND screenshot_filename = ?
         """, (reason, 'discarded', job_id, screenshot_filename))
+
+
+# ============================================================================
+# COST TRACKING OPERATIONS
+# ============================================================================
+
+def update_job_cost(job_id: int, ocr1_count: int, ocr2_count: int, total_cost: float):
+    """Update job with OCR counts and total API cost"""
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE jobs
+            SET ocr1_images_processed = ?,
+                ocr2_images_processed = ?,
+                total_api_cost = ?,
+                cost_calculated_at = ?
+            WHERE id = ?
+        """, (ocr1_count, ocr2_count, total_cost, datetime.utcnow().isoformat(), job_id))
+
+
+def get_budget_config() -> Optional[Dict]:
+    """Get current budget configuration"""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM app_config WHERE id = 1").fetchone()
+        if row:
+            return dict(row)
+    return None
+
+
+def save_budget_config(monthly_budget: float, budget_reset_day: int):
+    """Save or update budget configuration"""
+    with get_db() as conn:
+        existing = conn.execute("SELECT id FROM app_config WHERE id = 1").fetchone()
+
+        if existing:
+            # Update existing config
+            conn.execute("""
+                UPDATE app_config
+                SET monthly_budget = ?, budget_reset_day = ?, updated_at = ?
+                WHERE id = 1
+            """, (monthly_budget, budget_reset_day, datetime.utcnow().isoformat()))
+        else:
+            # Insert new config
+            now = datetime.utcnow().isoformat()
+            conn.execute("""
+                INSERT INTO app_config (id, monthly_budget, budget_reset_day, created_at, updated_at)
+                VALUES (1, ?, ?, ?, ?)
+            """, (monthly_budget, budget_reset_day, now, now))
+
+
+def get_monthly_spending() -> float:
+    """Get total spending for the current month"""
+    with get_db() as conn:
+        result = conn.execute("""
+            SELECT SUM(total_api_cost) as monthly_total
+            FROM jobs
+            WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+            AND status = 'completed'
+        """).fetchone()
+        return result['monthly_total'] if result['monthly_total'] else 0.0
+
+
+def get_budget_summary() -> Dict:
+    """Get complete budget summary including spending and percentage"""
+    config = get_budget_config()
+    monthly_spending = get_monthly_spending()
+
+    if not config:
+        # Default values if no config exists
+        monthly_budget = 50.0
+        budget_reset_day = 1
+    else:
+        monthly_budget = config['monthly_budget']
+        budget_reset_day = config['budget_reset_day']
+
+    remaining_budget = monthly_budget - monthly_spending
+    percentage_used = (monthly_spending / monthly_budget * 100) if monthly_budget > 0 else 0
+
+    return {
+        'monthly_budget': monthly_budget,
+        'monthly_spending': monthly_spending,
+        'remaining_budget': remaining_budget,
+        'percentage_used': percentage_used,
+        'budget_reset_day': budget_reset_day
+    }

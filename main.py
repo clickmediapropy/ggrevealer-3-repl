@@ -21,7 +21,8 @@ from pathlib import Path
 from typing import List, Optional
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded, update_job_detailed_metrics
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded, update_job_detailed_metrics, update_job_cost, get_budget_config, save_budget_config, get_budget_summary
+from config import GEMINI_COST_PER_IMAGE
 from parser import GGPokerParser
 from ocr import ocr_screenshot, ocr_hand_id, ocr_player_details
 from matcher import find_best_matches, _build_seat_mapping_by_roles
@@ -242,6 +243,14 @@ async def process_job(job_id: int, background_tasks: BackgroundTasks):
     if job['status'] == 'processing':
         raise HTTPException(status_code=400, detail="Job is already processing")
 
+    # Check budget before processing
+    budget_summary = get_budget_summary()
+    if budget_summary['monthly_spending'] >= budget_summary['monthly_budget']:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Presupuesto mensual agotado (${budget_summary['monthly_spending']:.2f} / ${budget_summary['monthly_budget']:.2f}). No se pueden procesar más jobs hasta el próximo ciclo."
+        )
+
     # Check if this is a reprocess (job already completed or failed)
     is_reprocess = job['status'] in ['completed', 'failed']
 
@@ -290,6 +299,12 @@ async def get_job_status(job_id: int):
             'processing_time': job.get('processing_time_seconds'),
             'ocr_processed': job.get('ocr_processed_count', 0),
             'ocr_total': job.get('ocr_total_count', 0)
+        },
+        'costs': {
+            'ocr1_images': job.get('ocr1_images_processed', 0),
+            'ocr2_images': job.get('ocr2_images_processed', 0),
+            'total_cost_usd': job.get('total_api_cost', 0.0),
+            'cost_calculated_at': job.get('cost_calculated_at')
         }
     }
     
@@ -374,6 +389,35 @@ async def list_jobs():
     """Get list of all jobs"""
     jobs = get_all_jobs()
     return {"jobs": jobs}
+
+
+@app.get("/api/config/budget")
+async def get_budget():
+    """Get current budget configuration and spending"""
+    summary = get_budget_summary()
+    return summary
+
+
+@app.post("/api/config/budget")
+async def update_budget(request: Request):
+    """Update budget configuration"""
+    data = await request.json()
+
+    monthly_budget = data.get('monthly_budget')
+    budget_reset_day = data.get('budget_reset_day', 1)
+
+    if monthly_budget is None:
+        raise HTTPException(status_code=400, detail="monthly_budget is required")
+
+    if not isinstance(monthly_budget, (int, float)) or monthly_budget < 0:
+        raise HTTPException(status_code=400, detail="monthly_budget must be a positive number")
+
+    if not isinstance(budget_reset_day, int) or budget_reset_day < 1 or budget_reset_day > 28:
+        raise HTTPException(status_code=400, detail="budget_reset_day must be between 1 and 28")
+
+    save_budget_config(monthly_budget, budget_reset_day)
+
+    return {"message": "Budget configuration updated", "monthly_budget": monthly_budget, "budget_reset_day": budget_reset_day}
 
 
 @app.get("/api/job/{job_id}/screenshots")
@@ -1344,6 +1388,12 @@ async def delete_job_endpoint(job_id: int):
     return {"message": "Job deleted"}
 
 
+def calculate_job_cost(ocr1_count: int, ocr2_count: int) -> float:
+    """Calculate total API cost for a job based on OCR operations"""
+    total_images = ocr1_count + ocr2_count
+    return total_images * GEMINI_COST_PER_IMAGE
+
+
 def run_processing_pipeline(job_id: int):
     """Execute the full processing pipeline for a job"""
     import time
@@ -1825,6 +1875,18 @@ def run_processing_pipeline(job_id: int):
 
         # Update detailed metrics in database
         update_job_detailed_metrics(job_id, detailed_metrics)
+
+        # Calculate and update API costs
+        ocr1_count = len(screenshot_files)  # OCR1 runs on ALL screenshots
+        ocr2_count = len(matched_screenshots)  # OCR2 runs only on matched screenshots
+        total_cost = calculate_job_cost(ocr1_count, ocr2_count)
+        update_job_cost(job_id, ocr1_count, ocr2_count, total_cost)
+
+        logger.info(f"💰 API costs calculated",
+                   ocr1_images=ocr1_count,
+                   ocr2_images=ocr2_count,
+                   total_images=ocr1_count + ocr2_count,
+                   total_cost_usd=round(total_cost, 6))
 
         update_job_status(job_id, 'completed')
 

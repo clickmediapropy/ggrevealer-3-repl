@@ -819,3 +819,4 @@ pytest test_validator.py -v
 5. **Table name extraction** - Uses regex on `Table 'Name'` format; fails if format differs
 6. **Hero position validation disabled** - PokerCraft's visual layout doesn't match seat numbers
 7. **Port discrepancy** - `main.py` uses port 5000, `restart.sh` uses port 8000 (update restart.sh if needed)
+- estamos live en el puerto 8000 http://0.0.0.0:8000/app
