@@ -119,12 +119,25 @@
                     </div>
                     <div class="card-body">
                         <div id="processing-status">
-                            <div class="d-flex align-items-center">
+                            <div class="d-flex align-items-center mb-3">
                                 <div class="spinner-border text-primary me-3" role="status"></div>
                                 <div>
                                     <h5 class="mb-0">Procesando archivos</h5>
                                     <p class="text-muted mb-0" id="status-text">Iniciando...</p>
                                 </div>
+                            </div>
+
+                            <div class="alert alert-warning d-flex align-items-center" role="alert">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <div class="flex-grow-1">
+                                    <strong>¿Necesitas detener el proceso?</strong> Puedes cancelar este job si subiste archivos incorrectos o cometiste un error.
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button id="cancel-job-btn" class="btn btn-danger">
+                                    <i class="bi bi-x-circle"></i> Cancelar Job
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -582,6 +582,60 @@ async function showError(message) {
     await generateErrorPrompt(currentJobId, message);
 }
 
+async function cancelJob() {
+    if (!currentJobId) {
+        console.error('No job ID to cancel');
+        return;
+    }
+
+    const confirmCancel = confirm('¿Estás seguro de que quieres cancelar este job? Se eliminarán todos los archivos y no se podrá recuperar.');
+    if (!confirmCancel) return;
+
+    const cancelBtn = document.getElementById('cancel-job-btn');
+    if (cancelBtn) {
+        cancelBtn.disabled = true;
+        cancelBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Cancelando...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/job/${currentJobId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al cancelar job');
+        }
+
+        // Stop polling
+        stopStatusPolling();
+        stopTimer();
+
+        // Clear current job
+        const jobId = currentJobId;
+        currentJobId = null;
+
+        // Show success message
+        alert(`Job #${jobId} cancelado exitosamente`);
+
+        // Return to welcome screen
+        showWelcomeSection();
+        updateSidebarActiveState('nav-new-job');
+
+        // Reload jobs list
+        loadJobs();
+        loadRecentJobs();
+
+    } catch (error) {
+        console.error('Error canceling job:', error);
+        alert('Error al cancelar el job. Por favor intenta de nuevo.');
+
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.innerHTML = '<i class="bi bi-x-circle"></i> Cancelar Job';
+        }
+    }
+}
+
 async function generateErrorPrompt(jobId, errorMessage) {
     const promptText = document.getElementById('error-prompt-text');
     const copyBtn = document.getElementById('copy-error-prompt-btn');
@@ -1520,6 +1574,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateSidebarActiveState('nav-history');
             }
         });
+    }
+
+    // Initialize cancel job button
+    const cancelJobBtn = document.getElementById('cancel-job-btn');
+    if (cancelJobBtn) {
+        cancelJobBtn.addEventListener('click', cancelJob);
     }
 
     // Load initial data
