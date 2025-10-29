@@ -2221,6 +2221,12 @@ def _build_table_mapping(
             continue
 
         success, ocr_data, error = ocr2_results[screenshot_filename]
+
+        # FIX: Parse JSON string to dict if ocr_data is stored as string
+        if isinstance(ocr_data, str):
+            import json
+            ocr_data = json.loads(ocr_data)
+
         if not success:
             logger.warning(f"OCR2 failed for {screenshot_filename}: {error}",
                          screenshot=screenshot_filename,
