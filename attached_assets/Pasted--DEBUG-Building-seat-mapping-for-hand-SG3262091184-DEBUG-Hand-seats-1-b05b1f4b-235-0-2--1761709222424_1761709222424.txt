@@ -1,0 +1,245 @@
+[DEBUG] Building seat mapping for hand SG3262091184
+[DEBUG] Hand seats: [(1, 'b05b1f4b', 235.0), (2, '92c000a3', 410.0), (3, 'Hero', 255.0)]
+[DEBUG] Screenshot players: [(2, 'JJust', 280.0), (3, 'Alinax999', 280.0), (1, 'TuichAAreko', 290.0)]
+[DEBUG] Hero in screenshot: TuichAAreko at position 1
+[DEBUG] Hero is at Seat 3 (real seat number)
+[DEBUG] Table has 3 seats in hand history
+[DEBUG] Available seats in hand: [1, 2, 3]
+[DEBUG] Screenshot shows 3 players
+[DEBUG] Visual position 2 → Real seat 2 (hero=3, offset=1)
+[DEBUG] Mapped: Seat 2 (92c000a3) → JJust
+[DEBUG] Visual position 3 → Real seat 1 (hero=3, offset=2)
+[DEBUG] Mapped: Seat 1 (b05b1f4b) → Alinax999
+[DEBUG] Visual position 1 → Real seat 3 (hero=3, offset=0)
+[DEBUG] Mapped: Seat 3 (Hero) → TuichAAreko
+[DEBUG] Final mapping: {'92c000a3': 'JJust', 'b05b1f4b': 'Alinax999', 'Hero': 'TuichAAreko'}
+[DEBUG] Mapping success: 3 of 3 seats mapped
+
+
+[DEBUG] Building seat mapping for hand SG3262091067
+[DEBUG] Hand seats: [(1, 'b05b1f4b', 250.0), (2, '92c000a3', 410.0), (3, 'Hero', 240.0)]
+[DEBUG] Screenshot players: [(2, 'JJust', 280.0), (3, 'Alinax999', 280.0), (1, 'TuichAAreko', 290.0)]
+[DEBUG] Hero in screenshot: TuichAAreko at position 1
+[DEBUG] Hero is at Seat 3 (real seat number)
+[DEBUG] Table has 3 seats in hand history
+[DEBUG] Available seats in hand: [1, 2, 3]
+[DEBUG] Screenshot shows 3 players
+[DEBUG] Visual position 2 → Real seat 2 (hero=3, offset=1)
+[DEBUG] Mapped: Seat 2 (92c000a3) → JJust
+[DEBUG] Visual position 3 → Real seat 1 (hero=3, offset=2)
+[DEBUG] Mapped: Seat 1 (b05b1f4b) → Alinax999
+[DEBUG] Visual position 1 → Real seat 3 (hero=3, offset=0)
+[DEBUG] Mapped: Seat 3 (Hero) → TuichAAreko
+[DEBUG] Final mapping: {'92c000a3': 'JJust', 'b05b1f4b': 'Alinax999', 'Hero': 'TuichAAreko'}
+[DEBUG] Mapping success: 3 of 3 seats mapped
+
+
+[DEBUG] Building seat mapping for hand SG3262090500
+[DEBUG] Hand seats: [(1, 'b05b1f4b', 270.0), (2, '92c000a3', 330.0), (3, 'Hero', 300.0)]
+[DEBUG] Screenshot players: [(2, 'JJust', 280.0), (3, 'Alinax999', 280.0), (1, 'TuichAAreko', 290.0)]
+[DEBUG] Hero in screenshot: TuichAAreko at position 1
+[DEBUG] Hero is at Seat 3 (real seat number)
+[DEBUG] Table has 3 seats in hand history
+[DEBUG] Available seats in hand: [1, 2, 3]
+[DEBUG] Screenshot shows 3 players
+[DEBUG] Visual position 2 → Real seat 2 (hero=3, offset=1)
+[DEBUG] Mapped: Seat 2 (92c000a3) → JJust
+[DEBUG] Visual position 3 → Real seat 1 (hero=3, offset=2)
+[DEBUG] Mapped: Seat 1 (b05b1f4b) → Alinax999
+[DEBUG] Visual position 1 → Real seat 3 (hero=3, offset=0)
+[DEBUG] Mapped: Seat 3 (Hero) → TuichAAreko
+[DEBUG] Final mapping: {'92c000a3': 'JJust', 'b05b1f4b': 'Alinax999', 'Hero': 'TuichAAreko'}
+[DEBUG] Mapping success: 3 of 3 seats mapped
+
+
+[DEBUG] Building seat mapping for hand SG3262090411
+[DEBUG] Hand seats: [(1, 'b05b1f4b', 270.0), (2, '92c000a3', 340.0), (3, 'Hero', 290.0)]
+[DEBUG] Screenshot players: [(2, 'JJust', 280.0), (3, 'Alinax999', 280.0), (1, 'TuichAAreko', 290.0)]
+[DEBUG] Hero in screenshot: TuichAAreko at position 1
+[DEBUG] Hero is at Seat 3 (real seat number)
+[DEBUG] Table has 3 seats in hand history
+[DEBUG] Available seats in hand: [1, 2, 3]
+[DEBUG] Screenshot shows 3 players
+[DEBUG] Visual position 2 → Real seat 2 (hero=3, offset=1)
+[DEBUG] Mapped: Seat 2 (92c000a3) → JJust
+[DEBUG] Visual position 3 → Real seat 1 (hero=3, offset=2)
+[DEBUG] Mapped: Seat 1 (b05b1f4b) → Alinax999
+[DEBUG] Visual position 1 → Real seat 3 (hero=3, offset=0)
+[DEBUG] Mapped: Seat 3 (Hero) → TuichAAreko
+[DEBUG] Final mapping: {'92c000a3': 'JJust', 'b05b1f4b': 'Alinax999', 'Hero': 'TuichAAreko'}
+[DEBUG] Mapping success: 3 of 3 seats mapped
+
+
+[DEBUG] Building seat mapping for hand SG3262090348
+[DEBUG] Hand seats: [(1, 'b05b1f4b', 280.0), (2, '92c000a3', 330.0), (3, 'Hero', 290.0)]
+[DEBUG] Screenshot players: [(2, 'JJust', 280.0), (3, 'Alinax999', 280.0), (1, 'TuichAAreko', 290.0)]
+[DEBUG] Hero in screenshot: TuichAAreko at position 1
+[DEBUG] Hero is at Seat 3 (real seat number)
+[DEBUG] Table has 3 seats in hand history
+[DEBUG] Available seats in hand: [1, 2, 3]
+[DEBUG] Screenshot shows 3 players
+[DEBUG] Visual position 2 → Real seat 2 (hero=3, offset=1)
+[DEBUG] Mapped: Seat 2 (92c000a3) → JJust
+[DEBUG] Visual position 3 → Real seat 1 (hero=3, offset=2)
+[DEBUG] Mapped: Seat 1 (b05b1f4b) → Alinax999
+[DEBUG] Visual position 1 → Real seat 3 (hero=3, offset=0)
+[DEBUG] Mapped: Seat 3 (Hero) → TuichAAreko
+[DEBUG] Final mapping: {'92c000a3': 'JJust', 'b05b1f4b': 'Alinax999', 'Hero': 'TuichAAreko'}
+[DEBUG] Mapping success: 3 of 3 seats mapped
+
+
+[DEBUG] Building seat mapping for hand SG3262059986
+[DEBUG] Hand seats: [(1, 'b05b1f4b', 300.0), (2, '92c000a3', 300.0), (3, 'Hero', 300.0)]
+[DEBUG] Screenshot players: [(2, 'JJust', 280.0), (3, 'Alinax999', 280.0), (1, 'TuichAAreko', 290.0)]
+[DEBUG] Hero in screenshot: TuichAAreko at position 1
+[DEBUG] Hero is at Seat 3 (real seat number)
+[DEBUG] Table has 3 seats in hand history
+[DEBUG] Available seats in hand: [1, 2, 3]
+[DEBUG] Screenshot shows 3 players
+[DEBUG] Visual position 2 → Real seat 2 (hero=3, offset=1)
+[DEBUG] Mapped: Seat 2 (92c000a3) → JJust
+[DEBUG] Visual position 3 → Real seat 1 (hero=3, offset=2)
+[DEBUG] Mapped: Seat 1 (b05b1f4b) → Alinax999
+[DEBUG] Visual position 1 → Real seat 3 (hero=3, offset=0)
+[DEBUG] Mapped: Seat 3 (Hero) → TuichAAreko
+[DEBUG] Final mapping: {'92c000a3': 'JJust', 'b05b1f4b': 'Alinax999', 'Hero': 'TuichAAreko'}
+[DEBUG] Mapping success: 3 of 3 seats mapped
+
+✅ Hand ID match: SG3262059986 ↔ 2025-10-27_06_13_PM_10_20_#SG3262059986.png
+
+📊 Matching Summary: 265 matches found from 3434 hands
+   - Hand ID matches (OCR): 197
+   - Filename matches: 5
+   - Fallback matches: 63
+2025-10-29 03:35:44 [JOB 26] [INFO] ✅ Found 265 matches | {"matches_count": 265, "hands_count": 3434, "match_rate": 7.7, "duration_ms": 5396}
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+2025-10-29 03:35:49 [JOB 26] [INFO] 🏷️  Generating name mappings from matches
+2025-10-29 03:35:49 [JOB 26] [INFO] ✅ Generated 420 name mappings | {"mappings_count": 420, "unique_players": 288, "duration_ms": 5}
+2025-10-29 03:35:49 [JOB 26] [INFO] 📝 Generating output TXT files by table
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:42750 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56462 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK
+INFO:     172.31.78.130:43298 - "GET /api/status/26 HTTP/1.1" 200 OK

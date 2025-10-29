@@ -406,20 +406,24 @@ async function checkStatus() {
         }
 
         const job = await response.json();
+        console.log(`[DEBUG] Job ${job.id} status: ${job.status}`);
         
         updateProcessingUI(job);
 
         if (job.status === 'completed') {
+            console.log('[DEBUG] Job completed, showing results...');
             stopStatusPolling();
             stopTimer();
-            showResults(job);
+            await showResults(job);
+            console.log('[DEBUG] Results displayed successfully');
         } else if (job.status === 'failed') {
+            console.log('[DEBUG] Job failed');
             stopStatusPolling();
             stopTimer();
             showError(job.error_message || 'Processing failed');
         }
     } catch (error) {
-        console.error('Error checking status:', error);
+        console.error('❌ Error checking status:', error);
     }
 }
 
@@ -530,11 +534,15 @@ function showProcessing() {
 }
 
 async function showResults(job) {
-    processingSection.classList.add('d-none');
-    resultsSection.classList.remove('d-none');
+    console.log('[DEBUG] showResults() called for job', job.id);
+    try {
+        processingSection.classList.add('d-none');
+        resultsSection.classList.remove('d-none');
+        console.log('[DEBUG] Sections toggled');
 
-    const stats = job.statistics || {};
-    const detailedStats = job.detailed_stats || {};
+        const stats = job.statistics || {};
+        const detailedStats = job.detailed_stats || {};
+        console.log('[DEBUG] Stats loaded:', stats);
     const processingTime = stats.processing_time ? formatDuration(stats.processing_time) : 'N/A';
 
     const tablesCount = detailedStats.tables_count || 0;
@@ -594,6 +602,11 @@ async function showResults(job) {
     }
 
     loadJobs();
+    console.log('[DEBUG] showResults() completed successfully');
+    } catch (error) {
+        console.error('❌ Error in showResults():', error);
+        showError('Error al mostrar resultados: ' + error.message);
+    }
 }
 
 async function loadScreenshotDetails(jobId, stats) {
