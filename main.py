@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import zipfile
 from dataclasses import asdict
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -202,9 +202,14 @@ async def serve_app(request: Request):
 @app.post("/api/upload")
 async def upload_files(
     txt_files: List[UploadFile] = File(...),
-    screenshots: List[UploadFile] = File(...)
+    screenshots: List[UploadFile] = File(...),
+    api_tier: str = Form(default='free')
 ):
     """Upload TXT files and screenshots for a new job"""
+    # Validate API tier
+    if api_tier not in ('free', 'paid'):
+        api_tier = 'free'
+
     # Validate file count limits
     if len(txt_files) > MAX_TXT_FILES:
         raise HTTPException(
@@ -218,7 +223,7 @@ async def upload_files(
             detail=f"Excede el límite de screenshots. Máximo: {MAX_SCREENSHOT_FILES}, Recibidos: {len(screenshots)}"
         )
 
-    job_id = create_job()
+    job_id = create_job(api_tier=api_tier)
 
     job_upload_path = UPLOADS_PATH / str(job_id)
     job_upload_path.mkdir(exist_ok=True)
@@ -1541,6 +1546,21 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
 
         logger.info(f"Using API key: {'User-provided' if api_key != os.getenv('GEMINI_API_KEY') else 'Environment'}")
 
+        # Get API tier from job and configure rate limiting
+        job = get_job(job_id)
+        api_tier = job.get('api_tier', 'free') if job else 'free'
+
+        if api_tier == 'free':
+            # Free tier: 14 requests per minute (1 concurrent, 4.3s delay between requests)
+            semaphore_limit = 1
+            delay_between_requests = 60 / 14  # ~4.3 seconds
+            logger.info("🔒 Free tier API detected - Rate limiting: 14 req/min (4.3s delay)")
+        else:
+            # Paid tier: No limits (10 concurrent requests)
+            semaphore_limit = 10
+            delay_between_requests = 0
+            logger.info("⚡ Paid tier API detected - No rate limiting (10 concurrent)")
+
         # Semaphore will be created inside each event loop to avoid cross-loop binding
         semaphore = None
 
@@ -1558,12 +1578,17 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
                 )
                 ocr1_results[screenshot_filename] = (success, hand_id, error)
                 increment_ocr_processed_count(job_id)
+
+                # Rate limiting for free tier
+                if delay_between_requests > 0:
+                    await asyncio.sleep(delay_between_requests)
+
                 return success
 
         async def process_all_ocr1():
             # Create semaphore inside event loop to avoid cross-loop binding issues
             nonlocal semaphore
-            semaphore = asyncio.Semaphore(10)
+            semaphore = asyncio.Semaphore(semaphore_limit)
             tasks = [process_ocr1(sf) for sf in screenshot_files]
             return await asyncio.gather(*tasks)
 
@@ -1653,12 +1678,16 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
                                screenshot=screenshot_filename,
                                error=error)
 
+                # Rate limiting for free tier
+                if delay_between_requests > 0:
+                    await asyncio.sleep(delay_between_requests)
+
                 return success
 
         async def process_all_ocr2():
             # Create semaphore inside event loop to avoid cross-loop binding issues
             nonlocal semaphore
-            semaphore = asyncio.Semaphore(10)
+            semaphore = asyncio.Semaphore(semaphore_limit)
             tasks = []
             for screenshot_file in screenshot_files:
                 screenshot_filename = screenshot_file['filename']

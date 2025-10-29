@@ -292,6 +292,15 @@ function updateUploadButton() {
 
 if (uploadBtn) {
     uploadBtn.addEventListener('click', async () => {
+    // Check if API tier is declared
+    const apiTier = localStorage.getItem('api_tier');
+    if (!apiTier) {
+        showWarning('Primero debes configurar tu API Key');
+        const apiKeyModal = new bootstrap.Modal(document.getElementById('apiKeyModal'));
+        apiKeyModal.show();
+        return;
+    }
+
     // Validate limits before upload
     if (txtFiles.length > MAX_TXT_FILES) {
         showWarning(`Excede el límite de archivos TXT (${txtFiles.length}/${MAX_TXT_FILES})`);
@@ -309,12 +318,22 @@ if (uploadBtn) {
         return;
     }
 
+    // Calculate estimated time and show warning if needed
+    const timeEstimate = calculateEstimatedTime(screenshotFiles.length, apiTier);
+    if (timeEstimate.minutes > 10 && apiTier === 'free') {
+        const confirmed = await showProcessingTimeWarning(timeEstimate.minutes, apiTier);
+        if (!confirmed) {
+            return;
+        }
+    }
+
     uploadBtn.disabled = true;
     uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Subiendo...';
 
     const formData = new FormData();
     txtFiles.forEach(file => formData.append('txt_files', file));
     screenshotFiles.forEach(file => formData.append('screenshots', file));
+    formData.append('api_tier', apiTier);
 
     try {
         const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
@@ -2331,6 +2350,7 @@ function checkApiKeyOnStartup() {
 async function validateAndSaveApiKey() {
     const apiKeyInput = document.getElementById('api-key-input');
     const apiKey = apiKeyInput.value.trim();
+    const apiTier = document.querySelector('input[name="apiTier"]:checked').value;
 
     const errorDiv = document.getElementById('api-key-error');
     const successDiv = document.getElementById('api-key-success');
@@ -2370,6 +2390,7 @@ async function validateAndSaveApiKey() {
 
         // Save to localStorage
         localStorage.setItem('gemini_api_key', apiKey);
+        localStorage.setItem('api_tier', apiTier);
 
         // Show success
         validatingDiv.classList.add('d-none');
@@ -2419,6 +2440,102 @@ function toggleApiKeyVisibility() {
         input.type = 'password';
         icon.className = 'bi bi-eye';
     }
+}
+
+// ========================================
+// RATE LIMITING & TIME ESTIMATION
+// ========================================
+
+function calculateEstimatedTime(screenshotCount, apiTier = null) {
+    // Get tier from parameter or localStorage
+    const tier = apiTier || localStorage.getItem('api_tier') || 'free';
+
+    // Calculate requests per minute based on tier
+    const requestsPerMin = tier === 'free' ? 14 : 300;
+
+    // Estimate total minutes (ORC1 + OCR2 = 2x screenshots)
+    const totalRequests = screenshotCount * 2;
+    const estimatedMinutes = Math.ceil(totalRequests / requestsPerMin);
+
+    return {
+        minutes: estimatedMinutes,
+        tier: tier,
+        requestsPerMin: requestsPerMin
+    };
+}
+
+function showProcessingTimeWarning(estimatedMinutes, apiTier) {
+    return new Promise((resolve) => {
+        // Create modal HTML
+        const warningHtml = `
+            <div class="modal fade" id="timeWarningModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning">
+                            <h5 class="modal-title">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                Procesamiento Lento
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p><strong>Tu API Key es TIER GRATIS</strong></p>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Tiempo estimado: ~${estimatedMinutes} minutos</strong>
+                                <br>
+                                <small>Los screenshots se procesarán a 14 requests/minuto</small>
+                            </div>
+                            <p class="mb-2">El procesamiento será más lento, pero completará correctamente.</p>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-lightning-fill"></i>
+                                <strong>Quieres procesar más rápido?</strong>
+                                <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener">
+                                    Configura facturación en Google Cloud
+                                </a>
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancel-warning">
+                                Cancelar
+                            </button>
+                            <button type="button" class="btn btn-warning" id="continue-warning">
+                                <i class="bi bi-play-fill"></i> Continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove if exists
+        const existing = document.getElementById('timeWarningModal');
+        if (existing) existing.remove();
+
+        // Add to body
+        document.body.insertAdjacentHTML('beforeend', warningHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('timeWarningModal'));
+
+        // Handle buttons
+        document.getElementById('cancel-warning').addEventListener('click', () => {
+            modal.hide();
+            resolve(false);
+        });
+
+        document.getElementById('continue-warning').addEventListener('click', () => {
+            modal.hide();
+            resolve(true);
+        });
+
+        // Resolve false if modal is dismissed
+        document.getElementById('timeWarningModal').addEventListener('hidden.bs.modal', () => {
+            resolve(false);
+        }, { once: true });
+
+        modal.show();
+    });
 }
 
 // ========================================

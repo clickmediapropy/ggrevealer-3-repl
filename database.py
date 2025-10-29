@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     name_mappings_count INTEGER DEFAULT 0,
     hands_parsed INTEGER DEFAULT 0,
     ocr_processed_count INTEGER DEFAULT 0,
-    ocr_total_count INTEGER DEFAULT 0
+    ocr_total_count INTEGER DEFAULT 0,
+    api_tier TEXT DEFAULT 'free' CHECK(api_tier IN ('free', 'paid'))
 );
 
 -- Files table
@@ -165,6 +166,8 @@ def init_db():
             migrations.append("ALTER TABLE jobs ADD COLUMN total_api_cost REAL DEFAULT 0.0")
         if 'cost_calculated_at' not in columns:
             migrations.append("ALTER TABLE jobs ADD COLUMN cost_calculated_at TEXT")
+        if 'api_tier' not in columns:
+            migrations.append("ALTER TABLE jobs ADD COLUMN api_tier TEXT DEFAULT 'free' CHECK(api_tier IN ('free', 'paid'))")
 
         for migration in migrations:
             conn.execute(migration)
@@ -275,12 +278,12 @@ def _recreate_screenshot_results_table(conn):
 # JOB OPERATIONS
 # ============================================================================
 
-def create_job() -> int:
+def create_job(api_tier: str = 'free') -> int:
     """Create a new job and return job ID"""
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO jobs (created_at, status) VALUES (?, ?)",
-            (datetime.utcnow().isoformat(), 'pending')
+            "INSERT INTO jobs (created_at, status, api_tier) VALUES (?, ?, ?)",
+            (datetime.utcnow().isoformat(), 'pending', api_tier)
         )
         return cursor.lastrowid
 
