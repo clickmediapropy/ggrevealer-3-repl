@@ -348,7 +348,8 @@ if (uploadBtn) {
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
     }
-});
+    });
+}
 
 function startTimer() {
     startTime = Date.now();
