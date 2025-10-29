@@ -91,8 +91,8 @@ Get API key from: https://makersuite.google.com/app/apikey
   4. Actions without amounts: `folds/checks`
   5. All-in actions: `raises $10 to $20 and is all-in`
   6-14. Dealt to, collected, shows, mucks, doesn't show, summary, uncalled bet, EV cashout
-- **CRITICAL**: Never replaces "Hero" (PokerTracker requirement)
-- **10 validations**: Hero preservation, line count, hand ID, timestamp, currency symbols, summary section, table info, seat count, chip format, unmapped IDs detection
+- **Hero Replacement**: Hero IS replaced with real player name extracted from OCR (e.g., "Hero" → "TuichAAreko")
+- **10 validations**: Hero count unchanged, line count, hand ID, timestamp, currency symbols, summary section, table info, seat count, chip format, unmapped IDs detection
 
 **database.py** - SQLite persistence
 - **jobs** table: Tracks status (pending/processing/completed/failed), file counts, statistics, processing time
@@ -145,11 +145,8 @@ Regex patterns MUST be applied in this order to avoid ID conflicts:
 2. Actions with amounts BEFORE actions without amounts
 3. Most specific patterns (with lookaheads/negations) first
 
-### Hero Protection (writer.py:168-169)
-```python
-if anon_id.lower() == 'hero':
-    continue  # NEVER replace Hero - PokerTracker requirement
-```
+### Hero Replacement Behavior
+The system DOES replace "Hero" with the real player name extracted from OCR screenshots. The matcher creates a mapping entry `"Hero" → "Real Name"` (e.g., "Hero" → "TuichAAreko"), and the writer applies all 14 regex patterns to this mapping just like any other anonymized ID. This allows PokerTracker to import hands with actual player names instead of the generic "Hero" identifier.
 
 ### Unmapped ID Detection (writer.py:78-98, 373-395)
 - Pattern: `\b[a-f0-9]{6,8}\b` (6-8 character hex strings)
@@ -218,7 +215,7 @@ storage/
 ## PokerTracker Compatibility
 
 Hand histories MUST pass these validations (writer.py:287-404):
-1. Hero count unchanged (CRITICAL)
+1. Hero mention count unchanged (CRITICAL) - The number of times the hero player is mentioned must remain the same, even though "Hero" is replaced with real name
 2. Line count within ±2 variance
 3. Hand ID unchanged
 4. Timestamp unchanged
@@ -726,7 +723,7 @@ pytest test_validator.py -v
 
 1. **GEMINI_API_KEY required** - OCR returns mock data if not configured
 2. **Rate limits** - Semaphore set to 10 concurrent requests (adjust if needed)
-3. **Hero protection** - "Hero" is NEVER replaced (PokerTracker requirement, not a bug)
+3. **Hero replacement behavior** - "Hero" IS replaced with real player name from OCR (e.g., "Hero" → "TuichAAreko")
 4. **Hand count preservation** - All hands from input appear in output (matched or unmatched)
 5. **Table name extraction** - Uses regex on `Table 'Name'` format; fails if format differs
 6. **Hero position validation disabled** - PokerCraft's visual layout doesn't match seat numbers
