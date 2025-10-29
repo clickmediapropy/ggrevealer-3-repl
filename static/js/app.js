@@ -929,7 +929,7 @@ function displayDetailedMetrics(metrics) {
         const mappings = metrics.mappings;
         const totalMappings = mappings.total || 0;
         const roleBasedPct = totalMappings > 0 ? Math.round((mappings.role_based / totalMappings) * 100) : 0;
-        const counterClockwisePct = totalMappings > 0 ? Math.round((mappings.counter_clockwise / totalMappings) * 100) : 0;
+        const visualPositionPct = totalMappings > 0 ? Math.round((mappings.visual_position / totalMappings) * 100) : 0;
 
         const mappingMetricsHTML = `
             <div class="metric-item">
@@ -948,12 +948,12 @@ function displayDetailedMetrics(metrics) {
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <small class="text-info">
-                        <i class="bi bi-arrow-clockwise"></i> Sentido Antihorario
+                        <i class="bi bi-eye"></i> Posición Visual
                     </small>
-                    <small><strong>${mappings.counter_clockwise || 0}</strong> (${counterClockwisePct}%)</small>
+                    <small><strong>${mappings.visual_position || 0}</strong> (${visualPositionPct}%)</small>
                 </div>
                 <div class="progress mb-2" style="height: 6px;">
-                    <div class="progress-bar bg-info" style="width: ${counterClockwisePct}%"></div>
+                    <div class="progress-bar bg-info" style="width: ${visualPositionPct}%"></div>
                 </div>
                 ${mappings.conflicts_detected > 0 ? `
                     <div class="alert alert-warning p-2 mb-0 mt-2">
@@ -1693,7 +1693,7 @@ function generateDetailedMetricsHTML(metrics) {
         const mappings = metrics.mappings;
         const totalMappings = mappings.total || 0;
         const roleBasedPct = totalMappings > 0 ? Math.round((mappings.role_based / totalMappings) * 100) : 0;
-        const counterClockwisePct = totalMappings > 0 ? Math.round((mappings.counter_clockwise / totalMappings) * 100) : 0;
+        const visualPositionPct = totalMappings > 0 ? Math.round((mappings.visual_position / totalMappings) * 100) : 0;
 
         html += `
             <div class="col-md-6 col-lg-4 mb-3">
@@ -1718,12 +1718,12 @@ function generateDetailedMetricsHTML(metrics) {
                             </div>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <small class="text-info">
-                                    <i class="bi bi-arrow-clockwise"></i> Sentido Antihorario
+                                    <i class="bi bi-eye"></i> Posición Visual
                                 </small>
-                                <small><strong>${mappings.counter_clockwise || 0}</strong> (${counterClockwisePct}%)</small>
+                                <small><strong>${mappings.visual_position || 0}</strong> (${visualPositionPct}%)</small>
                             </div>
                             <div class="progress mb-2" style="height: 6px;">
-                                <div class="progress-bar bg-info" style="width: ${counterClockwisePct}%"></div>
+                                <div class="progress-bar bg-info" style="width: ${visualPositionPct}%"></div>
                             </div>
                             ${mappings.conflicts_detected > 0 ? `
                                 <div class="alert alert-warning p-2 mb-0 mt-2">
