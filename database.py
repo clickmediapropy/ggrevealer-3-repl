@@ -61,10 +61,15 @@ CREATE TABLE IF NOT EXISTS screenshot_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
     screenshot_filename TEXT NOT NULL,
-    ocr_success INTEGER DEFAULT 0,
-    ocr_error TEXT,
-    ocr_data TEXT,
+    ocr1_success INTEGER DEFAULT 0,
+    ocr1_hand_id TEXT,
+    ocr1_error TEXT,
+    ocr1_retry_count INTEGER DEFAULT 0,
+    ocr2_success INTEGER DEFAULT 0,
+    ocr2_data TEXT,
+    ocr2_error TEXT,
     matches_found INTEGER DEFAULT 0,
+    discard_reason TEXT,
     unmapped_players TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -111,11 +116,11 @@ def init_db():
     """Initialize database with schema"""
     with get_db() as conn:
         conn.executescript(SCHEMA)
-        
+
         # Migration: Add new columns if they don't exist
         cursor = conn.execute("PRAGMA table_info(jobs)")
         columns = [row[1] for row in cursor.fetchall()]
-        
+
         migrations = []
         if 'started_at' not in columns:
             migrations.append("ALTER TABLE jobs ADD COLUMN started_at TEXT")
@@ -131,11 +136,110 @@ def init_db():
             migrations.append("ALTER TABLE jobs ADD COLUMN ocr_processed_count INTEGER DEFAULT 0")
         if 'ocr_total_count' not in columns:
             migrations.append("ALTER TABLE jobs ADD COLUMN ocr_total_count INTEGER DEFAULT 0")
-        
+
         for migration in migrations:
             conn.execute(migration)
-            
+
+        # NEW: Dual OCR migrations for screenshot_results
+        cursor = conn.execute("PRAGMA table_info(screenshot_results)")
+        ss_columns = [row[1] for row in cursor.fetchall()]
+
+        dual_ocr_migrations = []
+
+        # Drop old columns if they exist
+        if 'ocr_success' in ss_columns:
+            # SQLite doesn't support DROP COLUMN directly, need to recreate table
+            dual_ocr_migrations.append("DROP_OLD_COLUMNS")
+
+        # Add new columns if not exist
+        if 'ocr1_success' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_success INTEGER DEFAULT 0"
+            )
+        if 'ocr1_hand_id' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_hand_id TEXT"
+            )
+        if 'ocr1_error' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_error TEXT"
+            )
+        if 'ocr1_retry_count' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr1_retry_count INTEGER DEFAULT 0"
+            )
+        if 'ocr2_success' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr2_success INTEGER DEFAULT 0"
+            )
+        if 'ocr2_data' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr2_data TEXT"
+            )
+        if 'ocr2_error' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN ocr2_error TEXT"
+            )
+        if 'discard_reason' not in ss_columns:
+            dual_ocr_migrations.append(
+                "ALTER TABLE screenshot_results ADD COLUMN discard_reason TEXT"
+            )
+
+        # Execute migrations
+        for migration in dual_ocr_migrations:
+            if migration == "DROP_OLD_COLUMNS":
+                # Recreate table without old columns
+                _recreate_screenshot_results_table(conn)
+            else:
+                conn.execute(migration)
+
+        if dual_ocr_migrations:
+            print(f"✅ Applied {len(dual_ocr_migrations)} dual OCR migrations")
+
     print("✅ Database initialized")
+
+
+def _recreate_screenshot_results_table(conn):
+    """Recreate screenshot_results table without old columns"""
+    # Get all data
+    rows = conn.execute("SELECT * FROM screenshot_results").fetchall()
+
+    # Drop old table
+    conn.execute("DROP TABLE screenshot_results")
+
+    # Create new table with new schema (will be created by SCHEMA)
+    conn.executescript("""
+        CREATE TABLE screenshot_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER NOT NULL,
+            screenshot_filename TEXT NOT NULL,
+            ocr1_success INTEGER DEFAULT 0,
+            ocr1_hand_id TEXT,
+            ocr1_error TEXT,
+            ocr1_retry_count INTEGER DEFAULT 0,
+            ocr2_success INTEGER DEFAULT 0,
+            ocr2_data TEXT,
+            ocr2_error TEXT,
+            matches_found INTEGER DEFAULT 0,
+            discard_reason TEXT,
+            unmapped_players TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+        );
+    """)
+
+    # Migrate data (map old columns to new where possible)
+    for row in rows:
+        conn.execute("""
+            INSERT INTO screenshot_results
+            (id, job_id, screenshot_filename, matches_found, unmapped_players, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            row['id'], row['job_id'], row['screenshot_filename'],
+            row.get('matches_found', 0), row.get('unmapped_players'),
+            row['status'], row['created_at']
+        ))
 
 
 # ============================================================================
@@ -499,3 +603,59 @@ def clear_job_results(job_id: int):
                 status = 'pending'
             WHERE id = ?
         """, (job_id,))
+
+
+# ============================================================================
+# DUAL OCR OPERATIONS
+# ============================================================================
+
+def save_ocr1_result(job_id: int, screenshot_filename: str,
+                     success: bool, hand_id: str = None, error: str = None,
+                     retry_count: int = 0):
+    """Save first OCR (Hand ID extraction) result"""
+    with get_db() as conn:
+        # Check if entry exists
+        existing = conn.execute(
+            "SELECT id FROM screenshot_results WHERE job_id = ? AND screenshot_filename = ?",
+            (job_id, screenshot_filename)
+        ).fetchone()
+
+        if existing:
+            # Update existing
+            conn.execute("""
+                UPDATE screenshot_results
+                SET ocr1_success = ?, ocr1_hand_id = ?, ocr1_error = ?,
+                    ocr1_retry_count = ?, status = ?
+                WHERE id = ?
+            """, (int(success), hand_id, error, retry_count, 'ocr1_completed', existing['id']))
+        else:
+            # Insert new
+            conn.execute("""
+                INSERT INTO screenshot_results
+                (job_id, screenshot_filename, ocr1_success, ocr1_hand_id, ocr1_error,
+                 ocr1_retry_count, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (job_id, screenshot_filename, int(success), hand_id, error,
+                  retry_count, 'ocr1_completed', datetime.utcnow().isoformat()))
+
+
+def save_ocr2_result(job_id: int, screenshot_filename: str,
+                     success: bool, ocr_data: dict = None, error: str = None):
+    """Save second OCR (player details) result"""
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE screenshot_results
+            SET ocr2_success = ?, ocr2_data = ?, ocr2_error = ?, status = ?
+            WHERE job_id = ? AND screenshot_filename = ?
+        """, (int(success), json.dumps(ocr_data) if ocr_data else None,
+              error, 'ocr2_completed', job_id, screenshot_filename))
+
+
+def mark_screenshot_discarded(job_id: int, screenshot_filename: str, reason: str):
+    """Mark screenshot as discarded after retry failures"""
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE screenshot_results
+            SET discard_reason = ?, status = ?
+            WHERE job_id = ? AND screenshot_filename = ?
+        """, (reason, 'discarded', job_id, screenshot_filename))
