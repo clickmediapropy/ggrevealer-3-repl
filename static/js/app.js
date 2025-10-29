@@ -648,7 +648,7 @@ async function loadScreenshotDetails(jobId, stats) {
                               ss.status === 'warning' ? 'exclamation-triangle text-warning' :
                               'x-circle text-danger';
             const statusText = ss.status === 'success' ? 'Éxito' :
-                              ss.status === 'warning' ? 'Sin matches' :
+                              ss.status === 'warning' ? 'Sin coincidencias' :
                               'Error OCR';
             
             return `
@@ -658,7 +658,7 @@ async function loadScreenshotDetails(jobId, stats) {
                             <div>
                                 <i class="bi bi-${statusIcon}"></i>
                                 <strong>${ss.screenshot_filename}</strong>
-                                <span class="badge bg-secondary ms-2">${ss.matches_found} matches</span>
+                                <span class="badge bg-secondary ms-2">${ss.matches_found} coincidencias</span>
                             </div>
                             <small class="text-muted">${statusText}</small>
                         </div>
@@ -782,19 +782,19 @@ function displayDetailedMetrics(metrics) {
             <div class="metric-breakdown">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-success">
-                        <i class="bi bi-check-circle-fill"></i> Fully Mapped
+                        <i class="bi bi-check-circle-fill"></i> Completamente Mapeado
                     </small>
                     <small><strong>${hands.fully_mapped || 0}</strong> (${hands.coverage_percentage || 0}%)</small>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-warning">
-                        <i class="bi bi-exclamation-circle-fill"></i> Partially Mapped
+                        <i class="bi bi-exclamation-circle-fill"></i> Parcialmente Mapeado
                     </small>
                     <small>${hands.partially_mapped || 0}</small>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-danger">
-                        <i class="bi bi-x-circle-fill"></i> No Mappings
+                        <i class="bi bi-x-circle-fill"></i> Sin Mapeos
                     </small>
                     <small>${hands.no_mappings || 0}</small>
                 </div>
@@ -808,7 +808,7 @@ function displayDetailedMetrics(metrics) {
         const players = metrics.players;
         const playerMetricsHTML = `
             <div class="metric-item">
-                <div class="metric-label">Total Unique</div>
+                <div class="metric-label">Total Únicos</div>
                 <div class="metric-value">${players.total_unique || 0}</div>
             </div>
             <div class="progress mb-2" style="height: 8px;">
@@ -817,19 +817,19 @@ function displayDetailedMetrics(metrics) {
             <div class="metric-breakdown">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-success">
-                        <i class="bi bi-check-circle-fill"></i> Mapped
+                        <i class="bi bi-check-circle-fill"></i> Mapeados
                     </small>
                     <small><strong>${players.mapped || 0}</strong> (${players.mapping_rate || 0}%)</small>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-danger">
-                        <i class="bi bi-x-circle-fill"></i> Unmapped
+                        <i class="bi bi-x-circle-fill"></i> Sin Mapear
                     </small>
                     <small>${players.unmapped || 0}</small>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-muted">
-                        <i class="bi bi-graph-up"></i> Avg per Table
+                        <i class="bi bi-graph-up"></i> Promedio por Mesa
                     </small>
                     <small>${players.average_per_table || 0}</small>
                 </div>
@@ -843,7 +843,7 @@ function displayDetailedMetrics(metrics) {
         const tables = metrics.tables;
         const tableMetricsHTML = `
             <div class="metric-item">
-                <div class="metric-label">Total Tables</div>
+                <div class="metric-label">Total de Mesas</div>
                 <div class="metric-value">${tables.total || 0}</div>
             </div>
             <div class="progress mb-2" style="height: 8px;">
@@ -852,19 +852,19 @@ function displayDetailedMetrics(metrics) {
             <div class="metric-breakdown">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-success">
-                        <i class="bi bi-check-circle-fill"></i> Fully Resolved
+                        <i class="bi bi-check-circle-fill"></i> Completamente Resuelto
                     </small>
                     <small><strong>${tables.fully_resolved || 0}</strong> (${tables.resolution_rate || 0}%)</small>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-warning">
-                        <i class="bi bi-exclamation-circle-fill"></i> Partially Resolved
+                        <i class="bi bi-exclamation-circle-fill"></i> Parcialmente Resuelto
                     </small>
                     <small>${tables.partially_resolved || 0}</small>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-danger">
-                        <i class="bi bi-x-circle-fill"></i> Failed
+                        <i class="bi bi-x-circle-fill"></i> Fallidos
                     </small>
                     <small>${tables.failed || 0}</small>
                 </div>
@@ -878,44 +878,44 @@ function displayDetailedMetrics(metrics) {
         const screenshots = metrics.screenshots;
         const screenshotMetricsHTML = `
             <div class="metric-item mb-2">
-                <div class="metric-label">Total Screenshots</div>
+                <div class="metric-label">Total de Screenshots</div>
                 <div class="metric-value">${screenshots.total || 0}</div>
             </div>
             <div class="metric-breakdown">
                 <div class="mb-2">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="text-primary">OCR1 Success</small>
+                        <small class="text-primary">Éxito OCR1</small>
                         <small><strong>${screenshots.ocr1_success || 0}/${screenshots.total || 0}</strong></small>
                     </div>
                     <div class="progress" style="height: 6px;">
                         <div class="progress-bar bg-primary" style="width: ${screenshots.ocr1_success_rate || 0}%"></div>
                     </div>
-                    <small class="text-muted">${screenshots.ocr1_success_rate || 0}% success rate</small>
+                    <small class="text-muted">${screenshots.ocr1_success_rate || 0}% tasa de éxito</small>
                 </div>
                 <div class="mb-2">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="text-info">OCR2 Success</small>
+                        <small class="text-info">Éxito OCR2</small>
                         <small><strong>${screenshots.ocr2_success || 0}/${screenshots.ocr1_success || 0}</strong></small>
                     </div>
                     <div class="progress" style="height: 6px;">
                         <div class="progress-bar bg-info" style="width: ${screenshots.ocr2_success_rate || 0}%"></div>
                     </div>
-                    <small class="text-muted">${screenshots.ocr2_success_rate || 0}% success rate</small>
+                    <small class="text-muted">${screenshots.ocr2_success_rate || 0}% tasa de éxito</small>
                 </div>
                 <div>
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="text-success">Matched</small>
+                        <small class="text-success">Coincidencias</small>
                         <small><strong>${screenshots.matched || 0}/${screenshots.total || 0}</strong></small>
                     </div>
                     <div class="progress" style="height: 6px;">
                         <div class="progress-bar bg-success" style="width: ${screenshots.match_rate || 0}%"></div>
                     </div>
-                    <small class="text-muted">${screenshots.match_rate || 0}% match rate</small>
+                    <small class="text-muted">${screenshots.match_rate || 0}% tasa de coincidencias</small>
                 </div>
                 ${screenshots.discarded > 0 ? `
                     <div class="mt-2">
                         <small class="text-warning">
-                            <i class="bi bi-exclamation-triangle-fill"></i> ${screenshots.discarded} discarded
+                            <i class="bi bi-exclamation-triangle-fill"></i> ${screenshots.discarded} descartados
                         </small>
                     </div>
                 ` : ''}
@@ -933,13 +933,13 @@ function displayDetailedMetrics(metrics) {
 
         const mappingMetricsHTML = `
             <div class="metric-item">
-                <div class="metric-label">Total Mappings</div>
+                <div class="metric-label">Total de Mapeos</div>
                 <div class="metric-value">${totalMappings}</div>
             </div>
             <div class="metric-breakdown">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <small class="text-success">
-                        <i class="bi bi-bookmark-check-fill"></i> Role-Based
+                        <i class="bi bi-bookmark-check-fill"></i> Basado en Roles
                     </small>
                     <small><strong>${mappings.role_based || 0}</strong> (${roleBasedPct}%)</small>
                 </div>
@@ -948,7 +948,7 @@ function displayDetailedMetrics(metrics) {
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <small class="text-info">
-                        <i class="bi bi-arrow-clockwise"></i> Counter-Clockwise
+                        <i class="bi bi-arrow-clockwise"></i> Sentido Antihorario
                     </small>
                     <small><strong>${mappings.counter_clockwise || 0}</strong> (${counterClockwisePct}%)</small>
                 </div>
@@ -959,7 +959,7 @@ function displayDetailedMetrics(metrics) {
                     <div class="alert alert-warning p-2 mb-0 mt-2">
                         <small>
                             <i class="bi bi-exclamation-triangle-fill"></i>
-                            ${mappings.conflicts_detected} conflicts detected
+                            ${mappings.conflicts_detected} conflictos detectados
                         </small>
                     </div>
                 ` : ''}
@@ -1115,10 +1115,14 @@ async function generateErrorPrompt(jobId, errorMessage) {
             copyBtn.disabled = false;
             // Store prompt text in button's data attribute for reliable access
             copyBtn.setAttribute('data-prompt-text', prompt);
+            // Remove any existing event listeners to avoid duplicates
+            copyBtn.onclick = null;
             copyBtn.onclick = function() {
                 const textToCopy = this.getAttribute('data-prompt-text');
+                console.log('Copy button clicked, text length:', textToCopy ? textToCopy.length : 0);
                 copyToClipboard(textToCopy, this);
             };
+            console.log('Copy button configured for error prompt');
         }
 
         // Setup regenerate button
@@ -1218,10 +1222,14 @@ async function generatePartialErrorPrompt(jobId) {
             copyBtn.disabled = false;
             // Store prompt text in button's data attribute for reliable access
             copyBtn.setAttribute('data-prompt-text', prompt);
+            // Remove any existing event listeners to avoid duplicates
+            copyBtn.onclick = null;
             copyBtn.onclick = function() {
                 const textToCopy = this.getAttribute('data-prompt-text');
+                console.log('Copy button clicked, text length:', textToCopy ? textToCopy.length : 0);
                 copyToClipboard(textToCopy, this);
             };
+            console.log('Copy button configured for partial error prompt');
         }
 
         // Setup regenerate button
@@ -1560,23 +1568,82 @@ function renderLogs(logs, levelFilter = '') {
     logsContainer.scrollTop = logsContainer.scrollHeight;
 }
 
-function copyToClipboard(text, button) {
-    navigator.clipboard.writeText(text).then(() => {
-        // Show success feedback
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<i class="bi bi-check-circle"></i> Copiado';
-        button.classList.remove('btn-outline-dark', 'btn-outline-primary');
-        button.classList.add('btn-success');
+async function copyToClipboard(text, button) {
+    // Validate inputs
+    if (!text || text.trim() === '') {
+        console.error('No text to copy');
+        showCopyError(button, 'No hay texto para copiar');
+        return;
+    }
 
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.classList.remove('btn-success');
-            button.classList.add('btn-outline-dark');
-        }, 2000);
-    }).catch(err => {
+    if (!button) {
+        console.error('No button element provided');
+        return;
+    }
+
+    try {
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+
+            if (!successful) {
+                throw new Error('Fallback copy method failed');
+            }
+        }
+
+        // Show success feedback
+        showCopySuccess(button);
+
+    } catch (err) {
         console.error('Error copying to clipboard:', err);
-        alert('Error al copiar al portapapeles');
-    });
+        showCopyError(button, 'Error al copiar');
+    }
+}
+
+function showCopySuccess(button) {
+    const originalHTML = button.innerHTML;
+    const originalClasses = button.className;
+
+    // Change to success state
+    button.innerHTML = '<i class="bi bi-check-circle"></i> ¡Copiado!';
+    button.className = button.className.replace('btn-outline-dark', 'btn-success').replace('btn-outline-primary', 'btn-success');
+
+    // Reset after 2 seconds
+    setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.className = originalClasses;
+    }, 2000);
+}
+
+function showCopyError(button, message) {
+    const originalHTML = button.innerHTML;
+    const originalClasses = button.className;
+
+    // Change to error state
+    button.innerHTML = '<i class="bi bi-x-circle"></i> Error';
+    button.className = button.className.replace('btn-outline-dark', 'btn-danger').replace('btn-outline-primary', 'btn-danger');
+
+    // Show alert with error message
+    alert(message || 'Error al copiar al portapapeles');
+
+    // Reset after 3 seconds
+    setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.className = originalClasses;
+    }, 3000);
 }
 
 async function exportDebugData(jobId, debugData) {
@@ -1958,7 +2025,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="mb-2"><strong>Archivos TXT:</strong> ${data.txt_files_count || 0}</div>
                         <div class="mb-2"><strong>Screenshots:</strong> ${data.screenshot_files_count || 0}</div>
                         ${data.created_at ? `<div class="mb-2"><strong>Creado:</strong> ${new Date(data.created_at).toLocaleString('es-ES')}</div>` : ''}
-                        ${data.match_rate !== null && data.match_rate !== undefined ? `<div class="mb-2"><strong>Match Rate:</strong> ${(data.match_rate * 100).toFixed(1)}%</div>` : ''}
+                        ${data.match_rate !== null && data.match_rate !== undefined ? `<div class="mb-2"><strong>Tasa de Coincidencias:</strong> ${(data.match_rate * 100).toFixed(1)}%</div>` : ''}
                     `;
 
                     modalJobInfo.classList.remove('d-none');
