@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import List, Optional
 import shutil
 
-from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result
+from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded
 from parser import GGPokerParser
-from ocr import ocr_screenshot, ocr_hand_id
+from ocr import ocr_screenshot, ocr_hand_id, ocr_player_details
 from matcher import find_best_matches
 from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format
 from models import NameMapping
@@ -1394,159 +1394,167 @@ def run_processing_pipeline(job_id: int):
         # Set total count for progress tracking
         set_ocr_total_count(job_id, len(screenshot_files))
 
-        # Step 4: Process screenshots with OCR
-        logger.info(f"🔍 Starting OCR processing for {len(screenshot_files)} screenshots",
+        # Step 4: Dual OCR - Phase 1 (Hand ID Extraction)
+        logger.info(f"🔍 Phase 1: OCR1 - Extracting Hand IDs from {len(screenshot_files)} screenshots",
                    screenshot_count=len(screenshot_files),
                    max_concurrent=10)
         step_start = time.time()
 
-        # Process screenshots in parallel with semaphore to limit concurrency
-        semaphore = asyncio.Semaphore(10)  # Max 10 concurrent requests
+        # Get API key
+        api_key = os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
 
-        async def process_single_screenshot(screenshot_file):
-            """Process one screenshot and update progress, save results"""
-            filename = screenshot_file['filename']
-            ocr_success = False
-            ocr_error = None
-            ocr_data = None
-            status = "error"
-            
-            ocr_start = time.time()
-            try:
-                result = await ocr_screenshot(
-                    screenshot_file['file_path'],
-                    filename,
-                    semaphore
+        # Semaphore for concurrent OCR (max 10 concurrent)
+        semaphore = asyncio.Semaphore(10)
+
+        # OCR1: Extract Hand IDs from ALL screenshots
+        ocr1_results = {}  # {screenshot_filename: (success, hand_id, error)}
+
+        async def process_ocr1(screenshot_file):
+            """Run OCR1 (Hand ID extraction) with retry"""
+            async with semaphore:
+                screenshot_filename = screenshot_file['filename']
+                screenshot_path = screenshot_file['file_path']
+
+                success, hand_id, error = await ocr_hand_id_with_retry(
+                    screenshot_path, screenshot_filename, job_id, api_key, logger
                 )
-                ocr_success = True
-                ocr_data = result
-                status = "success"
-
-                ocr_duration = int((time.time() - ocr_start) * 1000)
-                logger.debug(f"✅ OCR successful: {filename}",
-                           filename=filename,
-                           hand_id=result.hand_id if result else None,
-                           duration_ms=ocr_duration)
-
-                # Save initial screenshot result (matches will be updated later)
-                # Convert ScreenshotAnalysis dataclass to dict for JSON serialization
-                save_screenshot_result(
-                    job_id=job_id,
-                    screenshot_filename=filename,
-                    ocr_success=True,
-                    ocr_data=asdict(result),  # Convert dataclass to dict
-                    matches_found=0,  # Will be updated after matching
-                    status="pending_match"
-                )
-
+                ocr1_results[screenshot_filename] = (success, hand_id, error)
                 increment_ocr_processed_count(job_id)
-                return result
+                return success
 
-            except Exception as e:
-                ocr_error = str(e)
-                status = "error"
-                ocr_duration = int((time.time() - ocr_start) * 1000)
-
-                logger.error(f"❌ OCR failed: {filename}",
-                           filename=filename,
-                           error=ocr_error,
-                           duration_ms=ocr_duration)
-
-                # Save failed screenshot result
-                save_screenshot_result(
-                    job_id=job_id,
-                    screenshot_filename=filename,
-                    ocr_success=False,
-                    ocr_error=ocr_error,
-                    matches_found=0,
-                    status="error"
-                )
-
-                increment_ocr_processed_count(job_id)
-                return None
-        
-        async def process_all_screenshots():
-            tasks = [
-                process_single_screenshot(screenshot_file)
-                for screenshot_file in screenshot_files
-            ]
+        async def process_all_ocr1():
+            tasks = [process_ocr1(sf) for sf in screenshot_files]
             return await asyncio.gather(*tasks)
-        
-        ocr_results_raw = asyncio.run(process_all_screenshots())
-        ocr_results = [r for r in ocr_results_raw if r is not None]
 
-        ocr_duration = int((time.time() - step_start) * 1000)
-        logger.info(f"✅ OCR completed: {len(ocr_results)}/{len(screenshot_files)} screenshots analyzed",
-                   success_count=len(ocr_results),
+        asyncio.run(process_all_ocr1())
+
+        ocr1_success_count = sum(1 for s, _, _ in ocr1_results.values() if s)
+        ocr1_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ OCR1 completed: {ocr1_success_count}/{len(screenshot_files)} successful",
+                   success_count=ocr1_success_count,
                    total_count=len(screenshot_files),
-                   failed_count=len(screenshot_files) - len(ocr_results),
-                   duration_ms=ocr_duration)
+                   failed_count=len(screenshot_files) - ocr1_success_count,
+                   duration_ms=ocr1_duration)
 
-        if len(ocr_results) == 0:
-            logger.error("❌ No screenshots could be analyzed")
-            raise Exception("No screenshots could be analyzed")
-
-        # Step 5: Match hands with screenshots
+        # Step 5: Match by Hand ID
+        logger.info("🔗 Phase 2: Matching screenshots to hands by Hand ID")
         step_start = time.time()
-        logger.info(f"🔗 Starting hand matching (threshold: 50)",
-                   hands_count=len(all_hands),
-                   screenshots_count=len(ocr_results))
 
-        matches = find_best_matches(all_hands, ocr_results, confidence_threshold=50)
+        matched_screenshots = {}  # {screenshot_filename: hand}
+        unmatched_screenshots = []
+
+        for screenshot_filename, (success, hand_id, error) in ocr1_results.items():
+            if not success:
+                unmatched_screenshots.append((screenshot_filename, error))
+                continue
+
+            # Find hand with matching Hand ID (use fuzzy matching)
+            matched_hand = None
+            for hand in all_hands:
+                if _normalize_hand_id(hand.hand_id) == _normalize_hand_id(hand_id):
+                    matched_hand = hand
+                    break
+
+            if matched_hand:
+                matched_screenshots[screenshot_filename] = matched_hand
+                logger.debug(f"✅ Matched: {screenshot_filename} → Hand {hand_id}",
+                           screenshot=screenshot_filename,
+                           hand_id=hand_id)
+            else:
+                unmatched_screenshots.append((screenshot_filename, f"No hand found for Hand ID {hand_id}"))
+                logger.warning(f"⚠️  No match: {screenshot_filename} (Hand ID: {hand_id})",
+                             screenshot=screenshot_filename,
+                             hand_id=hand_id)
 
         match_duration = int((time.time() - step_start) * 1000)
-        logger.info(f"✅ Found {len(matches)} matches",
-                   matches_count=len(matches),
-                   hands_count=len(all_hands),
-                   match_rate=round(len(matches) / len(all_hands) * 100, 1) if len(all_hands) > 0 else 0,
+        logger.info(f"✅ Matched {len(matched_screenshots)}/{len(screenshot_files)} screenshots",
+                   matched_count=len(matched_screenshots),
+                   total_count=len(screenshot_files),
+                   unmatched_count=len(unmatched_screenshots),
                    duration_ms=match_duration)
-        
-        # Track matches per screenshot
-        screenshot_match_count = {}
-        for match in matches:
-            screenshot_name = match.screenshot_id  # Use screenshot_id from HandMatch
-            screenshot_match_count[screenshot_name] = screenshot_match_count.get(screenshot_name, 0) + 1
-        
-        # Update screenshot results with match counts
-        for ocr_result in ocr_results:
-            screenshot_name = ocr_result.screenshot_id  # Use screenshot_id from ScreenshotAnalysis dataclass
-            match_count = screenshot_match_count.get(screenshot_name, 0)
-            status = "success" if match_count > 0 else "warning"
+
+        # Step 6: Discard unmatched screenshots
+        logger.info(f"🗑️  Phase 3: Discarding {len(unmatched_screenshots)} unmatched screenshots")
+        step_start = time.time()
+
+        for screenshot_filename, reason in unmatched_screenshots:
+            mark_screenshot_discarded(job_id, screenshot_filename, reason)
+            logger.warning(f"Discarded: {screenshot_filename} - {reason}",
+                         screenshot=screenshot_filename,
+                         reason=reason)
+
+        discard_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ Discarded {len(unmatched_screenshots)} screenshots",
+                   discarded_count=len(unmatched_screenshots),
+                   duration_ms=discard_duration)
+
+        # Step 7: OCR2 - Extract player details from MATCHED screenshots only
+        logger.info(f"🔍 Phase 4: OCR2 - Extracting player details from {len(matched_screenshots)} matched screenshots")
+        step_start = time.time()
+
+        ocr2_results = {}  # {screenshot_filename: (success, ocr_data, error)}
+
+        async def process_ocr2(screenshot_file, screenshot_filename):
+            """Run OCR2 (player details extraction)"""
+            async with semaphore:
+                screenshot_path = screenshot_file['file_path']
+
+                success, ocr_data, error = await ocr_player_details(screenshot_path, api_key)
+                save_ocr2_result(job_id, screenshot_filename, success, ocr_data, error)
+                ocr2_results[screenshot_filename] = (success, ocr_data, error)
+
+                if success:
+                    logger.debug(f"✅ OCR2 successful: {screenshot_filename}",
+                               screenshot=screenshot_filename,
+                               players_count=len(ocr_data.get('players', [])))
+                else:
+                    logger.error(f"❌ OCR2 failed: {screenshot_filename}",
+                               screenshot=screenshot_filename,
+                               error=error)
+
+                return success
+
+        async def process_all_ocr2():
+            tasks = []
+            for screenshot_file in screenshot_files:
+                screenshot_filename = screenshot_file['filename']
+                if screenshot_filename in matched_screenshots:
+                    tasks.append(process_ocr2(screenshot_file, screenshot_filename))
+            return await asyncio.gather(*tasks)
+
+        asyncio.run(process_all_ocr2())
+
+        ocr2_success_count = sum(1 for s, _, _ in ocr2_results.values() if s)
+        ocr2_duration = int((time.time() - step_start) * 1000)
+        logger.info(f"✅ OCR2 completed: {ocr2_success_count}/{len(matched_screenshots)} successful",
+                   success_count=ocr2_success_count,
+                   total_count=len(matched_screenshots),
+                   failed_count=len(matched_screenshots) - ocr2_success_count,
+                   duration_ms=ocr2_duration)
+
+        # Step 8: Generate name mappings (Phase 2 - Tasks 8-9)
+        # NOTE: This section will be replaced with table-wide mapping in Tasks 8-9
+        # For now, we just create empty mappings since OCR2 data is collected but not yet used
+        logger.warning("⚠️  Phase 2 not yet implemented - OCR2 data collected but not used for mapping")
+        logger.warning("⚠️  Name mappings generation skipped - waiting for Tasks 8-9 implementation")
+
+        step_start = time.time()
+        name_mappings = []
+        matched_hands = []
+
+        # Update screenshot results with match counts (1 match per matched screenshot)
+        for screenshot_filename in matched_screenshots.keys():
             update_screenshot_result_matches(
                 job_id=job_id,
-                screenshot_filename=screenshot_name,
-                matches_found=match_count,
-                status=status
+                screenshot_filename=screenshot_filename,
+                matches_found=1,
+                status="success"
             )
-        
-        # Step 6: Generate name mappings
-        step_start = time.time()
-        logger.info("🏷️  Generating name mappings from matches")
-
-        name_mappings = []
-        matched_hand_ids = set()
-
-        for match in matches:
-            matched_hand_ids.add(match.hand_id)
-            if match.auto_mapping:
-                for anon_id, real_name in match.auto_mapping.items():
-                    existing = next((m for m in name_mappings if m.anonymized_identifier == anon_id), None)
-                    if not existing:
-                        name_mappings.append(NameMapping(
-                            anonymized_identifier=anon_id,
-                            resolved_name=real_name,
-                            source='auto-match',
-                            confidence=match.confidence,
-                            locked=False
-                        ))
 
         mapping_duration = int((time.time() - step_start) * 1000)
-        logger.info(f"✅ Generated {len(name_mappings)} name mappings",
+        logger.info(f"⚠️  Generated {len(name_mappings)} name mappings (Tasks 8-9 not implemented yet)",
                    mappings_count=len(name_mappings),
-                   unique_players=len(set(m.resolved_name for m in name_mappings)),
                    duration_ms=mapping_duration)
-
-        matched_hands = [hand for hand in all_hands if hand.hand_id in matched_hand_ids]
 
         # Step 7: Generate output files
         step_start = time.time()
@@ -1762,6 +1770,22 @@ def run_processing_pipeline(job_id: int):
                 print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
         except Exception as e:
             logger.warning(f"Failed to export debug JSON: {str(e)}")
+
+
+def _normalize_hand_id(hand_id: str) -> str:
+    """
+    Normalize Hand ID for fuzzy matching (remove prefixes)
+
+    Args:
+        hand_id: Original Hand ID (e.g., "SG3247423387", "RC1234567890")
+
+    Returns:
+        Normalized ID without prefix (e.g., "3247423387", "1234567890")
+    """
+    import re
+    # Remove common prefixes: SG, RC, OM, MT, TT, HD, HH
+    normalized = re.sub(r'^(SG|RC|OM|MT|TT|HD|HH)', '', hand_id, flags=re.IGNORECASE)
+    return normalized.strip()
 
 
 if __name__ == "__main__":
