@@ -377,6 +377,189 @@ def test_build_table_mapping_no_screenshots():
     print("✅ TEST 4 PASSED: No screenshots results in empty mapping")
 
 
+def test_conflict_rejection():
+    """Test that conflicting mappings cause table rejection (Issue #1)"""
+    print("\n=== TEST 5: Conflict rejection (same anon_id → different names) ===")
+
+    # Create hand with player abc123
+    hand = ParsedHand(
+        hand_id="RC5001",
+        timestamp=datetime.now(),
+        game_type="Hold'em No Limit",
+        stakes="$0.10/$0.20",
+        table_format="3-max",
+        button_seat=3,
+        seats=[
+            Seat(seat_number=1, player_id="abc123", stack=100.0, position="SB"),
+            Seat(seat_number=2, player_id="def456", stack=200.0, position="BB"),
+            Seat(seat_number=3, player_id="Hero", stack=150.0, position="BTN")
+        ],
+        board_cards=BoardCards(),
+        actions=[],
+        raw_text="""Table 'ConflictTable' 3-max Seat #3 is the button
+abc123: posts small blind $0.10
+def456: posts big blind $0.20
+"""
+    )
+
+    # Create two screenshots with CONFLICTING mappings for abc123
+    matched_screenshots = {
+        "screenshot_conflict_A.png": hand,
+        "screenshot_conflict_B.png": hand
+    }
+
+    ocr2_results = {
+        "screenshot_conflict_A.png": (
+            True,
+            {
+                'hand_id': 'RC5001',
+                'dealer_player': 'RealHero',
+                'small_blind_player': 'Alice',  # abc123 → Alice
+                'big_blind_player': 'Bob',
+                'players': [
+                    {'name': 'Alice', 'stack': 100.0, 'position': 2},
+                    {'name': 'Bob', 'stack': 200.0, 'position': 3},
+                    {'name': 'RealHero', 'stack': 150.0, 'position': 1}
+                ]
+            },
+            None
+        ),
+        "screenshot_conflict_B.png": (
+            True,
+            {
+                'hand_id': 'RC5001',
+                'dealer_player': 'RealHero',
+                'small_blind_player': 'Charlie',  # abc123 → Charlie (CONFLICT!)
+                'big_blind_player': 'Bob',
+                'players': [
+                    {'name': 'Charlie', 'stack': 100.0, 'position': 2},  # Different name!
+                    {'name': 'Bob', 'stack': 200.0, 'position': 3},
+                    {'name': 'RealHero', 'stack': 150.0, 'position': 1}
+                ]
+            },
+            None
+        )
+    }
+
+    # Build table mapping
+    logger = MockLogger()
+    mapping = _build_table_mapping(
+        table_name='ConflictTable',
+        hands=[hand],
+        matched_screenshots=matched_screenshots,
+        ocr2_results=ocr2_results,
+        logger=logger
+    )
+
+    print(f"\nMapping result: {mapping}")
+    print(f"Expected: Empty dict (table rejected due to conflict)")
+
+    # Validate - mapping should be EMPTY because of conflict
+    assert len(mapping) == 0, f"Mapping should be empty due to conflict, got {len(mapping)} entries: {mapping}"
+
+    print("✅ TEST 5 PASSED: Conflicting mappings correctly rejected table")
+
+
+def test_unknown_table_matching():
+    """Test that unknown tables match correctly (Issue #2)"""
+    print("\n=== TEST 6: Unknown table matching ===")
+
+    # Create hands with no table name in raw_text (will return "Unknown")
+    hand1 = ParsedHand(
+        hand_id="RC6001",
+        timestamp=datetime.now(),
+        game_type="Hold'em No Limit",
+        stakes="$0.10/$0.20",
+        table_format="3-max",
+        button_seat=3,
+        seats=[
+            Seat(seat_number=1, player_id="player1", stack=100.0, position="SB"),
+            Seat(seat_number=2, player_id="player2", stack=200.0, position="BB"),
+            Seat(seat_number=3, player_id="Hero", stack=150.0, position="BTN")
+        ],
+        board_cards=BoardCards(),
+        actions=[],
+        raw_text="""Poker Hand #RC6001: Hold'em No Limit ($0.10/$0.20)
+Seat 1: player1 (100 in chips)
+Seat 2: player2 (200 in chips)
+Seat 3: Hero (150 in chips)
+player1: posts small blind $0.10
+player2: posts big blind $0.20
+"""
+    )
+
+    hand2 = ParsedHand(
+        hand_id="RC6002",
+        timestamp=datetime.now(),
+        game_type="Hold'em No Limit",
+        stakes="$0.10/$0.20",
+        table_format="3-max",
+        button_seat=1,
+        seats=[
+            Seat(seat_number=1, player_id="player2", stack=190.0, position="BTN"),
+            Seat(seat_number=2, player_id="Hero", stack=160.0, position="SB"),
+            Seat(seat_number=3, player_id="player1", stack=95.0, position="BB")
+        ],
+        board_cards=BoardCards(),
+        actions=[],
+        raw_text="""Poker Hand #RC6002: Hold'em No Limit ($0.10/$0.20)
+Seat 1: player2 (190 in chips)
+Seat 2: Hero (160 in chips)
+Seat 3: player1 (95 in chips)
+Hero: posts small blind $0.10
+player1: posts big blind $0.20
+"""
+    )
+
+    # When grouped, these will become "unknown_table_1" (see _group_hands_by_table)
+    # But extract_table_name() returns "Unknown"
+    # So we need to test the normalized comparison
+
+    # Simulate matched screenshot where hand's table is "Unknown"
+    matched_screenshots = {
+        "screenshot_unknown.png": hand1
+    }
+
+    ocr2_results = {
+        "screenshot_unknown.png": (
+            True,
+            {
+                'hand_id': 'RC6001',
+                'dealer_player': 'RealHero',
+                'small_blind_player': 'Alice',
+                'big_blind_player': 'Bob',
+                'players': [
+                    {'name': 'Alice', 'stack': 100.0, 'position': 2},
+                    {'name': 'Bob', 'stack': 200.0, 'position': 3},
+                    {'name': 'RealHero', 'stack': 150.0, 'position': 1}
+                ]
+            },
+            None
+        )
+    }
+
+    # Build table mapping with "unknown_table_1" as table name
+    logger = MockLogger()
+    mapping = _build_table_mapping(
+        table_name='unknown_table_1',  # This is what _group_hands_by_table creates
+        hands=[hand1, hand2],
+        matched_screenshots=matched_screenshots,
+        ocr2_results=ocr2_results,
+        logger=logger
+    )
+
+    print(f"\nMapping result: {mapping}")
+    print(f"Expected: 3 mappings (Hero, player1, player2)")
+
+    # Validate - should match because normalized comparison
+    assert len(mapping) == 3, f"Should have 3 mappings, got {len(mapping)}: {mapping}"
+    assert 'Hero' in mapping, "Hero should be in mapping"
+    assert 'player1' in mapping, "player1 should be in mapping"
+    assert 'player2' in mapping, "player2 should be in mapping"
+
+    print("✅ TEST 6 PASSED: Unknown tables matched correctly with normalization")
+
+
 if __name__ == "__main__":
     print("=" * 80)
     print("TABLE-WIDE MAPPING TESTS (Task 9)")
@@ -387,6 +570,8 @@ if __name__ == "__main__":
         test_build_table_mapping_single_screenshot()
         test_build_table_mapping_multiple_screenshots()
         test_build_table_mapping_no_screenshots()
+        test_conflict_rejection()
+        test_unknown_table_matching()
 
         print("\n" + "=" * 80)
         print("✅ ALL TESTS PASSED")

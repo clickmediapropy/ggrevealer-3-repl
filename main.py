@@ -1812,6 +1812,28 @@ def run_processing_pipeline(job_id: int):
             logger.warning(f"Failed to export debug JSON: {str(e)}")
 
 
+def _normalize_table_name(table_name: str) -> str:
+    """
+    Normalize table names for comparison.
+    Maps all unknown table variants to 'Unknown' for consistent matching.
+
+    Args:
+        table_name: Original table name (e.g., "Cartney", "Unknown", "unknown_table_1")
+
+    Returns:
+        Normalized table name ("Unknown" for all unknown variants, original name otherwise)
+
+    Example:
+        _normalize_table_name("Unknown") → "Unknown"
+        _normalize_table_name("unknown_table_1") → "Unknown"
+        _normalize_table_name("unknown_table_42") → "Unknown"
+        _normalize_table_name("Cartney") → "Cartney"
+    """
+    if table_name == "Unknown" or table_name.startswith("unknown_table_"):
+        return "Unknown"
+    return table_name
+
+
 def _group_hands_by_table(parsed_hands: List[ParsedHand]) -> dict[str, List[ParsedHand]]:
     """
     Group parsed hands by table name.
@@ -1872,8 +1894,9 @@ def _build_table_mapping(
     # Step 1: Find all screenshots that match ANY hand in this table
     for screenshot_filename, matched_hand in matched_screenshots.items():
         # Check if this screenshot matches a hand from this table
+        # CRITICAL FIX (Issue #2): Use normalized table names for comparison
         hand_table_name = extract_table_name(matched_hand.raw_text)
-        if hand_table_name == table_name:
+        if _normalize_table_name(hand_table_name) == _normalize_table_name(table_name):
             screenshots_for_table.append((screenshot_filename, matched_hand))
 
     logger.info(f"📊 Table '{table_name}': {len(hands)} hands, {len(screenshots_for_table)} matched screenshots",
@@ -1952,6 +1975,16 @@ def _build_table_mapping(
                        conflicting_names=list(unique_names),
                        table=table_name)
             conflicts_found = True
+
+    # CRITICAL FIX (Issue #1): Reject table if conflicts exist
+    if conflicts_found:
+        conflict_count = sum(1 for names in conflict_tracker.values() if len(set(names)) > 1)
+        logger.error(
+            f"❌ Table '{table_name}': REJECTED due to mapping conflicts",
+            table=table_name,
+            conflict_count=conflict_count
+        )
+        return {}  # Return empty mapping to fail the table
 
     # Step 5: Calculate statistics
     unique_players = set()
