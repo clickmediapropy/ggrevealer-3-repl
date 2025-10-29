@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 -- App config table (cost tracking and budget management)
 CREATE TABLE IF NOT EXISTS app_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    monthly_budget REAL DEFAULT 50.0,
+    monthly_budget REAL DEFAULT 200.0,
     budget_reset_day INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -784,7 +784,7 @@ def get_budget_summary() -> Dict:
 
     if not config:
         # Default values if no config exists
-        monthly_budget = 50.0
+        monthly_budget = 200.0
         budget_reset_day = 1
     else:
         monthly_budget = config['monthly_budget']
