@@ -77,6 +77,13 @@ function renderTxtFiles() {
         });
         txtFilesList.appendChild(div);
     });
+
+    // Update counter badge
+    const txtCountBadge = document.getElementById('txt-count-badge');
+    if (txtCountBadge) {
+        const count = txtFiles.length;
+        txtCountBadge.textContent = count === 1 ? '1 archivo' : `${count} archivos`;
+    }
 }
 
 screenshotDropzone.addEventListener('click', () => screenshotInput.click());
@@ -126,6 +133,13 @@ function renderScreenshotFiles() {
         });
         screenshotFilesList.appendChild(div);
     });
+
+    // Update counter badge
+    const screenshotCountBadge = document.getElementById('screenshot-count-badge');
+    if (screenshotCountBadge) {
+        const count = screenshotFiles.length;
+        screenshotCountBadge.textContent = count === 1 ? '1 archivo' : `${count} archivos`;
+    }
 }
 
 function updateUploadButton() {
@@ -335,6 +349,13 @@ function updateProcessingUI(job) {
             statsContainer.outerHTML = statsHTML;
         }
     }
+}
+
+function hideAllSections() {
+    welcomeSection.classList.add('d-none');
+    processingSection.classList.add('d-none');
+    resultsSection.classList.add('d-none');
+    errorSection.classList.add('d-none');
 }
 
 function showProcessing() {
@@ -1271,9 +1292,13 @@ function formatStatus(status) {
 async function loadRecentJobs() {
     try {
         const response = await fetch(`${API_BASE}/api/jobs`);
-        const jobs = await response.json();
+        const data = await response.json();
 
         const recentJobsList = document.getElementById('recent-jobs-list');
+        if (!recentJobsList) return;
+
+        // Handle both array and object responses
+        const jobs = Array.isArray(data) ? data : (data.jobs || []);
 
         if (jobs.length === 0) {
             recentJobsList.innerHTML = '<div class="text-muted small text-center py-2">No hay jobs</div>';
