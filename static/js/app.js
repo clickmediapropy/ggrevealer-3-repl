@@ -636,6 +636,51 @@ async function cancelJob() {
     }
 }
 
+// Cancel a specific job by ID (used in job history)
+async function cancelJobById(jobId, buttonElement) {
+    const confirmCancel = confirm('¿Estás seguro de que quieres cancelar este job? Se eliminarán todos los archivos y no se podrá recuperar.');
+    if (!confirmCancel) return;
+
+    // Update button to show loading state
+    const originalHTML = buttonElement.innerHTML;
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Cancelando...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/job/${jobId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al cancelar job');
+        }
+
+        // Show success message
+        alert(`Job #${jobId} cancelado exitosamente`);
+
+        // If this was the current job being viewed, clean up
+        if (currentJobId === jobId) {
+            stopStatusPolling();
+            stopTimer();
+            currentJobId = null;
+            showWelcomeSection();
+            updateSidebarActiveState('nav-new-job');
+        }
+
+        // Reload jobs list
+        loadJobs();
+        loadRecentJobs();
+
+    } catch (error) {
+        console.error('Error canceling job:', error);
+        alert('Error al cancelar el job. Por favor intenta de nuevo.');
+
+        // Restore button state
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = originalHTML;
+    }
+}
+
 async function generateErrorPrompt(jobId, errorMessage) {
     const promptText = document.getElementById('error-prompt-text');
     const copyBtn = document.getElementById('copy-error-prompt-btn');
@@ -914,6 +959,11 @@ function renderJobs(jobs) {
                     ${job.status === 'completed' ? `
                         <button class="btn btn-sm btn-success me-2" onclick="event.stopPropagation(); downloadResult(${job.id})">
                             <i class="bi bi-download"></i> Descargar
+                        </button>
+                    ` : ''}
+                    ${job.status === 'processing' ? `
+                        <button class="btn btn-sm btn-danger me-2" onclick="event.stopPropagation(); cancelJobById(${job.id}, this)">
+                            <i class="bi bi-x-circle"></i> Cancelar
                         </button>
                     ` : ''}
                     <i class="bi bi-chevron-down toggle-icon"></i>
