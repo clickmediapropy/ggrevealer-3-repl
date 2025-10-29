@@ -129,7 +129,7 @@ abc123: posts big blind $0.20
 
 def test_role_based_fallback_to_counter_clockwise():
     """Test fallback when no role indicators available"""
-    print("\n=== TEST 3: Fallback to counter-clockwise (no roles) ===")
+    print("\n=== TEST 3: Fallback to visual position (no roles) ===")
 
     hand = ParsedHand(
         hand_id="SG9876543210",
@@ -176,11 +176,11 @@ uvw456: posts big blind $0.20
 
     print(f"Mapping result: {mapping}")
 
-    # Should use counter-clockwise fallback
+    # Should use visual position fallback
     assert len(mapping) == 3, f"Should have 3 mappings via fallback, got {len(mapping)}"
     assert "Hero" in mapping, "Hero should be mapped via fallback"
 
-    print("✅ TEST 3 PASSED: Fallback to counter-clockwise works")
+    print("✅ TEST 3 PASSED: Fallback to visual position works")
 
 
 def test_duplicate_name_rejection():

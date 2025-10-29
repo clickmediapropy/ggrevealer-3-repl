@@ -680,7 +680,7 @@ def _analyze_debug_data(debug_json_path: str) -> dict:
         analysis['patterns_detected'].append({
             "pattern": "HERO_POSITION_NULL",
             "description": f"{hero_position_issues}/{total_screenshots} screenshots sin hero_position",
-            "impact": "Impide el mapping de jugadores (counter-clockwise algorithm necesita hero_position)",
+            "impact": "Impide el mapping de jugadores (visual position algorithm necesita hero_position)",
             "location": "ocr.py línea 46-117 (extracción de datos) o matcher.py línea 260 (_build_seat_mapping)"
         })
         analysis['priority_issues'].append({
@@ -2072,13 +2072,13 @@ def _calculate_detailed_metrics(
     # Count total mappings
     total_mappings = sum(len(mapping) for mapping in table_mappings.values())
 
-    # Count role-based vs counter-clockwise mappings
+    # Count role-based vs visual position mappings
     # Note: Current implementation doesn't distinguish between these in the mapping dict
     # Both are stored the same way. We could track this if we added metadata to mappings.
     # For now, we'll use heuristics based on OCR2 data
 
     role_based_count = 0
-    counter_clockwise_count = 0
+    visual_position_count = 0
 
     for screenshot_filename, (success, ocr_data, error) in ocr2_results.items():
         if success and ocr_data:
@@ -2091,8 +2091,8 @@ def _calculate_detailed_metrics(
                 # Estimate: each screenshot contributes ~3 players on average
                 role_based_count += len(ocr_data.get('players', []))
             else:
-                # Fallback to counter-clockwise
-                counter_clockwise_count += len(ocr_data.get('players', []))
+                # Fallback to visual position mapping
+                visual_position_count += len(ocr_data.get('players', []))
 
     # Conflicts detected (would need to be tracked in _build_table_mapping)
     # For now, we can't track this without modifying the mapping function
@@ -2102,7 +2102,7 @@ def _calculate_detailed_metrics(
     mappings_metrics = {
         'total': total_mappings,
         'role_based': role_based_count,
-        'counter_clockwise': counter_clockwise_count,
+        'visual_position': visual_position_count,
         'conflicts_detected': conflicts_detected,
         'tables_rejected': tables_rejected
     }

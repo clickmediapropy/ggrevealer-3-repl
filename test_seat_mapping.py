@@ -1,5 +1,5 @@
 """
-Test script to verify the new seat mapping logic with counter-clockwise calculation
+Test script to verify the new seat mapping logic with visual position calculation (clockwise)
 """
 
 from models import ParsedHand, Seat, BoardCards, ScreenshotAnalysis, PlayerStack
@@ -27,7 +27,7 @@ test_hand = ParsedHand(
 )
 
 # Simulate screenshot OCR result
-# PokerCraft shows Hero at position 1 (visual), then players counter-clockwise
+# PokerCraft shows Hero at position 1 (visual), then players clockwise (Seat 3→2→1)
 test_screenshot = ScreenshotAnalysis(
     screenshot_id="2025-10-27_11_27_AM_10_20_#SG3261001347.png",
     hand_id="3261001347",
@@ -39,8 +39,8 @@ test_screenshot = ScreenshotAnalysis(
     hero_cards="6d 4d",
     all_player_stacks=[
         PlayerStack(player_name="TuichAAreko", stack=500.0, position=1),  # Visual pos 1 = Hero = Seat 3
-        PlayerStack(player_name="v1[nn]1", stack=500.0, position=2),       # Visual pos 2 = Seat 2 (counter-clockwise from 3)
-        PlayerStack(player_name="Gyodong22", stack=500.0, position=3),     # Visual pos 3 = Seat 1 (counter-clockwise from 2)
+        PlayerStack(player_name="v1[nn]1", stack=500.0, position=2),       # Visual pos 2 = Seat 2 (clockwise from 3: 3→2)
+        PlayerStack(player_name="Gyodong22", stack=500.0, position=3),     # Visual pos 3 = Seat 1 (clockwise from 2: 3→2→1)
     ],
     confidence=98
 )

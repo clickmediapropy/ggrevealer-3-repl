@@ -139,7 +139,7 @@ def find_best_matches(
                 score = 100.0
                 breakdown = {"hand_id_match": 100.0}
 
-                # Use role-based mapping if OCR2 data is available, otherwise use counter-clockwise
+                # Use role-based mapping if OCR2 data is available, otherwise use visual position mapping
                 mapping = _build_seat_mapping_by_roles(screenshot, hand)
 
                 # Reject match if mapping is empty (indicates validation failure)
@@ -170,7 +170,7 @@ def find_best_matches(
                 score = 100.0
                 breakdown = {"filename_match": 100.0}
 
-                # Use role-based mapping if OCR2 data is available, otherwise use counter-clockwise
+                # Use role-based mapping if OCR2 data is available, otherwise use visual position mapping
                 mapping = _build_seat_mapping_by_roles(screenshot, hand)
 
                 # Reject match if mapping is empty (indicates validation failure)
@@ -212,7 +212,7 @@ def find_best_matches(
                         continue
 
                     # Build mapping and validate BEFORE accepting as best candidate
-                    # Use role-based mapping if OCR2 data is available, otherwise use counter-clockwise
+                    # Use role-based mapping if OCR2 data is available, otherwise use visual position mapping
                     mapping = _build_seat_mapping_by_roles(screenshot, hand)
 
                     # Only accept if mapping is valid (not empty)
@@ -349,7 +349,10 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     Maps anonymized player IDs to real names (including Hero to real hero name)
 
     IMPORTANT: PokerCraft reorganizes visual positions with Hero always at position 1.
-    We must calculate real seat numbers from visual positions using counter-clockwise mapping.
+    We must calculate real seat numbers from visual positions moving CLOCKWISE from Hero.
+
+    In poker, action moves clockwise: Seat 3 → Seat 1 → Seat 2 → Seat 3 (3-max example).
+    Formula: real_seat = hero_seat - (visual_position - 1) handles this clockwise rotation.
 
     Returns empty dict if duplicate names detected (indicates incorrect match)
     """
@@ -374,13 +377,14 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
     print(f"[DEBUG] Hero is at Seat {hero_seat_number} (real seat number)")
     print(f"[DEBUG] Table has {max_seats} seats in hand history")
 
-    # Step 2: Build mapping for ALL players in screenshot using counter-clockwise order
-    # PokerCraft shows Hero at visual position 1, then other players in counter-clockwise order
-    # 
+    # Step 2: Build mapping for ALL players in screenshot using visual position order
+    # PokerCraft shows Hero at visual position 1, then other players in CLOCKWISE order
+    #
     # IMPORTANT: PokerCraft visual positions are not seat numbers!
     # - Visual position is the display order on screen (Hero always at position 1)
     # - We need to calculate the REAL seat number from the visual position
     # - Formula: real_seat = hero_seat - (visual_position - 1), with wrap-around
+    # - This moves CLOCKWISE through seats (e.g., Seat 3 → 2 → 1 in a 3-max table)
     
     # Get all available seat numbers from hand history
     available_seats = sorted([s.seat_number for s in hand.seats])
@@ -391,10 +395,10 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
         visual_position = player_stack.position
         real_name = player_stack.player_name
 
-        # Calculate real seat number using counter-clockwise mapping
+        # Calculate real seat number using visual position mapping (CLOCKWISE)
         # Visual position 1 = Hero's seat
-        # Visual position 2 = Seat before Hero (counter-clockwise)
-        # Visual position 3 = Seat 2 before Hero (counter-clockwise)
+        # Visual position 2 = Next seat clockwise from Hero (e.g., Seat 3→2 in 3-max)
+        # Visual position 3 = Two seats clockwise from Hero (e.g., Seat 3→2→1 in 3-max)
         offset = visual_position - 1
         real_seat_number = hero_seat_number - offset
 
@@ -452,7 +456,7 @@ def _build_seat_mapping_by_roles(
     - Small Blind (SB) → SB seat
     - Big Blind (BB) → BB seat
 
-    Falls back to counter-clockwise calculation if roles are unavailable.
+    Falls back to visual position mapping if roles are unavailable.
 
     Args:
         screenshot: OCR analysis with role indicators (dealer_player, small_blind_player, big_blind_player)
@@ -483,7 +487,7 @@ def _build_seat_mapping_by_roles(
     roles_available = sum([has_dealer, has_sb, has_bb])
 
     if roles_available < 2:
-        log("WARNING", f"Insufficient role indicators ({roles_available}/3 available). Falling back to counter-clockwise mapping.")
+        log("WARNING", f"Insufficient role indicators ({roles_available}/3 available). Falling back to visual position mapping.")
         return _build_seat_mapping(hand, screenshot)
 
     log("INFO", f"Using role-based mapping ({roles_available}/3 roles available)")
@@ -544,14 +548,14 @@ def _build_seat_mapping_by_roles(
 
     # Verify we mapped at least 2 seats (minimum for meaningful mapping)
     if len(mapping) < 2:
-        log("WARNING", f"Insufficient mappings ({len(mapping)}) from role-based matching. Falling back to counter-clockwise mapping.")
+        log("WARNING", f"Insufficient mappings ({len(mapping)}) from role-based matching. Falling back to visual position mapping.")
         return _build_seat_mapping(hand, screenshot)
 
     # If we didn't map all seats, log which ones are missing
     if len(mapping) != len(hand.seats):
         unmapped = [s.player_id for s in hand.seats if s.player_id not in mapping]
         log("WARNING", f"Not all seats mapped via roles. Unmapped seats: {unmapped}")
-        log("INFO", "Attempting to map remaining seats using counter-clockwise calculation...")
+        log("INFO", "Attempting to map remaining seats using visual position calculation...")
 
         # Try to map remaining seats using position-based logic
         # This handles cases where we have D and SB but missing BB, etc.
