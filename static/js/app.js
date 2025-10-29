@@ -819,6 +819,13 @@ function renderJobs(jobs) {
         div.className = 'job-card';
         div.id = `job-${job.id}`;
 
+        // Calculate quality score
+        const stats = job.detailed_stats || {};
+        const successfulCount = (stats.successful_files || []).length;
+        const failedCount = (stats.failed_files || []).length;
+        const totalTables = successfulCount + failedCount;
+        const qualityScore = totalTables > 0 ? Math.round((successfulCount / totalTables) * 100) : 0;
+
         const statusClass = `status-badge-${job.status}`;
         const createdDate = new Date(job.created_at).toLocaleString('es-ES');
         const processingTime = job.processing_time_seconds ? formatDuration(job.processing_time_seconds) : 'N/A';
@@ -837,6 +844,11 @@ function renderJobs(jobs) {
                     <span class="${statusClass}">
                         <i class="bi ${statusIcon}"></i> ${job.status}
                     </span>
+                    ${job.status === 'completed' && totalTables > 0 ? `
+                        <span class="quality-score ms-3">
+                            📊 ${qualityScore}% (${successfulCount}/${totalTables} tables)
+                        </span>
+                    ` : ''}
                 </div>
                 <div class="job-card-right">
                     ${job.status === 'completed' ? `
@@ -866,6 +878,20 @@ function renderJobs(jobs) {
                         <span>${job.screenshot_files_count} screenshots</span>
                     </div>
                 </div>
+
+                ${job.status === 'completed' && totalTables > 0 ? `
+                    <div class="quality-bar mt-3 mb-3">
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-success" style="width: ${qualityScore}%">${qualityScore}%</div>
+                            ${failedCount > 0 ? `<div class="progress-bar bg-warning" style="width: ${100 - qualityScore}%">${100 - qualityScore}%</div>` : ''}
+                        </div>
+                        <div class="mt-2 small">
+                            ${successfulCount > 0 ? `<span class="text-success me-3">✅ ${successfulCount} tables ready</span>` : ''}
+                            ${failedCount > 0 ? `<span class="text-warning">⚠️ ${failedCount} tables need attention</span>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+
                 ${job.status === 'completed' ? `
                     <div class="job-stats-grid mt-3">
                         <div class="job-stat">
