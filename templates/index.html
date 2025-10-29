@@ -14,15 +14,34 @@
             <a class="navbar-brand" href="#">
                 <i class="bi bi-puzzle"></i> GGRevealer
             </a>
-            <span class="navbar-text">
-                Poker Hand De-anonymizer
-            </span>
+            <div class="d-flex align-items-center">
+                <span class="navbar-text me-3">
+                    Poker Hand De-anonymizer
+                </span>
+                <button id="settings-btn" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-gear"></i>
+                </button>
+            </div>
         </div>
     </nav>
 
+    <div class="container my-4">
+        <button id="new-job-btn-top" class="btn btn-primary btn-lg w-100">
+            <i class="bi bi-plus-circle"></i> New Job
+        </button>
+    </div>
+
     <div class="container my-5">
+        <!-- Jobs Section (moved above welcome) -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <h3>Historial de Jobs</h3>
+                <div id="jobs-list"></div>
+            </div>
+        </div>
+
         <!-- Development Mode Section -->
-        <div id="dev-mode-section" class="row mb-4">
+        <div id="dev-mode-section" class="row mb-4 d-none">
             <div class="col-12">
                 <div class="card border-warning">
                     <div class="card-header bg-warning text-dark">
@@ -296,13 +315,6 @@
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="row mt-5">
-            <div class="col-12">
-                <h3>Historial de Jobs</h3>
-                <div id="jobs-list"></div>
             </div>
         </div>
     </div>
