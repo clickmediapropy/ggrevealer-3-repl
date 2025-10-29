@@ -6,6 +6,7 @@ Uses 100-point scoring system with multiple criteria
 from typing import List, Optional, Dict
 from datetime import timedelta
 from models import ParsedHand, ScreenshotAnalysis, HandMatch
+from parser import find_seat_by_role
 
 
 def _normalize_hand_id(hand_id: str) -> str:
@@ -137,8 +138,10 @@ def find_best_matches(
                 
                 score = 100.0
                 breakdown = {"hand_id_match": 100.0}
-                mapping = _build_seat_mapping(hand, screenshot)
-                
+
+                # Use role-based mapping if OCR2 data is available, otherwise use counter-clockwise
+                mapping = _build_seat_mapping_by_roles(screenshot, hand)
+
                 # Reject match if mapping is empty (indicates validation failure)
                 if not mapping:
                     print(f"❌ Hand ID match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (mapping validation failed)")
@@ -166,8 +169,10 @@ def find_best_matches(
                 
                 score = 100.0
                 breakdown = {"filename_match": 100.0}
-                mapping = _build_seat_mapping(hand, screenshot)
-                
+
+                # Use role-based mapping if OCR2 data is available, otherwise use counter-clockwise
+                mapping = _build_seat_mapping_by_roles(screenshot, hand)
+
                 # Reject match if mapping is empty (indicates validation failure)
                 if not mapping:
                     print(f"❌ Filename match rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} (mapping validation failed)")
@@ -205,10 +210,11 @@ def find_best_matches(
                     if not is_valid:
                         print(f"❌ Fallback candidate rejected: {hand.hand_id} ↔ {screenshot.screenshot_id} ({reason}, score: {score:.1f})")
                         continue
-                    
+
                     # Build mapping and validate BEFORE accepting as best candidate
-                    mapping = _build_seat_mapping(hand, screenshot)
-                    
+                    # Use role-based mapping if OCR2 data is available, otherwise use counter-clockwise
+                    mapping = _build_seat_mapping_by_roles(screenshot, hand)
+
                     # Only accept if mapping is valid (not empty)
                     if mapping:
                         best_score = score
@@ -429,6 +435,141 @@ def _build_seat_mapping(hand: ParsedHand, screenshot: ScreenshotAnalysis) -> Dic
         unmapped = [s.player_id for s in hand.seats if s.player_id not in mapping]
         print(f"[WARNING] Not all seats mapped. Unmapped: {unmapped}")
 
+    return mapping
+
+
+def _build_seat_mapping_by_roles(
+    screenshot: ScreenshotAnalysis,
+    hand: ParsedHand,
+    logger=None
+) -> Dict[str, str]:
+    """
+    Build seat mapping using role indicators (D/SB/BB) from OCR2.
+    This is the PRIMARY mapping strategy (99% accuracy expected).
+
+    Maps players by role indicators:
+    - Dealer (D) → Button seat
+    - Small Blind (SB) → SB seat
+    - Big Blind (BB) → BB seat
+
+    Falls back to counter-clockwise calculation if roles are unavailable.
+
+    Args:
+        screenshot: OCR analysis with role indicators (dealer_player, small_blind_player, big_blind_player)
+        hand: Parsed hand with seats and positions
+        logger: Optional logger for structured logging
+
+    Returns:
+        Dict[anonymized_id, real_name] or empty dict on validation failure
+    """
+    mapping = {}
+    used_names = set()  # Track names to prevent duplicates
+
+    # Log function
+    def log(level: str, message: str):
+        if logger:
+            getattr(logger, level.lower())(message)
+        print(f"[{level}] {message}")
+
+    log("DEBUG", f"Building role-based seat mapping for hand {hand.hand_id}")
+    log("DEBUG", f"Screenshot roles - Dealer: {screenshot.dealer_player}, SB: {screenshot.small_blind_player}, BB: {screenshot.big_blind_player}")
+
+    # Check if role indicators are available
+    has_dealer = screenshot.dealer_player is not None
+    has_sb = screenshot.small_blind_player is not None
+    has_bb = screenshot.big_blind_player is not None
+
+    # Require at least 2 of 3 role indicators for role-based mapping
+    roles_available = sum([has_dealer, has_sb, has_bb])
+
+    if roles_available < 2:
+        log("WARNING", f"Insufficient role indicators ({roles_available}/3 available). Falling back to counter-clockwise mapping.")
+        return _build_seat_mapping(hand, screenshot)
+
+    log("INFO", f"Using role-based mapping ({roles_available}/3 roles available)")
+
+    # Role mapping configuration
+    role_configs = [
+        {
+            "role_name": "button",
+            "screenshot_player": screenshot.dealer_player,
+            "display_name": "Dealer (D)"
+        },
+        {
+            "role_name": "small blind",
+            "screenshot_player": screenshot.small_blind_player,
+            "display_name": "Small Blind (SB)"
+        },
+        {
+            "role_name": "big blind",
+            "screenshot_player": screenshot.big_blind_player,
+            "display_name": "Big Blind (BB)"
+        }
+    ]
+
+    # Map each role to corresponding seat in hand history
+    for config in role_configs:
+        role_name = config["role_name"]
+        screenshot_player = config["screenshot_player"]
+        display_name = config["display_name"]
+
+        if not screenshot_player:
+            log("DEBUG", f"Skipping {display_name} - not found in screenshot")
+            continue
+
+        # Find the seat with this role in hand history
+        seat = find_seat_by_role(hand, role_name)
+
+        if not seat:
+            log("WARNING", f"Could not find {role_name} seat in hand history for hand {hand.hand_id}")
+            continue
+
+        anon_id = seat.player_id
+        real_name = screenshot_player
+
+        # Check for duplicate name within this hand
+        if real_name in used_names:
+            log("ERROR", f"Duplicate name '{real_name}' detected in mapping for hand {hand.hand_id}.")
+            log("ERROR", f"{display_name} ({anon_id}) tried to map to '{real_name}' but it's already used.")
+            log("ERROR", "This indicates incorrect match. Rejecting mapping.")
+            return {}  # Return empty mapping - this is an incorrect match
+
+        # Add mapping
+        mapping[anon_id] = real_name
+        used_names.add(real_name)
+        log("INFO", f"Mapped: {anon_id} → {real_name} ({display_name})")
+
+    log("DEBUG", f"Final role-based mapping: {mapping}")
+    log("INFO", f"Role-based mapping success: {len(mapping)} of {len(hand.seats)} seats mapped")
+
+    # Verify we mapped at least 2 seats (minimum for meaningful mapping)
+    if len(mapping) < 2:
+        log("WARNING", f"Insufficient mappings ({len(mapping)}) from role-based matching. Falling back to counter-clockwise mapping.")
+        return _build_seat_mapping(hand, screenshot)
+
+    # If we didn't map all seats, log which ones are missing
+    if len(mapping) != len(hand.seats):
+        unmapped = [s.player_id for s in hand.seats if s.player_id not in mapping]
+        log("WARNING", f"Not all seats mapped via roles. Unmapped seats: {unmapped}")
+        log("INFO", "Attempting to map remaining seats using counter-clockwise calculation...")
+
+        # Try to map remaining seats using position-based logic
+        # This handles cases where we have D and SB but missing BB, etc.
+        remaining_mapping = _build_seat_mapping(hand, screenshot)
+
+        # Add only the missing mappings
+        for anon_id, real_name in remaining_mapping.items():
+            if anon_id not in mapping:
+                # Check for duplicate names
+                if real_name in used_names:
+                    log("WARNING", f"Cannot add {anon_id} → {real_name} (duplicate name)")
+                    continue
+
+                mapping[anon_id] = real_name
+                used_names.add(real_name)
+                log("INFO", f"Added missing mapping: {anon_id} → {real_name} (position-based)")
+
+    log("DEBUG", f"Complete mapping: {mapping}")
     return mapping
 
 

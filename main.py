@@ -24,9 +24,9 @@ import shutil
 from database import init_db, create_job, get_job, get_all_jobs, update_job_status, add_file, get_job_files, save_result, get_result, update_job_file_counts, delete_job, mark_job_started, update_job_stats, set_ocr_total_count, increment_ocr_processed_count, save_screenshot_result, get_screenshot_results, update_screenshot_result_matches, get_job_logs, clear_job_results, save_ocr1_result, save_ocr2_result, mark_screenshot_discarded
 from parser import GGPokerParser
 from ocr import ocr_screenshot, ocr_hand_id, ocr_player_details
-from matcher import find_best_matches
-from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format
-from models import NameMapping
+from matcher import find_best_matches, _build_seat_mapping_by_roles
+from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format, extract_table_name
+from models import NameMapping, ParsedHand
 from logger import get_job_logger
 import google.generativeai as genai
 
@@ -1532,15 +1532,54 @@ def run_processing_pipeline(job_id: int):
                    failed_count=len(matched_screenshots) - ocr2_success_count,
                    duration_ms=ocr2_duration)
 
-        # Step 8: Generate name mappings (Phase 2 - Tasks 8-9)
-        # NOTE: This section will be replaced with table-wide mapping in Tasks 8-9
-        # For now, we just create empty mappings since OCR2 data is collected but not yet used
-        logger.warning("⚠️  Phase 2 not yet implemented - OCR2 data collected but not used for mapping")
-        logger.warning("⚠️  Name mappings generation skipped - waiting for Tasks 8-9 implementation")
-
+        # Step 8: Generate name mappings (Phase 2 - Table-wide approach)
+        # NEW: Group by table → Aggregate mappings → Apply to ALL hands of that table
+        logger.info("🗂️  Phase 5: Generating table-wide name mappings")
         step_start = time.time()
+
+        # Step 8.1: Group hands by table
+        table_groups = _group_hands_by_table(all_hands)
+        logger.info(f"📊 Grouped {len(all_hands)} hands into {len(table_groups)} tables",
+                   total_hands=len(all_hands),
+                   table_count=len(table_groups),
+                   table_names=list(table_groups.keys()))
+
+        # Step 8.2: Build aggregated mapping per table
+        table_mappings = {}  # Dict[table_name, Dict[anon_id, real_name]]
+        total_mappings = 0
+
+        for table_name, table_hands in table_groups.items():
+            logger.info(f"🔨 Building mapping for table '{table_name}' ({len(table_hands)} hands)",
+                       table=table_name,
+                       hands_count=len(table_hands))
+
+            mapping = _build_table_mapping(
+                table_name=table_name,
+                hands=table_hands,
+                matched_screenshots=matched_screenshots,
+                ocr2_results=ocr2_results,
+                logger=logger
+            )
+
+            table_mappings[table_name] = mapping
+            total_mappings += len(mapping)
+
+            logger.info(f"✅ Table '{table_name}': Generated {len(mapping)} mappings",
+                       table=table_name,
+                       mapping_count=len(mapping))
+
+        # Step 8.3: Convert table mappings to flat list of NameMapping objects for writer
+        # The writer expects List[NameMapping], but we'll aggregate all mappings from all tables
         name_mappings = []
-        matched_hands = []
+        for table_name, mapping in table_mappings.items():
+            for anon_id, real_name in mapping.items():
+                name_mappings.append(NameMapping(
+                    anonymized_identifier=anon_id,
+                    resolved_name=real_name,
+                    source='auto-match',
+                    confidence=99.0,  # High confidence from role-based matching
+                    locked=False
+                ))
 
         # Update screenshot results with match counts (1 match per matched screenshot)
         for screenshot_filename in matched_screenshots.keys():
@@ -1552,8 +1591,9 @@ def run_processing_pipeline(job_id: int):
             )
 
         mapping_duration = int((time.time() - step_start) * 1000)
-        logger.info(f"⚠️  Generated {len(name_mappings)} name mappings (Tasks 8-9 not implemented yet)",
+        logger.info(f"✅ Generated {len(name_mappings)} total name mappings from {len(table_mappings)} tables",
                    mappings_count=len(name_mappings),
+                   tables_count=len(table_mappings),
                    duration_ms=mapping_duration)
 
         # Step 7: Generate output files
@@ -1770,6 +1810,175 @@ def run_processing_pipeline(job_id: int):
                 print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
         except Exception as e:
             logger.warning(f"Failed to export debug JSON: {str(e)}")
+
+
+def _group_hands_by_table(parsed_hands: List[ParsedHand]) -> dict[str, List[ParsedHand]]:
+    """
+    Group parsed hands by table name.
+
+    Args:
+        parsed_hands: List of ParsedHand objects
+
+    Returns:
+        Dict[table_name, List[ParsedHand]]
+    """
+    from collections import defaultdict
+
+    tables = defaultdict(list)
+    unknown_counter = 1
+
+    for hand in parsed_hands:
+        # Extract table name from raw text
+        table_name = extract_table_name(hand.raw_text)
+
+        # Fallback for unknown tables
+        if table_name == "Unknown":
+            table_name = f"unknown_table_{unknown_counter}"
+            unknown_counter += 1
+
+        tables[table_name].append(hand)
+
+    return dict(tables)
+
+
+def _build_table_mapping(
+    table_name: str,
+    hands: List[ParsedHand],
+    matched_screenshots: dict[str, ParsedHand],
+    ocr2_results: dict[str, tuple],
+    logger
+) -> dict[str, str]:
+    """
+    Build aggregated name mapping for entire table from all matched screenshots.
+
+    This is the CRITICAL change for Phase 2:
+    - OLD: Map per-hand (only players in matched hand)
+    - NEW: Map per-table (ALL players visible in ANY screenshot for this table)
+
+    Args:
+        table_name: Name of the table
+        hands: All hands for this table
+        matched_screenshots: Dict[screenshot_filename, matched_hand]
+        ocr2_results: Dict[screenshot_filename, (success, ocr_data, error)]
+        logger: Job logger
+
+    Returns:
+        Dict[anonymized_id, real_name] - Aggregated for entire table
+    """
+    aggregated_mapping = {}
+    conflict_tracker = {}  # Track {anon_id: [real_names]} to detect conflicts
+    screenshots_for_table = []
+
+    # Step 1: Find all screenshots that match ANY hand in this table
+    for screenshot_filename, matched_hand in matched_screenshots.items():
+        # Check if this screenshot matches a hand from this table
+        hand_table_name = extract_table_name(matched_hand.raw_text)
+        if hand_table_name == table_name:
+            screenshots_for_table.append((screenshot_filename, matched_hand))
+
+    logger.info(f"📊 Table '{table_name}': {len(hands)} hands, {len(screenshots_for_table)} matched screenshots",
+                table=table_name,
+                hands_count=len(hands),
+                screenshots_count=len(screenshots_for_table))
+
+    # Step 2: Extract role-based mappings from each matched screenshot
+    for screenshot_filename, matched_hand in screenshots_for_table:
+        # Get OCR2 data for this screenshot
+        if screenshot_filename not in ocr2_results:
+            logger.warning(f"No OCR2 data for {screenshot_filename}",
+                         screenshot=screenshot_filename)
+            continue
+
+        success, ocr_data, error = ocr2_results[screenshot_filename]
+        if not success:
+            logger.warning(f"OCR2 failed for {screenshot_filename}: {error}",
+                         screenshot=screenshot_filename,
+                         error=error)
+            continue
+
+        # Build screenshot analysis object
+        from models import ScreenshotAnalysis, PlayerStack
+
+        screenshot = ScreenshotAnalysis(
+            screenshot_id=screenshot_filename,
+            hand_id=ocr_data.get('hand_id'),
+            dealer_player=ocr_data.get('dealer_player'),
+            small_blind_player=ocr_data.get('small_blind_player'),
+            big_blind_player=ocr_data.get('big_blind_player'),
+            all_player_stacks=[
+                PlayerStack(
+                    player_name=p['name'],
+                    stack=p['stack'],
+                    position=p['position']
+                ) for p in ocr_data.get('players', [])
+            ]
+        )
+
+        # Use role-based mapping to get mapping for this screenshot
+        screenshot_mapping = _build_seat_mapping_by_roles(screenshot, matched_hand, logger)
+
+        if not screenshot_mapping:
+            logger.warning(f"Failed to build mapping for {screenshot_filename}",
+                         screenshot=screenshot_filename,
+                         hand_id=matched_hand.hand_id)
+            continue
+
+        logger.debug(f"Screenshot {screenshot_filename} contributed {len(screenshot_mapping)} mappings",
+                    screenshot=screenshot_filename,
+                    mapping_count=len(screenshot_mapping),
+                    mapping=screenshot_mapping)
+
+        # Step 3: Merge mapping into aggregated mapping
+        for anon_id, real_name in screenshot_mapping.items():
+            # Track all names seen for this anon_id
+            if anon_id not in conflict_tracker:
+                conflict_tracker[anon_id] = []
+            conflict_tracker[anon_id].append(real_name)
+
+            # Add to aggregated mapping (first occurrence wins)
+            if anon_id not in aggregated_mapping:
+                aggregated_mapping[anon_id] = real_name
+                logger.debug(f"Added mapping: {anon_id} → {real_name}",
+                           anon_id=anon_id,
+                           real_name=real_name)
+
+    # Step 4: Detect conflicts (same anon_id → different real names)
+    conflicts_found = False
+    for anon_id, names in conflict_tracker.items():
+        unique_names = set(names)
+        if len(unique_names) > 1:
+            logger.error(f"CONFLICT: {anon_id} mapped to multiple names: {unique_names}",
+                       anon_id=anon_id,
+                       conflicting_names=list(unique_names),
+                       table=table_name)
+            conflicts_found = True
+
+    # Step 5: Calculate statistics
+    unique_players = set()
+    for hand in hands:
+        for seat in hand.seats:
+            unique_players.add(seat.player_id)
+
+    mapped_players = len(aggregated_mapping)
+    total_players = len(unique_players)
+    coverage = (mapped_players / total_players * 100) if total_players > 0 else 0
+
+    unmapped_players = unique_players - set(aggregated_mapping.keys())
+
+    logger.info(f"✅ Table '{table_name}' mapping: {mapped_players}/{total_players} players mapped ({coverage:.1f}% coverage)",
+                table=table_name,
+                mapped_players=mapped_players,
+                total_players=total_players,
+                coverage_pct=coverage,
+                conflicts=conflicts_found)
+
+    if unmapped_players:
+        logger.warning(f"⚠️  Table '{table_name}': Unmapped players: {list(unmapped_players)}",
+                     table=table_name,
+                     unmapped_count=len(unmapped_players),
+                     unmapped_ids=list(unmapped_players))
+
+    return aggregated_mapping
 
 
 def _normalize_hand_id(hand_id: str) -> str:
