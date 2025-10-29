@@ -50,10 +50,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Custom middleware to enforce upload size limit
+# Custom middleware to enforce upload size limit and disable caching
 @app.middleware("http")
 async def limit_upload_size(request: Request, call_next):
-    """Enforce maximum upload size"""
+    """Enforce maximum upload size and disable caching for static files"""
     if request.method == "POST" and request.url.path == "/api/upload":
         content_length = request.headers.get("content-length")
         if content_length:
@@ -66,6 +66,13 @@ async def limit_upload_size(request: Request, call_next):
                     }
                 )
     response = await call_next(request)
+    
+    # Disable caching for static files to ensure fresh content
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    
     return response
 
 STORAGE_PATH = Path("storage")
