@@ -313,6 +313,62 @@ No importa que PokerCraft haya reorganizado, porque el resultado final es un map
 
 ## Plan de Implementación
 
+### Fase 0: Pre-requisitos (Base de Datos y Parser)
+
+**Objetivo:** Preparar la infraestructura necesaria antes de implementar dual OCR
+
+**Cambios en Base de Datos:**
+1. Agregar 6 campos nuevos a `screenshot_results` (ver Fase 4 para detalles)
+2. Implementar migrations automáticas en `database.py`
+3. Crear funciones `save_ocr1_result()` y `save_ocr2_result()`
+
+**Cambios en Parser:**
+Agregar función `find_seat_by_role()` en `parser.py`:
+
+```python
+def find_seat_by_role(hand: ParsedHand, role: str) -> Optional[Seat]:
+    """
+    Find seat by role (button, small blind, big blind)
+
+    Args:
+        hand: Parsed hand data
+        role: One of "button", "small blind", "big blind"
+
+    Returns:
+        Seat object if found, None otherwise
+    """
+    if role == "button":
+        # Find button seat from hand.button_seat or parse from summary
+        button_seat_num = hand.positions.get("button")
+        return next((s for s in hand.seats if s.seat_number == button_seat_num), None)
+
+    elif role == "small blind":
+        # Find seat that posted small blind
+        for seat in hand.seats:
+            if any("posts small blind" in str(action) for action in seat.actions):
+                return seat
+        return None
+
+    elif role == "big blind":
+        # Find seat that posted big blind
+        for seat in hand.seats:
+            if any("posts big blind" in str(action) for action in seat.actions):
+                return seat
+        return None
+
+    return None
+```
+
+**Archivos a modificar:**
+- `database.py` - Migrations y nuevas funciones DB
+- `models.py` - Actualizar `ScreenshotAnalysis` con campos de roles
+- `parser.py` - Agregar `find_seat_by_role()`
+
+**Validaciones:**
+- ✅ Migrations se ejecutan sin errores
+- ✅ Campos nuevos aparecen en DB
+- ✅ `find_seat_by_role()` funciona con manos de Job #9
+
 ### Fase 1: Implementación básica (bajo riesgo, alto valor)
 
 **Objetivo:** Validar que dos OCRs separados mejoran el match rate
@@ -596,27 +652,260 @@ def save_ocr2_result(screenshot_id: int, success: bool,
 
 ---
 
+## Edge Cases - Estrategias de Manejo
+
+Esta sección documenta todos los casos extremos identificados y sus estrategias de resolución.
+
+### 1. Roles No Visibles (Jugador Folded)
+
+**Caso:** Screenshot tomado después de que un jugador foldea (no aparece indicator)
+
+**Estrategia:**
+- **Detección**: Contar jugadores en screenshot vs hand history
+- **Fallback**: Si falta algún rol (D/SB/BB), usar mapeo por posiciones (sistema viejo arreglado)
+- **Log**: WARNING con detalles del fallback
+
+**Implementación:**
+```python
+def _build_seat_mapping_by_roles(hand, screenshot):
+    roles = extract_roles(screenshot)
+    if not all_roles_present(roles):
+        logger.warning(f"Roles incomplete, falling back to position mapping")
+        return _build_seat_mapping_by_position(hand, screenshot)
+    return _map_by_roles(hand, screenshot, roles)
+```
+
+### 2. Hand ID Cortado o Parcial
+
+**Caso:** Hand ID parcialmente visible en screenshot (cortado por overlay)
+
+**Estrategia:**
+- **Detección**: OCR extrae Hand ID parcial (ej: "247423387" sin prefijo "SG")
+- **Fuzzy Matching**: Comparar con Hand IDs disponibles usando substring match
+- **Threshold**: Match solo si >80% del Hand ID coincide
+- **Fallback**: Si no hay match claro, usar fallback scoring system
+
+**Implementación:**
+```python
+def match_hand_id_fuzzy(extracted_id, hand_ids, threshold=0.8):
+    for hand_id in hand_ids:
+        similarity = calculate_substring_match(extracted_id, hand_id)
+        if similarity >= threshold:
+            return hand_id
+    return None
+```
+
+### 3. Heads-Up Confusion (Button = Small Blind)
+
+**Caso:** En heads-up (2 jugadores), el button ES el small blind
+
+**Estrategia:**
+- **Detección**: `len(hand.seats) == 2`
+- **Lógica especial**: En heads-up, mapear:
+  - Jugador con "D" o "SB" → button seat (que es también SB)
+  - Jugador con "BB" → big blind seat
+- **Validación**: Confirmar que solo hay 2 jugadores
+
+**Implementación:**
+```python
+def _map_headsup_roles(hand, screenshot):
+    if len(hand.seats) != 2:
+        raise ValueError("Not a heads-up hand")
+
+    # Heads-up: button = SB, other = BB
+    button_player = find_player_with_indicator(screenshot, ["D", "SB"])
+    bb_player = find_player_with_indicator(screenshot, ["BB"])
+
+    button_seat = find_seat_by_role(hand, "button")  # Also SB in heads-up
+    bb_seat = find_seat_by_role(hand, "big blind")
+
+    return {
+        button_seat.player_id: button_player.name,
+        bb_seat.player_id: bb_player.name
+    }
+```
+
+### 4. Screenshot Timing Incorrecto
+
+**Caso:** Screenshot tomado antes de blinds o después de all-in (indicators no visibles)
+
+**Estrategia:**
+- **Detección**: OCR2 extrae jugadores pero sin indicators
+- **Fallback primario**: Intentar identificar roles por stacks
+  - SB típicamente tiene stack ligeramente menor (pagó blind)
+  - BB tiene stack menor aún (pagó blind mayor)
+- **Fallback secundario**: Usar mapeo por posiciones
+- **Log**: INFO indicando timing issue detectado
+
+**Implementación:**
+```python
+def infer_roles_from_stacks(screenshot, hand):
+    """Inferir roles cuando indicators no visibles"""
+    if not has_indicators(screenshot):
+        logger.info("No indicators found, inferring from stack changes")
+        # Compare stacks before/after blinds
+        return infer_from_blind_posts(hand)
+    return extract_roles_from_indicators(screenshot)
+```
+
+### 5. Indicators OCR Error (D → 0, SB → 58)
+
+**Caso:** OCR confunde indicators ("D" se lee como "0", "SB" como "58" o "S8")
+
+**Estrategia:**
+- **Fuzzy matching de indicators**: Aceptar variaciones comunes
+  - "D", "0", "O" → Dealer
+  - "SB", "58", "S8", "5B" → Small Blind
+  - "BB", "88", "B8" → Big Blind
+- **Validación de consistencia**: Si hay 3 jugadores, debe haber 3 roles distintos
+- **Fallback**: Si no se pueden normalizar, usar posiciones
+
+**Implementación:**
+```python
+INDICATOR_VARIATIONS = {
+    "dealer": ["D", "0", "O", "d"],
+    "small_blind": ["SB", "58", "S8", "5B", "sb"],
+    "big_blind": ["BB", "88", "B8", "bb"]
+}
+
+def normalize_indicator(raw_indicator):
+    for role, variations in INDICATOR_VARIATIONS.items():
+        if raw_indicator in variations:
+            return role
+    return None
+```
+
+### 6. Nombres con Caracteres Especiales
+
+**Caso:** Nombres como "v1[nn]1", "Le_Mon_spr", "RamsayGodr..." (cortados)
+
+**Estrategia:**
+- **Preservación**: Mantener caracteres especiales tal cual
+- **Normalización mínima**: Solo trim espacios
+- **Nombres cortados**: Usar fuzzy matching con nombres en hand history
+- **Threshold**: Match si >70% del nombre coincide
+
+**Implementación:**
+```python
+def match_player_name(extracted_name, hand_players, threshold=0.7):
+    # Exact match first
+    if extracted_name in hand_players:
+        return extracted_name
+
+    # Fuzzy match for truncated names
+    for player in hand_players:
+        similarity = difflib.SequenceMatcher(None, extracted_name, player).ratio()
+        if similarity >= threshold:
+            return player
+
+    return None  # No match found
+```
+
+### 7. Múltiples Screenshots con Mismo Hand ID
+
+**Caso:** Dos screenshots de la misma mano (different streets: flop, turn, river)
+
+**Estrategia:**
+- **Priorización**: Usar el screenshot más completo
+  - Preferir screenshot con board completo (river > turn > flop)
+  - Preferir screenshot con showdown (más info visible)
+- **Deduplicación**: No procesar dos veces el mismo hand
+- **Log**: INFO indicando screenshot duplicado detectado
+
+**Implementación:**
+```python
+def deduplicate_screenshots(screenshots):
+    hand_id_groups = {}
+    for screenshot in screenshots:
+        hand_id = screenshot.hand_id
+        if hand_id not in hand_id_groups:
+            hand_id_groups[hand_id] = []
+        hand_id_groups[hand_id].append(screenshot)
+
+    # Select best screenshot per hand_id
+    best_screenshots = []
+    for hand_id, group in hand_id_groups.items():
+        best = select_most_complete_screenshot(group)
+        best_screenshots.append(best)
+
+    return best_screenshots
+```
+
+### 8. Straddle Present (Jugador Extra Actúa)
+
+**Caso:** Un jugador pone straddle (apuesta extra antes de ver cartas)
+
+**Estrategia:**
+- **Detección**: Parser identifica straddle en acciones pre-flop
+- **Ignorar para roles**: Straddle no afecta roles (D/SB/BB siguen igual)
+- **Mapeo normal**: Usar roles estándar, ignorar straddle
+- **Validación**: Confirmar que straddle player existe en screenshot
+
+**Implementación:**
+```python
+def _build_seat_mapping_by_roles(hand, screenshot):
+    # Straddle doesn't affect role mapping
+    # D/SB/BB remain the same regardless of straddle
+    ignore_straddle = True
+    return map_standard_roles(hand, screenshot, ignore_straddle)
+```
+
+### 9. Dead Button (Button Skip un Seat)
+
+**Caso:** Button "muerto" cuando un jugador se va - button skip al siguiente
+
+**Estrategia:**
+- **Confianza en parser**: El parser extrae el button correcto del hand history
+- **No afecta mapeo**: Mapeo por roles funciona igual
+- **Validación**: Confirmar que button seat existe en screenshot
+
+### 10. 6-Max Tables (Más Complejidad)
+
+**Caso:** Mesa de 6 jugadores en vez de 3
+
+**Estrategia:**
+- **Fase 2 soporta 6-max automáticamente**: Mapeo por roles escala naturalmente
+- **Requisito**: OCR debe extraer 6 nombres + roles correctamente
+- **Fallback**: Si roles parciales, combinar roles + posiciones
+- **Validación**: Confirmar 6 jugadores en screenshot = 6 en hand
+
+**Implementación:**
+```python
+def _build_seat_mapping_by_roles(hand, screenshot):
+    max_seats = len(hand.seats)
+
+    if max_seats == 2:
+        return _map_headsup_roles(hand, screenshot)
+    elif max_seats in [3, 6, 9]:  # 3-max, 6-max, 9-max
+        return _map_standard_roles(hand, screenshot)
+    else:
+        logger.warning(f"Unusual table size: {max_seats}")
+        return _build_seat_mapping_by_position(hand, screenshot)
+```
+
+---
+
 ## Preguntas Abiertas
 
 1. **¿Todos los screenshots de PokerCraft tienen indicators visibles (D, SB, BB)?**
    - Necesitamos verificar con más screenshots
-   - ¿Qué pasa si un jugador ya foldeó?
+   - **Estrategia definida**: Fallback a posiciones si faltan
 
 2. **¿Cómo manejamos heads-up (2 jugadores)?**
    - En heads-up: button = small blind, otro jugador = big blind
-   - ¿PokerCraft muestra esto correctamente?
+   - **Estrategia definida**: Lógica especial en `_map_headsup_roles()`
 
 3. **¿Qué pasa con mesas de 6-max?**
    - Actual sistema solo soporta 3-max
-   - ¿Nueva propuesta escala mejor a 6-max?
+   - **Estrategia definida**: Mapeo por roles escala naturalmente a 6-max
 
 4. **¿Costo/beneficio vale la pena?**
    - 2x costo API vs mejora en match rate
-   - ¿Cuántos más matches necesitamos para justificar el costo?
+   - **Criterio**: +10% match rate justifica 2x costo ($0.27 extra por job)
 
 5. **¿Orden de extracción importa?**
-   - ¿Deberíamos hacer ambos OCRs en paralelo?
-   - ¿O secuencial: primero Hand ID, luego (si match) detalles?
+   - **Decisión**: Secuencial (OCR1 → Match → OCR2 solo para matched)
+   - **Optimización**: OCR2 solo para screenshots con match confirmado
 
 ---
 
@@ -624,21 +913,46 @@ def save_ocr2_result(screenshot_id: int, success: bool,
 
 **Inmediato:**
 1. ✅ Documentar todos los descubrimientos (este archivo)
-2. ⏳ Decidir si implementar Fase 1
+2. ✅ Plan aprobado con modificaciones
 3. ⏳ Crear feature branch para desarrollo
 
-**Si se aprueba implementación:**
-1. Implementar Fase 1 (dos OCRs separados)
-2. Testear con Job #9
-3. Medir métricas
-4. Si exitoso → Implementar Fase 2 (mapeo por dealer button)
-5. Testing completo
-6. Deploy a producción
+**Orden de Implementación Aprobado:**
 
-**Alternativa (no implementar):**
-1. Arreglar bug del mapeo invertido en código actual
-2. Mejorar prompt actual del OCR para extraer Hand ID más confiablemente
-3. Mantener arquitectura actual
+**Paso 1: Fase 0 (Pre-requisitos)**
+1. Implementar migrations en `database.py`
+2. Agregar `find_seat_by_role()` en `parser.py`
+3. Actualizar `models.py` con campos de roles
+4. Validar con Job #9
+
+**Paso 2: Fase 1 (Dual OCR)**
+1. Implementar `ocr_hand_id()` en `ocr.py`
+2. Implementar `ocr_player_details()` en `ocr.py`
+3. Modificar pipeline en `main.py`
+4. Testear con Job #9
+5. Medir match rate antes vs después
+
+**Paso 3: Fase 2 (Role-Based Mapping)**
+1. Implementar `_build_seat_mapping_by_roles()` en `matcher.py`
+2. Implementar edge case handlers (heads-up, roles missing, etc.)
+3. Testear con Job #9
+4. Validar mejora adicional
+
+**Paso 4: Fase 3 (Testing)**
+1. Testing funcional con Job #9
+2. Comparar resultados vs sistema actual
+3. Validar métricas de éxito (+10% match rate)
+
+**Paso 5: Fase 4 (Deploy Gradual)**
+1. Merge a main con feature flag
+2. Deploy a producción
+3. Monitorear métricas en jobs reales
+4. Si exitoso → Enable by default
+
+**Criterio de Éxito:**
+- ✅ Match rate mejora en al menos 10%
+- ✅ No aumentan mappings incorrectos
+- ✅ Tiempo de procesamiento aceptable (<5s por screenshot promedio)
+- ✅ Edge cases manejados correctamente
 
 ---
 
@@ -666,6 +980,28 @@ def save_ocr2_result(screenshot_id: int, success: bool,
 
 ---
 
+---
+
+## Estado del Plan
+
+**✅ PLAN APROBADO** (2025-09-29)
+
+**Modificaciones aplicadas:**
+1. ✅ Fase 0 agregada (Pre-requisitos: DB + Parser)
+2. ✅ Función `find_seat_by_role()` documentada con implementación
+3. ✅ Sección "Edge Cases" completa con 10 casos y estrategias
+4. ✅ Preguntas Abiertas resueltas con estrategias definidas
+5. ✅ Orden de implementación clarificado
+
+**No incluido (aprobado por usuario):**
+- ❌ Estimaciones de tiempo (no requeridas)
+- ❌ Test suite detallada (no requerida)
+
+**Listo para implementación:** SÍ - Fase 0 puede comenzar
+
+---
+
 **Fin del documento**
 
 *Última actualización: 2025-09-29*
+*Estado: Plan aprobado y completo*
