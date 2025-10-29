@@ -1208,26 +1208,6 @@ async function reprocessDevJob() {
 // SIDEBAR NAVIGATION
 // ========================================
 
-// Sidebar navigation links
-document.getElementById('nav-new-job').addEventListener('click', (e) => {
-    e.preventDefault();
-    showWelcomeSection();
-    updateSidebarActiveState('nav-new-job');
-    scrollToTop();
-});
-
-document.getElementById('nav-reprocess').addEventListener('click', (e) => {
-    e.preventDefault();
-    openReprocessModal();
-});
-
-document.getElementById('nav-history').addEventListener('click', (e) => {
-    e.preventDefault();
-    const historySection = document.getElementById('history-section');
-    historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    updateSidebarActiveState('nav-history');
-});
-
 function updateSidebarActiveState(activeId) {
     document.querySelectorAll('.sidebar-link').forEach(link => {
         link.classList.remove('active');
@@ -1248,16 +1228,17 @@ function showWelcomeSection() {
 // REPROCESS MODAL
 // ========================================
 
-const reprocessModal = new bootstrap.Modal(document.getElementById('reprocessModal'));
-const modalJobIdInput = document.getElementById('modal-job-id');
-const loadJobInfoBtn = document.getElementById('load-job-info-btn');
-const modalJobInfo = document.getElementById('modal-job-info');
-const modalJobError = document.getElementById('modal-job-error');
-const modalReprocessBtn = document.getElementById('modal-reprocess-btn');
-const modalJobIdDisplay = document.getElementById('modal-job-id-display');
-const modalJobDetails = document.getElementById('modal-job-details');
+let reprocessModal = null;
+let modalJobIdInput = null;
+let loadJobInfoBtn = null;
+let modalJobInfo = null;
+let modalJobError = null;
+let modalReprocessBtn = null;
+let modalJobIdDisplay = null;
+let modalJobDetails = null;
 
 function openReprocessModal() {
+    if (!reprocessModal) return;
     // Reset modal state
     modalJobIdInput.value = '';
     modalJobInfo.classList.add('d-none');
@@ -1266,46 +1247,11 @@ function openReprocessModal() {
     reprocessModal.show();
 }
 
-loadJobInfoBtn.addEventListener('click', async () => {
-    const jobId = parseInt(modalJobIdInput.value);
-    if (!jobId || jobId < 1) {
-        showModalError('Por favor ingresa un Job ID válido');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE}/api/job/${jobId}/status`);
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Error al cargar job');
-        }
-
-        // Display job info
-        modalJobIdDisplay.textContent = jobId;
-        modalJobDetails.innerHTML = `
-            <div class="mb-2"><strong>Estado:</strong> ${formatStatus(data.status)}</div>
-            <div class="mb-2"><strong>Archivos TXT:</strong> ${data.txt_count || 0}</div>
-            <div class="mb-2"><strong>Screenshots:</strong> ${data.screenshot_count || 0}</div>
-            ${data.created_at ? `<div class="mb-2"><strong>Creado:</strong> ${new Date(data.created_at).toLocaleString('es-ES')}</div>` : ''}
-            ${data.match_rate !== null && data.match_rate !== undefined ? `<div class="mb-2"><strong>Match Rate:</strong> ${(data.match_rate * 100).toFixed(1)}%</div>` : ''}
-        `;
-
-        modalJobInfo.classList.remove('d-none');
-        modalJobError.classList.add('d-none');
-        modalReprocessBtn.disabled = false;
-        modalReprocessBtn.dataset.jobId = jobId;
-
-    } catch (error) {
-        showModalError(error.message);
-        modalJobInfo.classList.add('d-none');
-        modalReprocessBtn.disabled = true;
-    }
-});
-
 function showModalError(message) {
-    modalJobError.textContent = message;
-    modalJobError.classList.remove('d-none');
+    if (modalJobError) {
+        modalJobError.textContent = message;
+        modalJobError.classList.remove('d-none');
+    }
 }
 
 function formatStatus(status) {
@@ -1317,36 +1263,6 @@ function formatStatus(status) {
     };
     return statusMap[status] || status;
 }
-
-modalReprocessBtn.addEventListener('click', async () => {
-    const jobId = parseInt(modalReprocessBtn.dataset.jobId);
-    if (!jobId) return;
-
-    modalReprocessBtn.disabled = true;
-    modalReprocessBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reprocesando...';
-
-    try {
-        const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
-            method: 'POST'
-        });
-
-        if (!response.ok) {
-            throw new Error('Error al reprocesar job');
-        }
-
-        // Close modal and show processing
-        reprocessModal.hide();
-        currentJobId = jobId;
-        showProcessing();
-        checkStatus(jobId);
-
-    } catch (error) {
-        showModalError(error.message);
-    } finally {
-        modalReprocessBtn.disabled = false;
-        modalReprocessBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Reprocesar Job';
-    }
-});
 
 // ========================================
 // RECENT JOBS IN SIDEBAR
@@ -1463,6 +1379,125 @@ function updateTabVisibility() {
 // ========================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize modal elements
+    const reprocessModalElement = document.getElementById('reprocessModal');
+    if (reprocessModalElement) {
+        reprocessModal = new bootstrap.Modal(reprocessModalElement);
+        modalJobIdInput = document.getElementById('modal-job-id');
+        loadJobInfoBtn = document.getElementById('load-job-info-btn');
+        modalJobInfo = document.getElementById('modal-job-info');
+        modalJobError = document.getElementById('modal-job-error');
+        modalReprocessBtn = document.getElementById('modal-reprocess-btn');
+        modalJobIdDisplay = document.getElementById('modal-job-id-display');
+        modalJobDetails = document.getElementById('modal-job-details');
+
+        // Modal load job info button
+        if (loadJobInfoBtn) {
+            loadJobInfoBtn.addEventListener('click', async () => {
+                const jobId = parseInt(modalJobIdInput.value);
+                if (!jobId || jobId < 1) {
+                    showModalError('Por favor ingresa un Job ID válido');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/job/${jobId}/status`);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Error al cargar job');
+                    }
+
+                    // Display job info
+                    modalJobIdDisplay.textContent = jobId;
+                    modalJobDetails.innerHTML = `
+                        <div class="mb-2"><strong>Estado:</strong> ${formatStatus(data.status)}</div>
+                        <div class="mb-2"><strong>Archivos TXT:</strong> ${data.txt_count || 0}</div>
+                        <div class="mb-2"><strong>Screenshots:</strong> ${data.screenshot_count || 0}</div>
+                        ${data.created_at ? `<div class="mb-2"><strong>Creado:</strong> ${new Date(data.created_at).toLocaleString('es-ES')}</div>` : ''}
+                        ${data.match_rate !== null && data.match_rate !== undefined ? `<div class="mb-2"><strong>Match Rate:</strong> ${(data.match_rate * 100).toFixed(1)}%</div>` : ''}
+                    `;
+
+                    modalJobInfo.classList.remove('d-none');
+                    modalJobError.classList.add('d-none');
+                    modalReprocessBtn.disabled = false;
+                    modalReprocessBtn.dataset.jobId = jobId;
+
+                } catch (error) {
+                    showModalError(error.message);
+                    modalJobInfo.classList.add('d-none');
+                    modalReprocessBtn.disabled = true;
+                }
+            });
+        }
+
+        // Modal reprocess button
+        if (modalReprocessBtn) {
+            modalReprocessBtn.addEventListener('click', async () => {
+                const jobId = parseInt(modalReprocessBtn.dataset.jobId);
+                if (!jobId) return;
+
+                modalReprocessBtn.disabled = true;
+                modalReprocessBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reprocesando...';
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/process/${jobId}`, {
+                        method: 'POST'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Error al reprocesar job');
+                    }
+
+                    // Close modal and show processing
+                    reprocessModal.hide();
+                    currentJobId = jobId;
+                    showProcessing();
+                    checkStatus(jobId);
+
+                } catch (error) {
+                    showModalError(error.message);
+                } finally {
+                    modalReprocessBtn.disabled = false;
+                    modalReprocessBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Reprocesar Job';
+                }
+            });
+        }
+    }
+
+    // Initialize sidebar navigation
+    const navNewJob = document.getElementById('nav-new-job');
+    const navReprocess = document.getElementById('nav-reprocess');
+    const navHistory = document.getElementById('nav-history');
+
+    if (navNewJob) {
+        navNewJob.addEventListener('click', (e) => {
+            e.preventDefault();
+            showWelcomeSection();
+            updateSidebarActiveState('nav-new-job');
+            scrollToTop();
+        });
+    }
+
+    if (navReprocess) {
+        navReprocess.addEventListener('click', (e) => {
+            e.preventDefault();
+            openReprocessModal();
+        });
+    }
+
+    if (navHistory) {
+        navHistory.addEventListener('click', (e) => {
+            e.preventDefault();
+            const historySection = document.getElementById('history-section');
+            if (historySection) {
+                historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                updateSidebarActiveState('nav-history');
+            }
+        });
+    }
+
+    // Load initial data
     loadJobs();
     loadRecentJobs();
 
