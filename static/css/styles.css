@@ -397,17 +397,77 @@ body {
     }
 }
 
+/* Settings Panel */
+.settings-panel {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    width: 320px;
+    height: 100vh;
+    background-color: #fff;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.15);
+    z-index: 1050;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+}
+
+.settings-panel.open {
+    right: 0;
+}
+
+.settings-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.settings-panel-header h5 {
+    margin: 0;
+}
+
+.settings-panel-body {
+    padding: 20px;
+}
+
+.settings-panel-body h6 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.settings-panel-body hr {
+    margin: 20px 0;
+}
+
+.settings-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 1040;
+    display: none;
+}
+
+.settings-backdrop.open {
+    display: block;
+}
+
 @media (max-width: 768px) {
     .stats-grid,
     .job-stats-grid,
     .job-details-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .phases-container {
         flex-direction: column;
     }
-    
+
     .timer-display {
         font-size: 1.5rem;
     }

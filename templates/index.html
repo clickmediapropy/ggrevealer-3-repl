@@ -319,6 +319,46 @@
         </div>
     </div>
 
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="settings-panel">
+        <div class="settings-panel-header">
+            <h5><i class="bi bi-gear"></i> Settings</h5>
+            <button id="close-settings-btn" class="btn-close"></button>
+        </div>
+        <div class="settings-panel-body">
+            <h6>🔧 Developer Tools</h6>
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="dev-mode-toggle">
+                <label class="form-check-label" for="dev-mode-toggle">
+                    Enable Developer Mode
+                </label>
+            </div>
+
+            <hr>
+
+            <h6>🔄 Reprocess Job</h6>
+            <div class="mb-3">
+                <label for="settings-job-id" class="form-label">Job ID</label>
+                <input type="number" class="form-control" id="settings-job-id" value="3" min="1">
+            </div>
+            <div id="settings-job-info" class="small text-muted mb-3">
+                Loading job info...
+            </div>
+            <button id="settings-reprocess-btn" class="btn btn-warning w-100">
+                <i class="bi bi-arrow-clockwise"></i> Reprocess Job
+            </button>
+
+            <hr>
+
+            <h6>ℹ️ About</h6>
+            <p class="small text-muted mb-0">
+                <strong>Version:</strong> 3.0<br>
+                <strong>API:</strong> <span id="api-status">Connected</span>
+            </p>
+        </div>
+    </div>
+    <div id="settings-backdrop" class="settings-backdrop"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
