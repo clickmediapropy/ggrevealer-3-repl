@@ -2368,6 +2368,37 @@ def _group_hands_by_table(parsed_hands: List[ParsedHand]) -> dict[str, List[Pars
     return dict(tables)
 
 
+def _table_matches(hand_table_name: str, group_table_name: str) -> bool:
+    """
+    Check if two table names refer to the same table.
+    Handles unknown_table_N pattern correctly.
+
+    Args:
+        hand_table_name: Table name from hand history
+        group_table_name: Table name from grouping (e.g., 'unknown_table_1')
+
+    Returns:
+        True if tables match, False otherwise
+
+    Example:
+        _table_matches('unknown_table_1', 'unknown_table_1') → True
+        _table_matches('unknown_table_1', 'unknown_table_2') → False
+        _table_matches('RealTable', 'RealTable') → True
+        _table_matches('RealTable', 'unknown_table_1') → False
+    """
+    # Exact match first
+    if hand_table_name == group_table_name:
+        return True
+
+    # Both are unknown_table_N: must match exactly (different unknowns are different)
+    if (hand_table_name.startswith('unknown_table_') and
+        group_table_name.startswith('unknown_table_')):
+        return hand_table_name == group_table_name
+
+    # Normalize and compare
+    return _normalize_table_name(hand_table_name) == _normalize_table_name(group_table_name)
+
+
 def _build_table_mapping(
     table_name: str,
     hands: List[ParsedHand],
@@ -2399,9 +2430,9 @@ def _build_table_mapping(
     # Step 1: Find all screenshots that match ANY hand in this table
     for screenshot_filename, matched_hand in matched_screenshots.items():
         # Check if this screenshot matches a hand from this table
-        # CRITICAL FIX (Issue #2): Use normalized table names for comparison
+        # CRITICAL FIX (Issue #2): Use _table_matches for consistent unknown table handling
         hand_table_name = extract_table_name(matched_hand.raw_text)
-        if _normalize_table_name(hand_table_name) == _normalize_table_name(table_name):
+        if _table_matches(hand_table_name, table_name):
             screenshots_for_table.append((screenshot_filename, matched_hand))
 
     logger.info(f"📊 Table '{table_name}': {len(hands)} hands, {len(screenshots_for_table)} matched screenshots",
