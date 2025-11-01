@@ -371,9 +371,30 @@ async def download_output(job_id: int):
         raise HTTPException(status_code=404, detail="Output file not found")
     
     output_path = Path(result['output_txt_path'])
-    
+
     # Check if it's a ZIP file (new format) or TXT file (old format)
     if output_path.suffix == '.zip' and output_path.exists():
+        # VALIDATE ZIP INTEGRITY BEFORE DOWNLOAD
+        try:
+            with zipfile.ZipFile(output_path, 'r') as zipf:
+                # testzip() returns None if valid, filename if corrupted
+                bad_file = zipf.testzip()
+                if bad_file:
+                    logger = JobLogger(job_id=job_id)
+                    logger.error(f"ZIP file corrupted: cannot read {bad_file}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Output file is corrupted and cannot be extracted. "
+                               f"Contact administrator with job ID {job_id}"
+                    )
+        except zipfile.BadZipFile:
+            logger = JobLogger(job_id=job_id)
+            logger.error(f"ZIP file is invalid/corrupted")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Output file is corrupted. Contact administrator with job ID {job_id}"
+            )
+
         return FileResponse(
             path=output_path,
             filename=f"resolved_hands_{job_id}.zip",
@@ -402,10 +423,31 @@ async def download_failed_files(job_id: int):
     
     # Check if fallidos.zip exists
     fallidos_path = OUTPUTS_PATH / str(job_id) / "fallidos.zip"
-    
+
     if not fallidos_path.exists():
         raise HTTPException(status_code=404, detail="No failed files found for this job")
-    
+
+    # VALIDATE ZIP INTEGRITY BEFORE DOWNLOAD
+    try:
+        with zipfile.ZipFile(fallidos_path, 'r') as zipf:
+            # testzip() returns None if valid, filename if corrupted
+            bad_file = zipf.testzip()
+            if bad_file:
+                logger = JobLogger(job_id=job_id)
+                logger.error(f"ZIP file corrupted: cannot read {bad_file}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed files ZIP is corrupted and cannot be extracted. "
+                           f"Contact administrator with job ID {job_id}"
+                )
+    except zipfile.BadZipFile:
+        logger = JobLogger(job_id=job_id)
+        logger.error(f"ZIP file is invalid/corrupted")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed files ZIP is corrupted. Contact administrator with job ID {job_id}"
+        )
+
     return FileResponse(
         path=fallidos_path,
         filename=f"fallidos_{job_id}.zip",
