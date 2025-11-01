@@ -1702,12 +1702,12 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
                        failed_count=len(matched_screenshots) - ocr2_success_count,
                        duration_ms=ocr2_duration)
 
-            return matched_screenshots
+            return matched_screenshots, unmatched_screenshots
 
         # SINGLE event loop call for both OCR phases
         logger.info("🔄 Running OCR phases in unified event loop")
         ocr2_results = {}  # {screenshot_filename: (success, ocr_data, error)}
-        matched_screenshots = asyncio.run(run_all_ocr_phases())
+        matched_screenshots, unmatched_screenshots = asyncio.run(run_all_ocr_phases())
 
         # Step 8: Generate name mappings (Phase 2 - Table-wide approach)
         # NEW: Group by table → Aggregate mappings → Apply to ALL hands of that table
