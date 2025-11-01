@@ -29,7 +29,10 @@ async def ocr_hand_id(screenshot_path: str, api_key: str) -> Tuple[bool, Optiona
     try:
         # Check if API key is configured
         if not api_key or api_key == "DUMMY_API_KEY_FOR_TESTING":
-            return (False, None, "Gemini API key not configured")
+            raise ValueError(
+                "Gemini API key is required but not configured. "
+                "This should have been caught in main.py - report this error."
+            )
 
         # Read image
         with open(screenshot_path, 'rb') as f:
@@ -120,7 +123,10 @@ async def ocr_player_details(screenshot_path: str, api_key: str) -> Tuple[bool, 
     try:
         # Check if API key is configured
         if not api_key or api_key == "DUMMY_API_KEY_FOR_TESTING":
-            return (False, None, "Gemini API key not configured")
+            raise ValueError(
+                "Gemini API key is required but not configured. "
+                "This should have been caught in main.py - report this error."
+            )
 
         # Read image
         with open(screenshot_path, 'rb') as f:

@@ -1542,9 +1542,21 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
 
         # Use provided API key or fallback to environment
         if not api_key or not api_key.strip():
-            api_key = os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
+            api_key = os.getenv('GEMINI_API_KEY')
 
-        logger.info(f"Using API key: {'User-provided' if api_key != os.getenv('GEMINI_API_KEY') else 'Environment'}")
+        # CRITICAL: Fail fast if no API key
+        if not api_key or api_key == 'your_gemini_api_key_here' or api_key == 'DUMMY_API_KEY_FOR_TESTING':
+            error_msg = (
+                "GEMINI_API_KEY not configured. Cannot proceed with OCR processing.\n"
+                "Please configure:\n"
+                "1. Set in .env file: GEMINI_API_KEY=your_actual_key\n"
+                "2. Or pass in request header: X-Gemini-API-Key: your_actual_key\n"
+                "3. Get key from: https://makersuite.google.com/app/apikey"
+            )
+            logger.critical(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+
+        logger.info(f"✓ Using Gemini API key (first 10 chars): {api_key[:10]}...")
 
         # Get API tier from job and configure rate limiting
         job = get_job(job_id)
