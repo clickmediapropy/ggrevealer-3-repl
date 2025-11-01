@@ -2558,7 +2558,26 @@ def _build_table_mapping(
         small_blind_player = None
         big_blind_player = None
 
-        if dealer_player and dealer_player in players_list:
+        if not dealer_player:
+            logger.warning(
+                f"⚠️  No dealer detected for screenshot {screenshot_filename}",
+                screenshot=screenshot_filename,
+                table=table_name,
+                reason="dealer role not extracted by OCR2"
+            )
+            small_blind_player = None
+            big_blind_player = None
+        elif dealer_player not in players_list:
+            logger.warning(
+                f"⚠️  Dealer '{dealer_player}' not found in player list for {screenshot_filename}",
+                screenshot=screenshot_filename,
+                table=table_name,
+                dealer=dealer_player,
+                available_players=players_list
+            )
+            small_blind_player = None
+            big_blind_player = None
+        else:
             # Find dealer index in players list
             dealer_index = players_list.index(dealer_player)
             total_players = len(players_list)
@@ -2571,11 +2590,14 @@ def _build_table_mapping(
             small_blind_player = players_list[sb_index]
             big_blind_player = players_list[bb_index]
 
-            logger.debug(f"Calculated blinds from dealer '{dealer_player}' (index {dealer_index}): SB='{small_blind_player}' (index {sb_index}), BB='{big_blind_player}' (index {bb_index})",
-                        screenshot=screenshot_filename,
-                        dealer=dealer_player,
-                        sb=small_blind_player,
-                        bb=big_blind_player)
+            logger.debug(
+                f"✓ Calculated blinds from dealer",
+                screenshot=screenshot_filename,
+                table=table_name,
+                dealer=dealer_player,
+                sb=small_blind_player,
+                bb=big_blind_player
+            )
 
         # Ensure all lists have the same length
         min_length = min(len(players_list), len(stacks_list), len(positions_list)) if positions_list else len(players_list)
