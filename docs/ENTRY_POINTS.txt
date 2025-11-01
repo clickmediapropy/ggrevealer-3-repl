@@ -1,0 +1,375 @@
+================================================================================
+              GGRevealer Entry Points & Key Execution Flows
+================================================================================
+
+ENTRY POINT 1: main.py (FastAPI Application)
+================================================================================
+Location: /Users/nicodelgadob/ggrevealer-3-repl/main.py:1-100
+
+@app.on_event("startup")
+└─ init_db()  [database.py:95-123]
+    └─ Creates/migrates SQLite schema
+        ├─ jobs table (job tracking)
+        ├─ files table (TXT/screenshot references)
+        ├─ results table (output files)
+        ├─ screenshot_results table (OCR tracking)
+        └─ logs table (structured logging)
+
+@app.get("/")
+└─ Redirects to /app
+
+@app.get("/app")
+└─ Serves index.html (Jinja2 template)
+    └─ Browser loads Bootstrap 5 + app.js
+
+
+ENTRY POINT 2: Frontend User Actions (templates/index.html + static/app.js)
+================================================================================
+
+User uploads files:
+POST /api/upload [main.py:202-260]
+├─ Validate file types and sizes
+├─ Save TXT files to storage/uploads/{job_id}/txt/
+├─ Save screenshot files to storage/uploads/{job_id}/screenshots/
+├─ database.py: create_job() → Generate job_id
+├─ database.py: add_file() → Track uploaded files
+└─ Response: {job_id, status: "pending"}
+
+User clicks "Process Job":
+POST /api/process/{job_id} [main.py:261-302]
+├─ Validate API key (from header or env)
+├─ Mark job as "processing"
+└─ Background task: run_processing_pipeline(job_id, api_key)
+    [main.py:1477-2330]
+
+User polls for status:
+GET /api/status/{job_id} [main.py:303-358]
+├─ database.py: get_job() → Fetch job record
+├─ database.py: get_screenshot_results() → Progress data
+└─ Response: {status, progress, matched_hands, errors, etc.}
+
+User downloads results:
+GET /api/download/{job_id} [main.py:359-392]
+└─ FastAPI: FileResponse("storage/outputs/{job_id}/resolved_hands.zip")
+
+
+ENTRY POINT 3: Processing Pipeline (run_processing_pipeline)
+================================================================================
+Location: main.py:1477-2330
+
+PHASE 1: Parse Hand Histories
+├─ Load TXT files from storage/uploads/{job_id}/txt/
+├─ parser.py: GGPokerParser.parse_file(content)
+│  ├─ Extract hand ID (Poker Hand #...)
+│  ├─ Extract timestamp (YYYY/MM/DD HH:MM:SS)
+│  ├─ Extract seats (Seat N: PlayerID (stack))
+│  ├─ Extract actions (Preflop, Flop, Turn, River, Showdown)
+│  └─ Return: List[ParsedHand]
+├─ database.py: update_job_file_counts()
+└─ logger.py: Log parsed hand count
+
+PHASE 2: OCR1 - Hand ID Extraction
+├─ ocr.py: ocr_hand_id_with_retry() [Async, parallel]
+│  ├─ Semaphore-based rate limiting (free: 1, paid: 10)
+│  ├─ Prompt: "EXTRACT ONLY THE HAND ID"
+│  ├─ Return: (success, hand_id, error)
+│  └─ Retry once with 1s delay if failed
+├─ database.py: save_ocr1_result()
+│  └─ Save to screenshot_results table
+├─ database.py: increment_ocr_processed_count()
+└─ logger.py: Log OCR1 progress
+
+PHASE 3: Match Hands to Screenshots
+├─ matcher.py: find_best_matches()
+│  ├─ For each hand, find best screenshot match
+│  ├─ Strategy:
+│  │  1. Normalize hand IDs (remove prefixes)
+│  │  2. Primary: Hand ID exact match (99.9%)
+│  │  3. Fallback: 100-point scoring system
+│  │  4. Validation gates:
+│  │     - Player count match
+│  │     - Hero stack within ±25%
+│  │     - ≥50% stacks within ±30%
+│  └─ Return: List[HandMatch]
+├─ Identify unmatched screenshots (discard later)
+└─ logger.py: Log match results
+
+PHASE 4: Discard Unmatched Screenshots
+├─ Mark screenshots as "discarded" if no match found
+├─ database.py: mark_screenshot_discarded()
+└─ Result: ~50% cost savings (OCR2 only on matched)
+
+PHASE 5: OCR2 - Player Details Extraction
+├─ ocr.py: ocr_player_details() [Async, parallel - MATCHED ONLY]
+│  ├─ Prompt: "EXTRACT PLAYER NAMES + ROLE INDICATORS (D/SB/BB)"
+│  ├─ Return: {player_names, dealer_player, sb_player, bb_player, stacks}
+│  └─ Return: ScreenshotAnalysis object
+├─ database.py: save_ocr2_result()
+│  └─ Save to screenshot_results.ocr2_data (JSON)
+└─ logger.py: Log OCR2 progress
+
+PHASE 6: Role-Based Mapping
+├─ matcher.py: _build_seat_mapping_by_roles()
+│  ├─ For each matched hand:
+│  │  1. Get screenshot with role indicators
+│  │  2. Find dealer button (D)
+│  │  3. Auto-calculate SB, BB positions
+│  │  4. Map anonymized_ids → real_names
+│  │  5. Validate (no duplicate names per hand)
+│  └─ Return: Dict[anonymized_id, real_name]
+├─ Table aggregation:
+│  ├─ Group by table name
+│  ├─ Apply one screenshot's mappings to ALL hands in that table
+│  └─ Result: One screenshot → many hands resolved
+└─ logger.py: Log mapping creation
+
+PHASE 7: Write Output Files
+├─ Group hands by table name
+├─ writer.py: generate_txt_files_by_table()
+│  ├─ For each table:
+│  │  1. Combine raw_text of all hands
+│  │  2. Apply 14 regex patterns (in exact order!)
+│  │  3. Replace anonymized IDs with real names
+│  │  4. Detect unmapped IDs in output
+│  │  5. Classify: _resolved.txt or _fallado.txt
+│  └─ Write to storage/outputs/{job_id}/
+├─ Create per-table files:
+│  ├─ TableName_resolved.txt (100% mapped)
+│  └─ TableName_fallado.txt (has unmapped IDs)
+└─ logger.py: Log output generation
+
+PHASE 8: Validate PokerTracker Compatibility
+├─ validator.py: GGPokerHandHistoryValidator
+│  ├─ 12 critical validation checks:
+│  │  1. Pot size (Cash Drop fees)
+│  │  2. Blind consistency
+│  │  3. Stack sizes (no negatives)
+│  │  4. Hand metadata (ID format)
+│  │  5. Player identifiers (hex format)
+│  │  6. Card validation (no duplicates)
+│  │  7. Game type support
+│  │  8. Action sequence logic
+│  │  9. Stack consistency
+│  │ 10. Split pots calculation
+│  │ 11. EV Cashout detection
+│  │ 12. All-in with straddle
+│  └─ Classify files: _resolved vs _fallado
+└─ logger.py: Log validation results
+
+PHASE 9: Create ZIP Archives
+├─ Create storage/outputs/{job_id}/resolved_hands.zip
+│  └─ All *_resolved.txt files (ready for PT4)
+├─ Create storage/outputs/{job_id}/fallidos.zip
+│  └─ All *_fallado.txt files (need more screenshots)
+└─ logger.py: Log ZIP creation
+
+PHASE 10: Calculate Metrics & Persist
+├─ _calculate_detailed_metrics() [main.py:2051-2250]
+│  ├─ Count matched hands
+│  ├─ Count successful mappings
+│  ├─ Count unmapped players
+│  ├─ Calculate match rate
+│  ├─ Calculate coverage percentage
+│  └─ Return: 30+ metrics across 5 categories
+├─ database.py: update_job_stats()
+│  └─ Save statistics to jobs table
+├─ database.py: update_job_detailed_metrics()
+│  └─ Save metrics JSON to results table
+├─ database.py: update_job_cost()
+│  └─ Calculate total Gemini API cost
+└─ logger.py: flush_to_db()
+    └─ Persist all buffered logs
+
+PHASE 11: Auto-Export Debug JSON
+├─ _export_debug_json(job_id) [main.py:578-660]
+│  ├─ Export complete job context
+│  ├─ Include: job info, files, results, logs
+│  ├─ Include: screenshot results, metrics, errors
+│  └─ File: storage/debug/debug_job_{id}_{timestamp}.json
+├─ OPTIONAL: Generate AI debugging prompt
+│  ├─ POST /api/debug/{job_id}/generate-prompt
+│  ├─ _analyze_debug_data(debug_json_path)
+│  ├─ Call Gemini 2.5 Flash for analysis
+│  └─ Generate actionable debugging steps
+└─ Update job status to "completed"
+
+
+ENTRY POINT 4: Validation System (Optional)
+================================================================================
+Location: main.py:1394-1450
+
+POST /api/validate (Standalone validation)
+├─ Accept single TXT file (no screenshots needed)
+├─ validator.py: GGPokerHandHistoryValidator()
+│  └─ Run 12 validation checks
+├─ Return: {valid, pt4_would_reject, errors, warnings}
+└─ No database persistence (just validation)
+
+
+ENTRY POINT 5: Debugging & Diagnostics
+================================================================================
+Location: main.py:515-1000
+
+GET /api/debug/{job_id}
+├─ database.py: get_job() + get_job_logs() + get_screenshot_results()
+├─ Combine all job data
+└─ Return: {job, files, results, logs, screenshots}
+
+POST /api/debug/{job_id}/generate-prompt
+├─ Call _export_debug_json() if not already exported
+├─ Call _analyze_debug_data(debug_json_path)
+│  ├─ Parse job metrics
+│  ├─ Identify problems (low match rate, OCR failures, etc.)
+│  ├─ Generate structured analysis dict
+│  └─ Return: {issues, suggestions, file_paths}
+├─ Call Gemini 2.5 Flash API (if available)
+│  ├─ Generate AI-powered debugging prompt
+│  ├─ Include: Job metrics, error patterns, suggested fixes
+│  └─ Instruct Claude Code to read debug JSON first
+└─ Fallback: _generate_fallback_prompt() if Gemini fails
+
+POST /api/debug/{job_id}/export
+├─ Call _export_debug_json()
+└─ Return: {filepath}
+
+GET /api/job/{job_id}/screenshots
+├─ database.py: get_screenshot_results()
+├─ Return detailed OCR results per screenshot
+│  ├─ ocr1_success, ocr1_hand_id, ocr1_error
+│  ├─ ocr2_success, ocr2_data, ocr2_error
+│  ├─ matches_found, discard_reason
+│  └─ unmapped_players
+└─ Frontend: Display OCR errors for debugging
+
+
+ENTRY POINT 6: Configuration & Settings
+================================================================================
+Location: main.py:423-503
+
+GET /api/config/budget
+├─ database.py: get_budget_config()
+└─ Return: {monthly_budget, current_spending}
+
+POST /api/config/budget
+├─ Receive: {monthly_budget}
+├─ database.py: save_budget_config()
+└─ Response: {success}
+
+POST /api/validate-api-key
+├─ Receive: {api_key}
+├─ Test: Make test call to Gemini API
+├─ Return: {valid: true/false, error: string}
+└─ Frontend: Display key status indicator
+
+
+ASYNC EXECUTION PATTERN
+================================================================================
+
+Dual OCR Processing (OCR1 + OCR2):
+
+asyncio.run(process_screenshots())
+└─ semaphore = asyncio.Semaphore(limit)  # 1 (free) or 10 (paid)
+    └─ async def process_single_screenshot(ss):
+        ├─ async with semaphore:
+        │  ├─ OCR1: await ocr_hand_id()
+        │  │  └─ Call Gemini API
+        │  └─ Save result
+        └─ Repeat for all screenshots in parallel
+
+Result: Batch processing with rate limiting
+
+
+DATABASE PERSISTENCE PATTERN
+================================================================================
+
+Every phase updates the database:
+
+1. upload: create_job() + add_file()
+2. OCR1:  save_ocr1_result() + increment_ocr_processed_count()
+3. Match: (no DB update, just in-memory tracking)
+4. OCR2:  save_ocr2_result()
+5. Mapping: (no direct DB update, saved with results)
+6. Write: save_result() with output_txt_path
+7. Validate: update_job_stats() with statistics
+8. Complete: update_job_status() + logger.flush_to_db()
+
+
+CRITICAL EXECUTION CONSTRAINTS
+================================================================================
+
+1. File Organization Must Be Preserved
+   ├─ All hands from input TXT files included in output
+   ├─ Classified: _resolved.txt (clean) or _fallado.txt (unmapped)
+   └─ No hands ever discarded
+
+2. Name Replacement Order Is Critical
+   ├─ 14 regex patterns must be applied in exact order
+   ├─ Most specific patterns first
+   └─ Prevents ID conflicts and incorrect replacements
+
+3. Rate Limiting Based on API Tier
+   ├─ Free tier: 14 requests/minute (use semaphore=1)
+   ├─ Paid tier: 10 concurrent (use semaphore=10)
+   └─ Smart rate limiting prevents Gemini API errors
+
+4. Table Aggregation Requires OCR2 Data
+   ├─ Use role indicators (D/SB/BB) for mapping
+   ├─ Apply mappings to ALL hands in same table
+   ├─ One screenshot can resolve entire table session
+   └─ Ensures maximum coverage
+
+5. Validation Before Output
+   ├─ 12 PokerTracker 4 checks run on every file
+   ├─ Classify files by validation results
+   ├─ Critical errors → _fallado.txt
+   └─ Clean files → _resolved.txt
+
+
+ERROR HANDLING & RECOVERY
+================================================================================
+
+OCR1 Retry:
+├─ if ocr1_success == 0:
+└─ ocr_hand_id_with_retry()
+    ├─ Wait 1 second
+    └─ Retry once
+
+Failed Match Recovery:
+├─ Unmatched screenshots → Mark as discarded
+├─ Skip OCR2 (cost savings)
+└─ No data loss (original TXT intact)
+
+Failed OCR2 Recovery:
+├─ If ocr2_success == 0 after match:
+├─ Mapping cannot be auto-generated
+├─ Fallback: Manual mapping or use fallback method
+└─ File classified as _fallado.txt
+
+Validation Errors:
+├─ Classify file as _fallado.txt
+├─ Log detailed error reason
+├─ Include in fallidos.zip
+└─ User can fix and reprocess
+
+
+PERFORMANCE CHARACTERISTICS
+================================================================================
+
+Typical Job (300 TXT files, 300 screenshots):
+├─ Phase 1 (Parse): ~10 seconds
+├─ Phase 2 (OCR1): ~10 minutes (1 concurrent, 4.3s delay)
+│             or ~3 minutes (10 concurrent, no delay)
+├─ Phase 3 (Match): ~30 seconds
+├─ Phase 4 (Discard): ~5 seconds
+├─ Phase 5 (OCR2): ~5 minutes (if 50% matched)
+├─ Phase 6 (Mapping): ~30 seconds
+├─ Phase 7 (Write): ~1 minute
+├─ Phase 8 (Validate): ~2 minutes
+├─ Phase 9 (ZIP): ~1 minute
+├─ Phase 10 (Metrics): ~10 seconds
+├─ Phase 11 (Export): ~30 seconds
+└─ Total: 15-30 minutes depending on API tier
+
+Cost: ~$5 for 300 screenshots ($0.0164 per screenshot)
+
+================================================================================
