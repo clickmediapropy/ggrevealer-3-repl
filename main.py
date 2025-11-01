@@ -2495,12 +2495,54 @@ def _build_table_mapping(
         # FIX: Parse JSON string to dict if ocr_data is stored as string
         if isinstance(ocr_data, str):
             import json
-            ocr_data = json.loads(ocr_data)
+            try:
+                ocr_data = json.loads(ocr_data)
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"❌ OCR2 JSON parse error for {screenshot_filename}",
+                    screenshot=screenshot_filename,
+                    error=str(e),
+                    table=table_name
+                )
+                continue  # Skip this screenshot
 
         if not success:
             logger.warning(f"OCR2 failed for {screenshot_filename}: {error}",
                          screenshot=screenshot_filename,
                          error=error)
+            continue
+
+        # VALIDATE SCHEMA
+        required_fields = ['players', 'roles']
+        missing_fields = [f for f in required_fields if f not in ocr_data]
+
+        if missing_fields:
+            logger.error(
+                f"❌ OCR2 missing required fields for {screenshot_filename}",
+                screenshot=screenshot_filename,
+                missing_fields=missing_fields,
+                table=table_name,
+                received_keys=list(ocr_data.keys())
+            )
+            continue  # Skip this screenshot
+
+        # Validate field types
+        if not isinstance(ocr_data.get('players'), list):
+            logger.error(
+                f"❌ OCR2 'players' must be list for {screenshot_filename}",
+                screenshot=screenshot_filename,
+                received_type=type(ocr_data.get('players')).__name__,
+                table=table_name
+            )
+            continue
+
+        if not isinstance(ocr_data.get('roles'), dict):
+            logger.error(
+                f"❌ OCR2 'roles' must be dict for {screenshot_filename}",
+                screenshot=screenshot_filename,
+                received_type=type(ocr_data.get('roles')).__name__,
+                table=table_name
+            )
             continue
 
         # Build screenshot analysis object
