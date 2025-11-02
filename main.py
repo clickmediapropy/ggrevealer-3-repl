@@ -509,14 +509,22 @@ async def validate_api_key(request: Request):
                 content={"valid": False, "error": "API key is required"}
             )
 
-        # Test the API key with a minimal Gemini request
+        # Validate basic format first
+        if len(api_key) < 20:
+            return JSONResponse(
+                status_code=400,
+                content={"valid": False, "error": "API key inválida. El formato no es correcto."}
+            )
+
+        # Test the API key with a minimal async request
         # Create thread-safe client with the provided API key
         client = genai.Client(api_key=api_key)
-
-        # Use the simplest possible request to test the key
-        response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
-            contents='Test'
+        
+        # Use a minimal async request to validate the API key
+        # This will fail immediately if the API key is invalid
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents='test'
         )
 
         # If we got here, the API key is valid
@@ -526,15 +534,20 @@ async def validate_api_key(request: Request):
         error_message = str(e)
 
         # Check for common error patterns
-        if "API_KEY_INVALID" in error_message or "invalid API key" in error_message.lower():
+        if "API_KEY_INVALID" in error_message or "invalid API key" in error_message.lower() or "INVALID_API_KEY" in error_message:
             return JSONResponse(
                 status_code=401,
                 content={"valid": False, "error": "API key inválida. Verifica que sea correcta."}
             )
-        elif "quota" in error_message.lower() or "limit" in error_message.lower():
+        elif "quota" in error_message.lower() or "limit" in error_message.lower() or "PERMISSION_DENIED" in error_message:
             return JSONResponse(
                 status_code=429,
-                content={"valid": False, "error": "Límite de cuota excedido. Verifica tu saldo en Google Cloud."}
+                content={"valid": False, "error": "Límite de cuota excedido o sin permisos. Verifica tu saldo en Google Cloud."}
+            )
+        elif "403" in error_message or "Forbidden" in error_message:
+            return JSONResponse(
+                status_code=403,
+                content={"valid": False, "error": "API key sin permisos. Verifica que la API key tenga acceso a Gemini API."}
             )
         else:
             return JSONResponse(
