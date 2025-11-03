@@ -292,14 +292,16 @@ function updateUploadButton() {
 
 if (uploadBtn) {
     uploadBtn.addEventListener('click', async () => {
-    // Check if API tier is declared
-    const apiTier = localStorage.getItem('api_tier');
-    if (!apiTier) {
+    // Check if API key is configured
+    if (!hasApiKey()) {
         showWarning('Primero debes configurar tu API Key');
         const apiKeyModal = new bootstrap.Modal(document.getElementById('apiKeyModal'));
         apiKeyModal.show();
         return;
     }
+
+    // Get API tier for time estimation (default to 'free' if not set)
+    const apiTier = localStorage.getItem('api_tier') || 'free';
 
     // Validate limits before upload
     if (txtFiles.length > MAX_TXT_FILES) {
@@ -2350,7 +2352,10 @@ function checkApiKeyOnStartup() {
 async function validateAndSaveApiKey() {
     const apiKeyInput = document.getElementById('api-key-input');
     const apiKey = apiKeyInput.value.trim();
-    const apiTier = document.querySelector('input[name="apiTier"]:checked').value;
+
+    // Get selected API tier (default to 'free' if somehow not selected)
+    const apiTierElement = document.querySelector('input[name="apiTier"]:checked');
+    const apiTier = apiTierElement ? apiTierElement.value : 'free';
 
     const errorDiv = document.getElementById('api-key-error');
     const successDiv = document.getElementById('api-key-success');

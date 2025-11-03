@@ -119,10 +119,18 @@ def get_api_key_from_request(request: Request) -> str:
     # Try to get API key from request header
     user_api_key = request.headers.get('X-Gemini-API-Key')
     if user_api_key and user_api_key.strip():
+        masked_key = '***' + user_api_key[-4:] if len(user_api_key) > 4 else '***'
+        print(f"[DEBUG] Using custom API key from header: {masked_key}")
         return user_api_key.strip()
 
     # Fallback to environment variable
-    return os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
+    env_key = os.getenv('GEMINI_API_KEY', 'DUMMY_API_KEY_FOR_TESTING')
+    if env_key != 'DUMMY_API_KEY_FOR_TESTING':
+        masked_key = '***' + env_key[-4:] if len(env_key) > 4 else '***'
+        print(f"[DEBUG] Using API key from .env file: {masked_key}")
+    else:
+        print(f"[DEBUG] No API key found (using dummy key)")
+    return env_key
 
 
 async def ocr_hand_id_with_retry(
@@ -519,17 +527,25 @@ async def validate_api_key(request: Request):
         # Test the API key with a minimal async request
         # Create thread-safe client with the provided API key
         client = genai.Client(api_key=api_key)
-        
-        # Use a minimal async request to validate the API key
+
+        # Use a minimal async request to validate the API key with 10 second timeout
         # This will fail immediately if the API key is invalid
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
-            contents='test'
+        response = await asyncio.wait_for(
+            client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents='test'
+            ),
+            timeout=10.0
         )
 
         # If we got here, the API key is valid
         return {"valid": True, "message": "API key is valid"}
 
+    except asyncio.TimeoutError:
+        return JSONResponse(
+            status_code=408,
+            content={"valid": False, "error": "Timeout al validar API key. Intenta nuevamente en unos momentos."}
+        )
     except Exception as e:
         error_message = str(e)
 
