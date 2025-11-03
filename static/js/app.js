@@ -2772,6 +2772,25 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBudgetBtn.addEventListener('click', saveBudgetConfig);
     }
 
+    // Initialize API key buttons
+    const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+    if (saveApiKeyBtn) {
+        saveApiKeyBtn.addEventListener('click', validateAndSaveApiKey);
+    }
+
+    const clearApiKeyBtn = document.getElementById('clear-api-key-btn');
+    if (clearApiKeyBtn) {
+        clearApiKeyBtn.addEventListener('click', clearApiKey);
+    }
+
+    const toggleApiKeyBtn = document.getElementById('toggle-api-key-visibility');
+    if (toggleApiKeyBtn) {
+        toggleApiKeyBtn.addEventListener('click', toggleApiKeyVisibility);
+    }
+
+    // Check API key status on startup
+    checkApiKeyOnStartup();
+
     // Load initial data
     loadJobs();
     loadRecentJobs();
