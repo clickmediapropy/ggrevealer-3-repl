@@ -65,7 +65,13 @@ class Logger:
         if extra:
             console_msg += f" | {json.dumps(extra, ensure_ascii=False)}"
 
-        print(console_msg, file=sys.stdout)
+        # Wrap in try-except to handle BrokenPipeError in background tasks
+        # When HTTP client disconnects, stdout may be closed, but logs still persist to DB
+        try:
+            print(console_msg, file=sys.stdout)
+        except (BrokenPipeError, IOError):
+            # Silently ignore - log is still saved to buffer for DB persistence
+            pass
 
     def _save_to_buffer(self, log_entry: Dict[str, Any]):
         """Save log entry to buffer for later persistence"""
