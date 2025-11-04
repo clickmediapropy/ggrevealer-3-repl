@@ -1950,10 +1950,9 @@ async def reprocess_failed_file(
     )
     from parser import GGPokerParser
     from ocr import ocr_player_details
-    from matcher import _build_seat_mapping
+    from matcher import _build_seat_mapping_by_roles
     from writer import (
-        generate_final_txt, detect_unmapped_ids_in_text,
-        validate_output_hand_history
+        generate_final_txt, detect_unmapped_ids_in_text
     )
     from pathlib import Path
     import asyncio
@@ -2029,8 +2028,8 @@ async def reprocess_failed_file(
         all_mappings = {}  # {anon_id: real_name}
 
         for hand in hands:
-            # Build seat mapping for this hand
-            mapping = _build_seat_mapping(
+            # Build seat mapping for this hand using role-based method
+            mapping = _build_seat_mapping_by_roles(
                 screenshot_analysis,
                 hand,
                 None  # logger (optional)
