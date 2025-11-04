@@ -146,6 +146,40 @@ const processingSection = document.getElementById('processing-section');
 const resultsSection = document.getElementById('results-section');
 const errorSection = document.getElementById('error-section');
 
+// Clear reprocess modal on close
+const reprocessModalElement = document.getElementById('reprocessModal');
+if (reprocessModalElement) {
+    reprocessModalElement.addEventListener('hidden.bs.modal', () => {
+        console.log('[MODAL] Clearing reprocess modal state');
+
+        // Clear input field
+        const jobIdInput = document.getElementById('modal-job-id');
+        if (jobIdInput) {
+            jobIdInput.value = '';
+        }
+
+        // Hide job info section
+        const jobInfo = document.getElementById('modal-job-info');
+        if (jobInfo) {
+            jobInfo.classList.add('d-none');
+        }
+
+        // Hide error section
+        const jobError = document.getElementById('modal-job-error');
+        if (jobError) {
+            jobError.classList.add('d-none');
+        }
+
+        // Disable reprocess button
+        const reprocessBtn = document.getElementById('modal-reprocess-btn');
+        if (reprocessBtn) {
+            reprocessBtn.disabled = true;
+        }
+
+        console.log('[MODAL] Reprocess modal cleared');
+    });
+}
+
 const statusText = document.getElementById('status-text');
 const resultsStats = document.getElementById('results-stats');
 const downloadBtn = document.getElementById('download-btn');
