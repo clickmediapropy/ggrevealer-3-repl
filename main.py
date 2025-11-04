@@ -1942,7 +1942,7 @@ def create_screenshot_analysis_from_ocr2_data(ocr_data: dict):
     )
 
 
-def convert_mapping_dict_to_name_mappings(mapping_dict: dict, table_name: str):
+def convert_mapping_dict_to_name_mappings(mapping_dict: dict):
     """Convert {anon_id: real_name} dict to List[NameMapping]"""
     from models import NameMapping
 
@@ -1952,8 +1952,7 @@ def convert_mapping_dict_to_name_mappings(mapping_dict: dict, table_name: str):
             anonymized_identifier=anon_id,
             resolved_name=real_name,
             confidence=100.0,  # 100% confidence for manual reprocess
-            source='reprocess_ocr2',
-            table_name=table_name
+            source='reprocess_ocr2'
         ))
 
     return name_mappings
@@ -2119,10 +2118,10 @@ async def reprocess_failed_file(
             return {"success": False, "error": "Could not generate player mappings from screenshot"}
 
         # Convert to NameMapping objects
-        name_mappings = convert_mapping_dict_to_name_mappings(all_mappings, table_name or str(table_number))
+        name_mappings = convert_mapping_dict_to_name_mappings(all_mappings)
 
         # Generate final TXT with mappings
-        final_txt, _ = generate_final_txt(original_txt, name_mappings)
+        final_txt = generate_final_txt(original_txt, name_mappings)
 
         # Validate: Check for unmapped IDs
         unmapped_ids = detect_unmapped_ids_in_text(final_txt)
