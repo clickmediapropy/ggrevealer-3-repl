@@ -2057,14 +2057,20 @@ def convert_mapping_dict_to_name_mappings(mapping_dict: dict):
 
 @app.post("/api/reprocess-failed-file")
 async def reprocess_failed_file(
-    pt4_failed_file_id: int = Form(...),
+    pt4_failed_file_id: Optional[int] = Form(None),
+    job_id: Optional[int] = Form(None),
+    table_number: Optional[int] = Form(None),
     api_key: Optional[str] = Form(None)
 ):
     """
-    Reprocess a PT4 failed file with its associated screenshot
+    Reprocess a failed file with its associated screenshot
+
+    SUPPORTS TWO MODES:
+    1. PT4 Import Failures: Use pt4_failed_file_id (from pt4_failed_files table)
+    2. Initial Processing Failures: Use job_id + table_number (from results.stats_json)
 
     Steps:
-    1. Get original TXT + screenshot from database
+    1. Get original TXT + screenshot (from DB or by searching job files)
     2. Parse original TXT file
     3. Run OCR2 on screenshot to extract player names
     4. Generate seat mappings using OCR2 data
@@ -2075,7 +2081,8 @@ async def reprocess_failed_file(
     Returns download URL on success, error with unmapped IDs on failure
     """
     from database import (
-        get_db, get_pt4_failed_files_for_job, update_pt4_failed_file_screenshots
+        get_db, get_pt4_failed_files_for_job, update_pt4_failed_file_screenshots,
+        get_job_files, get_job_outputs_path
     )
     from parser import GGPokerParser
     from ocr import ocr_player_details
@@ -2087,29 +2094,76 @@ async def reprocess_failed_file(
     import asyncio
 
     try:
-        # Get the failed file from database
-        with get_db() as conn:
-            cursor = conn.execute(
-                "SELECT * FROM pt4_failed_files WHERE id = ?",
-                (pt4_failed_file_id,)
-            )
-            failed_file = dict(cursor.fetchone() or {})
-
-        if not failed_file:
-            return {"success": False, "error": "Failed file not found"}
-
-        job_id = failed_file['associated_job_id']
-        original_txt_path = failed_file['associated_original_txt_path']
-        table_number = failed_file['table_number']
-
-        # Parse screenshot paths
+        original_txt_path = None
         screenshot_paths = []
-        if failed_file.get('associated_screenshot_paths'):
-            try:
-                screenshot_paths = json.loads(failed_file['associated_screenshot_paths'])
-            except:
-                screenshot_paths = []
+        resolved_job_id = None
+        resolved_table_number = None
 
+        # MODE 1: PT4 Import Failure (has database ID)
+        if pt4_failed_file_id:
+            # Get the failed file from database
+            with get_db() as conn:
+                cursor = conn.execute(
+                    "SELECT * FROM pt4_failed_files WHERE id = ?",
+                    (pt4_failed_file_id,)
+                )
+                failed_file = dict(cursor.fetchone() or {})
+
+            if not failed_file:
+                return {"success": False, "error": "Failed file not found"}
+
+            resolved_job_id = failed_file['associated_job_id']
+            original_txt_path = failed_file['associated_original_txt_path']
+            resolved_table_number = failed_file['table_number']
+
+            # Parse screenshot paths
+            if failed_file.get('associated_screenshot_paths'):
+                try:
+                    screenshot_paths = json.loads(failed_file['associated_screenshot_paths'])
+                except:
+                    screenshot_paths = []
+
+        # MODE 2: Initial Processing Failure (no database ID, use job_id + table_number)
+        elif job_id and table_number:
+            resolved_job_id = job_id
+            resolved_table_number = table_number
+
+            # Find paths using get_job_files
+            job_files = get_job_files(job_id)
+            outputs_path = get_job_outputs_path(job_id)
+
+            # Find original TXT
+            for file in job_files:
+                if file['file_type'] == 'txt' and str(table_number) in file['filename']:
+                    original_txt_path = file['file_path']
+                    break
+
+            # Find screenshots using hand-ID-based matching
+            if original_txt_path:
+                from pt4_matcher import _extract_hand_ids_from_txt
+                hand_ids = _extract_hand_ids_from_txt(original_txt_path)
+
+                # Try hand ID matching first
+                found_by_hand_id = False
+                if hand_ids:
+                    for file in job_files:
+                        if file['file_type'] == 'screenshot':
+                            filename_lower = file['filename'].lower()
+                            for hand_id in hand_ids:
+                                if hand_id.lower() in filename_lower:
+                                    screenshot_paths.append(file['file_path'])
+                                    found_by_hand_id = True
+                                    break
+
+                # Fallback to table number matching
+                if not found_by_hand_id:
+                    for file in job_files:
+                        if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
+                            screenshot_paths.append(file['file_path'])
+        else:
+            return {"success": False, "error": "Must provide either pt4_failed_file_id OR (job_id + table_number)"}
+
+        # Validate we have required data
         if not screenshot_paths:
             return {"success": False, "error": "No screenshots associated with this file"}
 
@@ -2233,10 +2287,10 @@ async def reprocess_failed_file(
             }
 
         # Save corrected file
-        corrections_dir = Path(f"storage/corrections/{job_id}")
+        corrections_dir = Path(f"storage/corrections/{resolved_job_id}")
         corrections_dir.mkdir(parents=True, exist_ok=True)
 
-        corrected_file_path = corrections_dir / f"{table_number}_corregido.txt"
+        corrected_file_path = corrections_dir / f"{resolved_table_number}_corregido.txt"
         with open(corrected_file_path, 'w', encoding='utf-8') as f:
             f.write(final_txt)
 

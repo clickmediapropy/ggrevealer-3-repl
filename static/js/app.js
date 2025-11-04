@@ -2808,7 +2808,7 @@ function displayFailedFilesResults(data) {
                     <button class="btn btn-sm btn-warning reprocess-btn"
                             data-file-id="${file.id}"
                             data-table="${file.table_number}"
-                            onclick="reprocessFailedFile(${file.id}, ${file.table_number})">
+                            onclick="reprocessFailedFile(${file.id}, ${file.table_number}, ${file.matched_job_id})">
                         <i class="bi bi-arrow-clockwise"></i> Reprocesar
                     </button>
                     <div class="spinner-border spinner-border-sm d-none mt-2" role="status" id="spinner-${file.id}"></div>
@@ -2837,10 +2837,11 @@ function downloadFile(filepath) {
     link.click();
 }
 
-async function reprocessFailedFile(failedFileId, tableNumber) {
+async function reprocessFailedFile(failedFileId, tableNumber, jobId) {
     console.log('[REPROCESS] ===== Starting Reprocess =====');
     console.log('[REPROCESS] Failed file ID:', failedFileId);
     console.log('[REPROCESS] Table number:', tableNumber);
+    console.log('[REPROCESS] Job ID:', jobId);
 
     const button = document.querySelector(`button[data-file-id="${failedFileId}"]`);
     const spinner = document.getElementById(`spinner-${failedFileId}`);
@@ -2859,7 +2860,25 @@ async function reprocessFailedFile(failedFileId, tableNumber) {
 
     try {
         const formData = new FormData();
-        formData.append('pt4_failed_file_id', failedFileId);
+
+        // MODE 1: PT4 Import Failure (has database ID)
+        if (failedFileId !== null && failedFileId !== undefined && failedFileId !== 'null') {
+            console.log('[REPROCESS] Mode: PT4 Import Failure');
+            formData.append('pt4_failed_file_id', failedFileId);
+        }
+        // MODE 2: Initial Processing Failure (no database ID)
+        else if (jobId && tableNumber) {
+            console.log('[REPROCESS] Mode: Initial Processing Failure');
+            formData.append('job_id', jobId);
+            formData.append('table_number', tableNumber);
+        } else {
+            console.error('[REPROCESS] Invalid parameters - need either pt4_failed_file_id OR (job_id + table_number)');
+            button.disabled = false;
+            button.classList.remove('d-none');
+            spinner.classList.add('d-none');
+            alert('Error: Parámetros inválidos para reprocesar');
+            return;
+        }
 
         // Check if API key is available and add it
         const apiKeyInput = document.getElementById('api-key-input');
