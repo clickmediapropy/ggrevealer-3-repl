@@ -2276,12 +2276,15 @@ function showScreenshots(screenshotPaths) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    ${screenshotPaths.map(path => `
+                    ${screenshotPaths.map(path => {
+                        // Remove leading slash if present
+                        const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+                        return `
                         <div class="mb-3">
                             <p class="small text-muted">${path.split('/').pop()}</p>
-                            <img src="/api/screenshot/${encodeURIComponent(path)}" class="img-fluid border" alt="Screenshot">
+                            <img src="/api/screenshot/${cleanPath}" class="img-fluid border" alt="Screenshot">
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
             </div>
         </div>
