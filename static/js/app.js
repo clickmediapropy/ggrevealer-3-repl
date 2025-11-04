@@ -823,74 +823,42 @@ async function checkStatus() {
 function updateProcessingUI(job) {
     const stats = job.statistics || {};
     const isCompleted = job.status === 'completed';
-    
+
+    // Update timer
     if (job.elapsed_time_seconds !== null && job.elapsed_time_seconds !== undefined) {
         stopTimer();
         updateTimer(job.elapsed_time_seconds);
     }
-    
-    const phases = [
-        { name: 'Parsing', icon: 'bi-file-text', done: isCompleted || stats.hands_parsed > 0 },
-        { name: 'OCR', icon: 'bi-eye', done: isCompleted || stats.matched_hands > 0 },
-        { name: 'Matching', icon: 'bi-link-45deg', done: isCompleted || stats.matched_hands > 0 },
-        { name: 'Writing', icon: 'bi-pencil', done: isCompleted || stats.name_mappings > 0 }
-    ];
-
-    const phasesHTML = phases.map(phase => {
-        const statusClass = phase.done ? 'phase-done' : 'phase-processing';
-        const icon = phase.done ? 'bi-check-circle-fill' : 'bi-arrow-repeat spinning';
-        return `
-            <div class="phase-item ${statusClass}">
-                <i class="bi ${icon}"></i>
-                <span>${phase.name}</span>
-            </div>
-        `;
-    }).join('');
-    
-    const statsHTML = `
-        <div class="processing-stats">
-            <div class="processing-stat-item">
-                <i class="bi bi-file-text"></i>
-                <span>${stats.txt_files || 0} archivos TXT</span>
-            </div>
-            <div class="processing-stat-item">
-                <i class="bi bi-image"></i>
-                <span>${stats.screenshots || 0} screenshots</span>
-            </div>
-            ${stats.ocr_total > 0 && stats.ocr_processed < stats.ocr_total ? `
-                <div class="processing-stat-item processing">
-                    <i class="bi bi-arrow-repeat spinning"></i>
-                    <span>OCR: ${stats.ocr_processed}/${stats.ocr_total} procesados</span>
-                </div>
-            ` : ''}
-            ${stats.hands_parsed > 0 ? `
-                <div class="processing-stat-item success">
-                    <i class="bi bi-check-circle"></i>
-                    <span>${stats.hands_parsed} manos parseadas</span>
-                </div>
-            ` : ''}
-            ${stats.matched_hands > 0 ? `
-                <div class="processing-stat-item success">
-                    <i class="bi bi-check-circle"></i>
-                    <span>${stats.matched_hands} manos matched</span>
-                </div>
-            ` : ''}
-            ${stats.name_mappings > 0 ? `
-                <div class="processing-stat-item success">
-                    <i class="bi bi-check-circle"></i>
-                    <span>${stats.name_mappings} nombres resueltos</span>
-                </div>
-            ` : ''}
-        </div>
-    `;
 
     const processingStatus = document.getElementById('processing-status');
-    
+    if (!processingStatus) return;
+
+    // Check if initial render needed
     let timerElement = document.getElementById('timer');
+
     if (!timerElement) {
+        // First render - build full structure
+        const phases = [
+            { name: 'Parsing', icon: 'bi-file-text', done: isCompleted || stats.hands_parsed > 0 },
+            { name: 'OCR', icon: 'bi-eye', done: isCompleted || stats.matched_hands > 0 },
+            { name: 'Matching', icon: 'bi-link-45deg', done: isCompleted || stats.matched_hands > 0 },
+            { name: 'Writing', icon: 'bi-pencil', done: isCompleted || stats.name_mappings > 0 }
+        ];
+
+        const phasesHTML = phases.map(phase => {
+            const statusClass = phase.done ? 'phase-done' : 'phase-processing';
+            const icon = phase.done ? 'bi-check-circle-fill' : 'bi-arrow-repeat spinning';
+            return `
+                <div class="phase-item ${statusClass}" data-phase="${phase.name}">
+                    <i class="bi ${icon}"></i>
+                    <span>${phase.name}</span>
+                </div>
+            `;
+        }).join('');
+
         processingStatus.innerHTML = `
             <div class="timer-display">
-                <i class="bi bi-clock"></i> 
+                <i class="bi bi-clock"></i>
                 <span id="timer">0:00</span>
             </div>
             <h5 class="mb-3">Procesando Job #${job.id}</h5>
@@ -898,16 +866,104 @@ function updateProcessingUI(job) {
             <div class="phases-container mb-4">
                 ${phasesHTML}
             </div>
-            ${statsHTML}
+            <div class="processing-stats">
+                <div class="processing-stat-item" data-stat="txt-files">
+                    <i class="bi bi-file-text"></i>
+                    <span>${stats.txt_files || 0} archivos TXT</span>
+                </div>
+                <div class="processing-stat-item" data-stat="screenshots">
+                    <i class="bi bi-image"></i>
+                    <span>${stats.screenshots || 0} screenshots</span>
+                </div>
+                ${stats.ocr_total > 0 ? `
+                    <div class="processing-stat-item processing" data-stat="ocr">
+                        <i class="bi bi-arrow-repeat spinning"></i>
+                        <span>OCR: ${stats.ocr_processed}/${stats.ocr_total} procesados</span>
+                    </div>
+                ` : ''}
+                <div class="processing-stat-item" data-stat="parsed" style="display: ${stats.hands_parsed > 0 ? 'flex' : 'none'}">
+                    <i class="bi bi-check-circle"></i>
+                    <span>${stats.hands_parsed} manos parseadas</span>
+                </div>
+                <div class="processing-stat-item" data-stat="matched" style="display: ${stats.matched_hands > 0 ? 'flex' : 'none'}">
+                    <i class="bi bi-check-circle"></i>
+                    <span>${stats.matched_hands} manos matched</span>
+                </div>
+                <div class="processing-stat-item" data-stat="mappings" style="display: ${stats.name_mappings > 0 ? 'flex' : 'none'}">
+                    <i class="bi bi-check-circle"></i>
+                    <span>${stats.name_mappings} nombres resueltos</span>
+                </div>
+            </div>
         `;
     } else {
-        const phasesContainer = processingStatus.querySelector('.phases-container');
-        if (phasesContainer) {
-            phasesContainer.innerHTML = phasesHTML;
+        // Incremental update - only change what's needed
+
+        // Update phases
+        const phases = [
+            { name: 'Parsing', done: isCompleted || stats.hands_parsed > 0 },
+            { name: 'OCR', done: isCompleted || stats.matched_hands > 0 },
+            { name: 'Matching', done: isCompleted || stats.matched_hands > 0 },
+            { name: 'Writing', done: isCompleted || stats.name_mappings > 0 }
+        ];
+
+        phases.forEach(phase => {
+            const phaseElement = processingStatus.querySelector(`[data-phase="${phase.name}"]`);
+            if (phaseElement && phase.done && !phaseElement.classList.contains('phase-done')) {
+                phaseElement.classList.remove('phase-processing');
+                phaseElement.classList.add('phase-done');
+                const icon = phaseElement.querySelector('i');
+                icon.className = 'bi bi-check-circle-fill';
+            }
+        });
+
+        // Update stat items (only change text, don't rebuild DOM)
+        const updateStat = (selector, value) => {
+            const element = processingStatus.querySelector(selector);
+            if (element) {
+                const span = element.querySelector('span');
+                if (span && span.textContent !== value) {
+                    span.textContent = value;
+                    element.classList.add('success');
+                }
+            }
+        };
+
+        // Update OCR progress if exists
+        const ocrElement = processingStatus.querySelector('[data-stat="ocr"]');
+        if (ocrElement && stats.ocr_total > 0 && stats.ocr_processed < stats.ocr_total) {
+            const ocrSpan = ocrElement.querySelector('span');
+            if (ocrSpan) {
+                ocrSpan.textContent = `OCR: ${stats.ocr_processed}/${stats.ocr_total} procesados`;
+            }
+        } else if (ocrElement) {
+            ocrElement.remove();
         }
-        const statsContainer = processingStatus.querySelector('.processing-stats');
-        if (statsContainer) {
-            statsContainer.outerHTML = statsHTML;
+
+        // Show/update parsed hands
+        const parsedElement = processingStatus.querySelector('[data-stat="parsed"]');
+        if (stats.hands_parsed > 0) {
+            if (parsedElement) {
+                updateStat('[data-stat="parsed"]', `${stats.hands_parsed} manos parseadas`);
+                parsedElement.style.display = 'flex';
+            }
+        }
+
+        // Show/update matched hands
+        const matchedElement = processingStatus.querySelector('[data-stat="matched"]');
+        if (stats.matched_hands > 0) {
+            if (matchedElement) {
+                updateStat('[data-stat="matched"]', `${stats.matched_hands} manos matched`);
+                matchedElement.style.display = 'flex';
+            }
+        }
+
+        // Show/update mappings
+        const mappingsElement = processingStatus.querySelector('[data-stat="mappings"]');
+        if (stats.name_mappings > 0) {
+            if (mappingsElement) {
+                updateStat('[data-stat="mappings"]', `${stats.name_mappings} nombres resueltos`);
+                mappingsElement.style.display = 'flex';
+            }
         }
     }
 }

@@ -593,6 +593,20 @@ body {
     }
 }
 
+/* Highlight animation for changed stats */
+@keyframes highlightChange {
+    0% {
+        background-color: rgba(16, 185, 129, 0.3);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.processing-stat-item.success {
+    animation: highlightChange 0.5s ease;
+}
+
 /* Sidebar Layout */
 .main-layout {
     display: flex;
