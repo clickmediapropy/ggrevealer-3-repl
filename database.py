@@ -106,6 +106,26 @@ CREATE TABLE IF NOT EXISTS pt4_import_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_pt4_attempts_job_id ON pt4_import_attempts(job_id);
 
+-- PT4 failed files table (individual failed files)
+CREATE TABLE IF NOT EXISTS pt4_failed_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pt4_import_attempt_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    table_number INTEGER,
+    error_count INTEGER DEFAULT 0,
+    error_details TEXT,
+    associated_job_id INTEGER,
+    associated_original_txt_path TEXT,
+    associated_processed_txt_path TEXT,
+    associated_screenshot_paths TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (pt4_import_attempt_id) REFERENCES pt4_import_attempts (id) ON DELETE CASCADE,
+    FOREIGN KEY (associated_job_id) REFERENCES jobs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt4_failed_files_attempt_id ON pt4_failed_files(pt4_import_attempt_id);
+CREATE INDEX IF NOT EXISTS idx_pt4_failed_files_table_number ON pt4_failed_files(table_number);
+
 -- App config table (cost tracking and budget management)
 CREATE TABLE IF NOT EXISTS app_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -838,5 +858,37 @@ def create_pt4_import_attempt(
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (job_id, import_log, now, total_files, failed_files_count, now)
+        )
+        return cursor.lastrowid
+
+
+def create_pt4_failed_file(
+    pt4_import_attempt_id: int,
+    filename: str,
+    table_number: Optional[int],
+    error_count: int,
+    error_details: str,
+    associated_job_id: Optional[int] = None,
+    associated_original_txt_path: Optional[str] = None,
+    associated_processed_txt_path: Optional[str] = None,
+    associated_screenshot_paths: Optional[str] = None
+) -> int:
+    """Create a new PT4 failed file record"""
+    from datetime import datetime
+
+    now = datetime.now().isoformat()
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO pt4_failed_files
+            (pt4_import_attempt_id, filename, table_number, error_count, error_details,
+             associated_job_id, associated_original_txt_path, associated_processed_txt_path,
+             associated_screenshot_paths, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (pt4_import_attempt_id, filename, table_number, error_count, error_details,
+             associated_job_id, associated_original_txt_path, associated_processed_txt_path,
+             associated_screenshot_paths, now)
         )
         return cursor.lastrowid
