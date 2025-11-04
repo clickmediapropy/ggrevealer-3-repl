@@ -1987,11 +1987,17 @@ async def reprocess_failed_file(
         if not original_txt_path:
             raise HTTPException(status_code=400, detail="Original TXT file path not found")
 
-        # Read original TXT
-        if not Path(original_txt_path).exists():
-            raise HTTPException(status_code=404, detail="Original TXT file not found")
+        # Normalize path: handle leading slash issue
+        # Paths in database may have leading slash (old format) or without (new format)
+        normalized_path = original_txt_path
+        if normalized_path.startswith('/'):
+            normalized_path = normalized_path.lstrip('/')
 
-        with open(original_txt_path, 'r', encoding='utf-8') as f:
+        # Read original TXT
+        if not Path(normalized_path).exists():
+            raise HTTPException(status_code=404, detail=f"Original TXT file not found: {normalized_path}")
+
+        with open(normalized_path, 'r', encoding='utf-8') as f:
             original_txt = f.read()
 
         # Parse hands
@@ -2013,6 +2019,10 @@ async def reprocess_failed_file(
 
         # Run OCR2 on screenshot
         screenshot_path = screenshot_paths[0]
+        # Normalize path: handle leading slash issue
+        if screenshot_path.startswith('/'):
+            screenshot_path = screenshot_path.lstrip('/')
+
         success, ocr_data, error = await ocr_player_details(screenshot_path, ocr_api_key)
 
         if not success:
