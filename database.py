@@ -979,7 +979,6 @@ def get_app_failed_files_for_job(job_id: int) -> List[Dict]:
     if not result or not result.get('stats_json'):
         return []
 
-    import json
     stats = json.loads(result['stats_json'])
 
     return stats.get('failed_files', [])

@@ -5,6 +5,7 @@ FastAPI application entry point
 import os
 import asyncio
 import json
+import re
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -1271,7 +1272,6 @@ def _validate_generated_prompt(prompt: str, detailed_analysis: dict, debug_json_
     # Check 6: If there are priority issues, prompt should mention specific files/locations
     if detailed_analysis.get('priority_issues') and len(detailed_analysis['priority_issues']) > 0:
         # Check for file references like "file.py:123" or "file.py línea"
-        import re
         has_file_references = re.search(r'\w+\.py:\d+', prompt) or 'línea' in prompt.lower()
         if not has_file_references:
             issues.append("Hay issues prioritarios pero el prompt no menciona archivos/líneas específicas")
@@ -1556,7 +1556,6 @@ async def upload_pt4_log(
     from pt4_parser import parse_pt4_import_log
     from pt4_matcher import match_failed_files_to_jobs
     from database import create_pt4_import_attempt, create_pt4_failed_file
-    import json
 
     # Parse PT4 log
     parsed_result = parse_pt4_import_log(log_text)
@@ -1636,7 +1635,6 @@ async def get_failed_files_for_job(job_id: int):
     - App-detected failures (unmapped IDs from processing)
     """
     from database import get_pt4_failed_files_for_job, get_app_failed_files_for_job, get_job
-    import json
 
     job = get_job(job_id)
     if not job:
@@ -1672,7 +1670,6 @@ async def get_all_failed_files():
     Useful for global "Failed Files Recovery" view
     """
     from database import get_all_pt4_failed_files
-    import json
 
     failed_files = get_all_pt4_failed_files()
 
@@ -2673,7 +2670,6 @@ def _build_table_mapping(
 
         # FIX: Parse JSON string to dict if ocr_data is stored as string
         if isinstance(ocr_data, str):
-            import json
             try:
                 ocr_data = json.loads(ocr_data)
             except json.JSONDecodeError as e:
@@ -2863,7 +2859,6 @@ def _normalize_hand_id(hand_id: str) -> str:
     Returns:
         Normalized ID without prefix (e.g., "3247423387", "1234567890")
     """
-    import re
     # Remove common prefixes: SG, RC, OM, MT, TT, HD, HH
     normalized = re.sub(r'^(SG|RC|OM|MT|TT|HD|HH)', '', hand_id, flags=re.IGNORECASE)
     return normalized.strip()
