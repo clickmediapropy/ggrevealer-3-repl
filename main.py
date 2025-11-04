@@ -287,6 +287,19 @@ async def upload_batch(
     total_txt = len([f for f in job_files if f['file_type'] == 'txt'])
     total_screenshots = len([f for f in job_files if f['file_type'] == 'screenshot'])
 
+    # Validate file count limits
+    if total_txt > MAX_TXT_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Excede el límite de archivos TXT. Máximo: {MAX_TXT_FILES}, Total acumulado: {total_txt}"
+        )
+
+    if total_screenshots > MAX_SCREENSHOT_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Excede el límite de screenshots. Máximo: {MAX_SCREENSHOT_FILES}, Total acumulado: {total_screenshots}"
+        )
+
     # Update job file counts
     update_job_file_counts(job_id, total_txt, total_screenshots)
 
@@ -1655,8 +1668,8 @@ async def upload_pt4_log(
     if not parsed_result:
         raise HTTPException(status_code=400, detail="Invalid PT4 log format")
 
-    # Match failed files to jobs
-    matches = match_failed_files_to_jobs(parsed_result.failed_files)
+    # Match failed files to jobs (pass job_id if provided by user)
+    matches = match_failed_files_to_jobs(parsed_result.failed_files, preferred_job_id=job_id)
 
     # Determine job_id to use
     resolved_job_id = job_id
