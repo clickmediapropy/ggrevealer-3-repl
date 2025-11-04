@@ -1835,6 +1835,94 @@ async def get_unified_failed_files(job_id: int):
     return failed_files
 
 
+@app.post("/api/reprocess/{job_id}")
+async def reprocess_failed_files(job_id: int, request: dict, background_tasks: BackgroundTasks):
+    """
+    Initiate reprocessing of selected failed files
+
+    Request body:
+    {
+        "files": [
+            {"source": "pt4", "id": 12},
+            {"source": "app", "table_name": "46798"}
+        ]
+    }
+
+    Returns:
+        - reprocess_id: ID of the reprocess batch
+        - status: 'started'
+    """
+    from database import (
+        create_reprocess_attempt, get_failed_files_for_job
+    )
+
+    # Validate job exists
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get current failed files
+    current_failed = get_failed_files_for_job(job_id)
+
+    # Validate requested files exist
+    files = request.get('files', [])
+    if not files:
+        raise HTTPException(status_code=400, detail="No files specified")
+
+    # Create reprocess attempt records
+    attempt_ids = []
+    for file_spec in files:
+        source = file_spec.get('source')
+
+        if source == 'pt4':
+            file_id = file_spec.get('id')
+            # Find matching PT4 failure
+            matching = [f for f in current_failed['pt4_failures'] if f['id'] == file_id]
+            if not matching:
+                raise HTTPException(status_code=400, detail=f"PT4 file ID {file_id} not found")
+
+            attempt_id = create_reprocess_attempt(
+                job_id=job_id,
+                file_source='pt4',
+                file_id=file_id,
+                file_name=matching[0]['filename'],
+                attempt_number=matching[0]['reprocess_count'] + 1
+            )
+            attempt_ids.append(attempt_id)
+
+        elif source == 'app':
+            table_name = file_spec.get('table_name')
+            # Find matching app failure
+            matching = [f for f in current_failed['app_failures'] if f['table_name'] == table_name]
+            if not matching:
+                raise HTTPException(status_code=400, detail=f"App failure for table {table_name} not found")
+
+            attempt_id = create_reprocess_attempt(
+                job_id=job_id,
+                file_source='app',
+                file_id=None,
+                file_name=table_name,
+                attempt_number=matching[0]['reprocess_count'] + 1
+            )
+            attempt_ids.append(attempt_id)
+
+    # Queue background processing
+    background_tasks.add_task(
+        run_reprocess_pipeline,
+        job_id=job_id,
+        attempt_ids=attempt_ids,
+        files=files
+    )
+
+    return {
+        'reprocess_id': attempt_ids[0] if attempt_ids else None,
+        'job_id': job_id,
+        'files_selected': len(files),
+        'status': 'started',
+        'estimated_time_seconds': 120
+    }
+
+
 @app.post("/api/pt4-log/recalculate-screenshots/{job_id}")
 async def recalculate_screenshots(job_id: int):
     """
