@@ -37,3 +37,20 @@ def test_reprocess_attempts_table_schema():
     }
 
     assert required_cols.issubset(columns), f"Missing columns: {required_cols - columns}"
+
+def test_pt4_failed_files_has_reprocess_columns():
+    """Test that pt4_failed_files has reprocess tracking columns"""
+    init_db()
+
+    # Direct connection for testing
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(pt4_failed_files)")
+    columns = {row[1] for row in cursor.fetchall()}
+
+    conn.close()
+
+    required_cols = {'reprocess_count', 'last_reprocess_attempt_id'}
+
+    assert required_cols.issubset(columns), f"Missing columns: {required_cols - columns}"
