@@ -92,6 +92,20 @@ CREATE TABLE IF NOT EXISTS logs (
 CREATE INDEX IF NOT EXISTS idx_logs_job_id ON logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 
+-- PT4 import attempts table (second-stage failure tracking)
+CREATE TABLE IF NOT EXISTS pt4_import_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    import_log TEXT NOT NULL,
+    parsed_at TEXT NOT NULL,
+    total_files INTEGER DEFAULT 0,
+    failed_files_count INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pt4_attempts_job_id ON pt4_import_attempts(job_id);
+
 -- App config table (cost tracking and budget management)
 CREATE TABLE IF NOT EXISTS app_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -803,3 +817,26 @@ def get_budget_summary() -> Dict:
         'percentage_used': percentage_used,
         'budget_reset_day': budget_reset_day
     }
+
+
+def create_pt4_import_attempt(
+    job_id: int,
+    import_log: str,
+    total_files: int,
+    failed_files_count: int
+) -> int:
+    """Create a new PT4 import attempt record"""
+    from datetime import datetime
+
+    now = datetime.now().isoformat()
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO pt4_import_attempts
+            (job_id, import_log, parsed_at, total_files, failed_files_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (job_id, import_log, now, total_files, failed_files_count, now)
+        )
+        return cursor.lastrowid
