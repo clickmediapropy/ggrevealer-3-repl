@@ -399,6 +399,30 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+/* Override Bootstrap outline-primary button for theme compatibility */
+.btn-outline-primary {
+    color: var(--info) !important;
+    border-color: var(--info) !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--info) !important;
+    border-color: var(--info) !important;
+    color: white !important;
+}
+
+.btn-outline-primary:focus {
+    color: var(--info) !important;
+    border-color: var(--info) !important;
+    box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25) !important;
+}
+
+.btn-outline-primary:active {
+    background-color: var(--info) !important;
+    border-color: var(--info) !important;
+    color: white !important;
+}
+
 /* Section Headers with Gradient */
 .section-header {
     background: var(--brand-gradient);
@@ -1412,6 +1436,11 @@ body {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    color: var(--text-secondary) !important;
+}
+
+.card-title.text-muted {
+    color: var(--text-secondary) !important;
 }
 
 .metric-item {
