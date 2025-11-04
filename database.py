@@ -174,6 +174,34 @@ def get_db():
         conn.close()
 
 
+def migrate_add_reprocess_columns():
+    """Add reprocess tracking columns to pt4_failed_files table"""
+    with get_db() as db:
+        cursor = db.cursor()
+
+        # Check if columns exist
+        cursor.execute("PRAGMA table_info(pt4_failed_files)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        # Add reprocess_count if missing
+        if 'reprocess_count' not in columns:
+            cursor.execute('''
+                ALTER TABLE pt4_failed_files
+                ADD COLUMN reprocess_count INTEGER DEFAULT 0
+            ''')
+            print("[DB] Added reprocess_count column to pt4_failed_files")
+
+        # Add last_reprocess_attempt_id if missing
+        if 'last_reprocess_attempt_id' not in columns:
+            cursor.execute('''
+                ALTER TABLE pt4_failed_files
+                ADD COLUMN last_reprocess_attempt_id INTEGER
+            ''')
+            print("[DB] Added last_reprocess_attempt_id column to pt4_failed_files")
+
+        db.commit()
+
+
 def init_db():
     """Initialize database with schema"""
     with get_db() as conn:
@@ -295,6 +323,8 @@ def init_db():
 
         if pt4_migrations:
             print(f"✅ Applied {len(pt4_migrations)} PT4 failed files migrations")
+
+    migrate_add_reprocess_columns()
 
     print("✅ Database initialized")
 
@@ -1056,30 +1086,30 @@ def get_failed_files_for_job(job_id: int) -> Dict:
     Returns:
         Dict with 'pt4_failures' and 'app_failures' lists
     """
-    db = get_db()
-    cursor = db.cursor()
+    with get_db() as db:
+        cursor = db.cursor()
 
-    # Get PT4 failures
-    cursor.execute('''
-        SELECT id, filename, table_number, error_message, error_count,
-               reprocess_count, last_reprocess_attempt_id
-        FROM pt4_failed_files
-        WHERE job_id = ?
-        ORDER BY id DESC
-    ''', (job_id,))
+        # Get PT4 failures
+        cursor.execute('''
+            SELECT id, filename, table_number, error_details, error_count,
+                   reprocess_count, last_reprocess_attempt_id
+            FROM pt4_failed_files
+            WHERE associated_job_id = ?
+            ORDER BY id DESC
+        ''', (job_id,))
 
-    pt4_failures = []
-    for row in cursor.fetchall():
-        pt4_failures.append({
-            'id': row[0],
-            'filename': row[1],
-            'table_number': row[2],
-            'error_message': row[3],
-            'error_count': row[4],
-            'reprocess_count': row[5],
-            'last_reprocess_attempt_id': row[6],
-            'status': 'failed'
-        })
+        pt4_failures = []
+        for row in cursor.fetchall():
+            pt4_failures.append({
+                'id': row[0],
+                'filename': row[1],
+                'table_number': row[2],
+                'error_message': row[3],
+                'error_count': row[4],
+                'reprocess_count': row[5],
+                'last_reprocess_attempt_id': row[6],
+                'status': 'failed'
+            })
 
     # Get App failures from results stats_json
     result = get_result(job_id)
