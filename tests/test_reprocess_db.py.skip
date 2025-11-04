@@ -1,6 +1,7 @@
 import pytest
-from database import init_db, get_db, create_job, get_failed_files_for_job
+from database import init_db, get_db, create_job, get_failed_files_for_job, create_reprocess_attempt
 import json
+from datetime import datetime
 
 @pytest.fixture
 def setup_db():
@@ -51,3 +52,31 @@ def test_get_failed_files_returns_both_sources(setup_db):
     assert len(failed_files['app_failures']) == 1
     assert failed_files['pt4_failures'][0]['filename'] == '46798_resolved.txt'
     assert failed_files['app_failures'][0]['table_name'] == '46798'
+
+def test_create_reprocess_attempt(setup_db):
+    """Test creating a reprocess attempt record"""
+    job_id = create_job(api_tier='free')
+
+    attempt_id = create_reprocess_attempt(
+        job_id=job_id,
+        file_source='pt4',
+        file_id=1,
+        file_name='46798_resolved.txt',
+        attempt_number=1
+    )
+
+    assert attempt_id > 0
+
+    # Verify stored in DB
+    with get_db() as db:
+        cursor = db.cursor()
+        cursor.execute('SELECT * FROM reprocess_attempts WHERE id = ?', (attempt_id,))
+        row = cursor.fetchone()
+
+    assert row is not None
+    assert row[1] == job_id  # job_id
+    assert row[2] == 'pt4'   # file_source
+    assert row[3] == 1       # file_id
+    assert row[4] == '46798_resolved.txt'  # file_name
+    assert row[5] == 1       # attempt_number
+    assert row[6] == 'pending'  # status

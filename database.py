@@ -1135,3 +1135,36 @@ def get_failed_files_for_job(job_id: int) -> Dict:
         'total_app_failures': len(app_failures),
         'total_failures': len(pt4_failures) + len(app_failures)
     }
+
+
+def create_reprocess_attempt(
+    job_id: int,
+    file_source: str,
+    file_id: Optional[int],
+    file_name: str,
+    attempt_number: int
+) -> int:
+    """
+    Create a new reprocess attempt record
+
+    Args:
+        job_id: Job ID
+        file_source: 'pt4' or 'app'
+        file_id: ID in source table (pt4_failed_files.id or None for app)
+        file_name: Human-readable file name
+        attempt_number: Attempt sequence number
+
+    Returns:
+        ID of created reprocess_attempts record
+    """
+    with get_db() as db:
+        cursor = db.cursor()
+
+        cursor.execute('''
+            INSERT INTO reprocess_attempts
+            (job_id, file_source, file_id, file_name, attempt_number, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ''', (job_id, file_source, file_id, file_name, attempt_number, 'pending'))
+
+        db.commit()
+        return cursor.lastrowid
