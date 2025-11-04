@@ -1758,35 +1758,31 @@ async def get_failed_files_for_job(job_id: int):
     """
     Get all failed files for a specific job
 
-    Returns both:
+    Returns UNIFIED list combining:
     - PT4 import failures (user-reported)
-    - App-detected failures (unmapped IDs from processing)
+    - Initial processing failures (unmapped IDs from processing)
+
+    Each file includes 'failure_source' field: 'pt4_import' or 'initial_processing'
     """
-    from database import get_pt4_failed_files_for_job, get_app_failed_files_for_job, get_job
+    from database import get_unified_failed_files_for_job, get_job
 
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Get PT4 failures
-    pt4_failures = get_pt4_failed_files_for_job(job_id)
+    # Get unified failures (PT4 + initial processing)
+    unified_failures = get_unified_failed_files_for_job(job_id)
 
-    # Parse JSON fields
-    for failure in pt4_failures:
-        if failure.get('error_details'):
-            failure['errors'] = json.loads(failure['error_details'])
-        if failure.get('associated_screenshot_paths'):
-            failure['screenshot_paths'] = json.loads(failure['associated_screenshot_paths'])
-
-    # Get app-detected failures
-    app_failures = get_app_failed_files_for_job(job_id)
+    # Count by source
+    pt4_count = sum(1 for f in unified_failures if f['failure_source'] == 'pt4_import')
+    initial_count = sum(1 for f in unified_failures if f['failure_source'] == 'initial_processing')
 
     return {
         'job_id': job_id,
-        'pt4_failures': pt4_failures,
-        'app_failures': app_failures,
-        'total_pt4_failures': len(pt4_failures),
-        'total_app_failures': len(app_failures)
+        'unified_failures': unified_failures,
+        'total_failures': len(unified_failures),
+        'pt4_failures_count': pt4_count,
+        'initial_failures_count': initial_count
     }
 
 

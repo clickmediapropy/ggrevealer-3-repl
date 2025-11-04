@@ -612,10 +612,34 @@
                                         </button>
                                     </div>
                                     <div class="card-body">
+                                        <!-- Summary Statistics -->
+                                        <div id="failed-files-summary" class="alert alert-info d-flex justify-content-between align-items-center mb-3" style="display: none !important;">
+                                            <div>
+                                                <strong><i class="bi bi-info-circle"></i> Resumen de Archivos Fallidos</strong>
+                                            </div>
+                                            <div class="d-flex gap-3">
+                                                <span>
+                                                    <strong>Total:</strong>
+                                                    <span class="badge bg-primary" id="failed-files-total-count">0</span>
+                                                </span>
+                                                <span class="text-muted">|</span>
+                                                <span>
+                                                    <strong>PT4 Import:</strong>
+                                                    <span class="badge bg-danger" id="failed-files-pt4-count">0</span>
+                                                </span>
+                                                <span class="text-muted">|</span>
+                                                <span>
+                                                    <strong>Procesamiento Inicial:</strong>
+                                                    <span class="badge bg-warning text-dark" id="failed-files-initial-count">0</span>
+                                                </span>
+                                            </div>
+                                        </div>
+
                                         <div class="table-responsive">
                                             <table class="table table-hover">
                                                 <thead>
                                                     <tr>
+                                                        <th>Fuente</th>
                                                         <th>Archivo</th>
                                                         <th>Mesa</th>
                                                         <th>Errores</th>

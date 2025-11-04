@@ -1026,3 +1026,134 @@ def get_app_failed_files_for_job(job_id: int) -> List[Dict]:
     stats = json.loads(result['stats_json'])
 
     return stats.get('failed_files', [])
+
+
+def get_unified_failed_files_for_job(job_id: int) -> List[Dict]:
+    """
+    Get UNIFIED failed files combining:
+    1. PT4 import failures (from pt4_failed_files table)
+    2. Initial processing failures (from results.stats_json.failed_files)
+
+    Returns unified format with failure_source indicator.
+
+    Args:
+        job_id: Job ID to query
+
+    Returns:
+        List of unified failed file dicts with structure:
+        {
+            'filename': str,
+            'table_number': int,
+            'failure_source': 'pt4_import' | 'initial_processing',
+            'error_count': int,
+            'errors': List[str],
+            'unmapped_ids': List[str] (only for initial_processing),
+            'matched_job_id': int,
+            'original_txt_path': str,
+            'processed_txt_path': Optional[str],
+            'screenshot_paths': List[str]
+        }
+    """
+    unified = []
+
+    # 1. Get PT4 import failures
+    pt4_failures = get_pt4_failed_files_for_job(job_id)
+
+    for failure in pt4_failures:
+        # Parse JSON fields
+        errors = json.loads(failure['error_details']) if failure.get('error_details') else []
+        screenshot_paths = json.loads(failure['associated_screenshot_paths']) if failure.get('associated_screenshot_paths') else []
+
+        unified.append({
+            'filename': failure['filename'],
+            'table_number': failure['table_number'],
+            'failure_source': 'pt4_import',
+            'error_count': failure['error_count'],
+            'errors': errors,
+            'unmapped_ids': None,
+            'matched_job_id': failure['associated_job_id'],
+            'original_txt_path': failure['associated_original_txt_path'],
+            'processed_txt_path': failure['associated_processed_txt_path'],
+            'screenshot_paths': screenshot_paths
+        })
+
+    # 2. Get initial processing failures
+    initial_failures = get_app_failed_files_for_job(job_id)
+
+    for failure in initial_failures:
+        table_name = failure['table']
+        unmapped_ids = failure.get('unmapped_ids', [])
+        total_hands = failure.get('total_hands', 0)
+
+        # Extract table number from table name (e.g., "46798" from "46798")
+        table_number = None
+        try:
+            table_number = int(table_name)
+        except (ValueError, TypeError):
+            # Try extracting number from string like "Table 46798"
+            import re
+            match = re.search(r'\d+', str(table_name))
+            if match:
+                table_number = int(match.group())
+
+        # Find paths using get_job_files
+        original_txt_path = None
+        processed_txt_path = None
+        screenshot_paths = []
+
+        job_files = get_job_files(job_id)
+        outputs_path = get_job_outputs_path(job_id)
+
+        # Find original TXT
+        for file in job_files:
+            if file['file_type'] == 'txt' and str(table_number) in file['filename']:
+                original_txt_path = file['file_path']
+                break
+
+        # Find processed TXT (fallado version)
+        if outputs_path and table_number:
+            from pathlib import Path
+            fallado_path = Path(outputs_path) / f"{table_number}_fallado.txt"
+            if fallado_path.exists():
+                processed_txt_path = str(fallado_path)
+
+        # Find screenshots using hand-ID-based matching (same logic as pt4_matcher.py)
+        if original_txt_path:
+            from pt4_matcher import _extract_hand_ids_from_txt
+            hand_ids = _extract_hand_ids_from_txt(original_txt_path)
+
+            # Try hand ID matching first
+            found_by_hand_id = False
+            if hand_ids:
+                for file in job_files:
+                    if file['file_type'] == 'screenshot':
+                        filename_lower = file['filename'].lower()
+                        for hand_id in hand_ids:
+                            if hand_id.lower() in filename_lower:
+                                screenshot_paths.append(file['file_path'])
+                                found_by_hand_id = True
+                                break
+
+            # Fallback to table number matching
+            if not found_by_hand_id and table_number:
+                for file in job_files:
+                    if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
+                        screenshot_paths.append(file['file_path'])
+
+        # Build error message
+        error_msg = f"{len(unmapped_ids)} unmapped anonymous IDs"
+
+        unified.append({
+            'filename': f"{table_name}_fallado.txt",
+            'table_number': table_number,
+            'failure_source': 'initial_processing',
+            'error_count': len(unmapped_ids),
+            'errors': [error_msg],
+            'unmapped_ids': unmapped_ids,
+            'matched_job_id': job_id,
+            'original_txt_path': original_txt_path,
+            'processed_txt_path': processed_txt_path,
+            'screenshot_paths': screenshot_paths
+        })
+
+    return unified

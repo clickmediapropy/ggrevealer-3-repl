@@ -2696,14 +2696,47 @@ function displayFailedFilesResults(data) {
     console.log('Displaying failed files results:', data);
 
     if (!data.failed_files || data.failed_files.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No se detectaron archivos fallidos</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No se detectaron archivos fallidos</td></tr>';
         resultsDiv.style.display = 'block';
+        // Hide summary if no files
+        const summaryDiv = document.getElementById('failed-files-summary');
+        if (summaryDiv) summaryDiv.style.display = 'none';
         return;
+    }
+
+    // Update summary statistics
+    const summaryDiv = document.getElementById('failed-files-summary');
+    const totalCountEl = document.getElementById('failed-files-total-count');
+    const pt4CountEl = document.getElementById('failed-files-pt4-count');
+    const initialCountEl = document.getElementById('failed-files-initial-count');
+
+    if (summaryDiv && totalCountEl && pt4CountEl && initialCountEl) {
+        // Count by source
+        const pt4Count = data.failed_files.filter(f => f.failure_source === 'pt4_import').length;
+        const initialCount = data.failed_files.filter(f => f.failure_source === 'initial_processing').length;
+        const totalCount = data.failed_files.length;
+
+        totalCountEl.textContent = totalCount;
+        pt4CountEl.textContent = pt4Count;
+        initialCountEl.textContent = initialCount;
+
+        summaryDiv.style.display = 'flex';
     }
 
     // Populate table
     data.failed_files.forEach(file => {
         const row = document.createElement('tr');
+
+        // Source badge (NEW COLUMN)
+        const sourceCell = document.createElement('td');
+        if (file.failure_source === 'pt4_import') {
+            sourceCell.innerHTML = '<span class="badge bg-danger">PT4 Import</span>';
+        } else if (file.failure_source === 'initial_processing') {
+            sourceCell.innerHTML = '<span class="badge bg-warning text-dark">Processing</span>';
+        } else {
+            sourceCell.innerHTML = '<span class="badge bg-secondary">Unknown</span>';
+        }
+        row.appendChild(sourceCell);
 
         // Filename
         const filenameCell = document.createElement('td');
@@ -2715,9 +2748,13 @@ function displayFailedFilesResults(data) {
         tableCell.textContent = file.table_number || 'N/A';
         row.appendChild(tableCell);
 
-        // Error count
+        // Error count (with unmapped IDs for initial_processing)
         const errorCell = document.createElement('td');
-        errorCell.innerHTML = `<span class="error-badge">${file.error_count} error(es)</span>`;
+        let errorDisplay = `<span class="error-badge">${file.error_count} error(es)</span>`;
+        if (file.failure_source === 'initial_processing' && file.unmapped_ids && file.unmapped_ids.length > 0) {
+            errorDisplay += `<br><small class="text-muted">${file.unmapped_ids.length} IDs sin mapear</small>`;
+        }
+        errorCell.innerHTML = errorDisplay;
         row.appendChild(errorCell);
 
         // Original TXT
@@ -3015,10 +3052,11 @@ async function loadJobFailedFiles(jobId) {
 
         const data = await response.json();
 
-        const pt4Count = data.total_pt4_failures || 0;
-        const appCount = data.total_app_failures || 0;
+        const pt4Count = data.pt4_failures_count || 0;
+        const initialCount = data.initial_failures_count || 0;
+        const totalCount = data.total_failures || 0;
 
-        if (pt4Count > 0 || appCount > 0) {
+        if (totalCount > 0) {
             const failedFilesSection = document.getElementById('modal-job-failed-files-section');
             const pt4CountSpan = document.getElementById('modal-job-pt4-failures-count');
             const appCountSpan = document.getElementById('modal-job-app-failures-count');
@@ -3026,7 +3064,7 @@ async function loadJobFailedFiles(jobId) {
             if (failedFilesSection && pt4CountSpan && appCountSpan) {
                 failedFilesSection.style.display = 'block';
                 pt4CountSpan.textContent = pt4Count;
-                appCountSpan.textContent = appCount;
+                appCountSpan.textContent = initialCount;
 
                 // Store for later viewing
                 window.currentJobFailedFiles = data;
@@ -3049,10 +3087,10 @@ function viewJobFailedFiles() {
     showFailedFilesView();
     updateSidebarActiveState('nav-failed-files');
 
-    // Display the failed files
+    // Display the failed files (now unified)
     displayFailedFilesResults({
-        failed_files_count: window.currentJobFailedFiles.total_pt4_failures,
-        failed_files: window.currentJobFailedFiles.pt4_failures
+        failed_files_count: window.currentJobFailedFiles.total_failures,
+        failed_files: window.currentJobFailedFiles.unified_failures
     });
 }
 
@@ -3094,23 +3132,10 @@ async function recalculateScreenshots() {
                 const reloadData = await reloadResponse.json();
                 window.currentJobFailedFiles = reloadData;
 
-                // Parse JSON fields
-                if (reloadData.pt4_failures) {
-                    reloadData.pt4_failures.forEach(failure => {
-                        if (failure.associated_screenshot_paths) {
-                            try {
-                                failure.screenshot_paths = JSON.parse(failure.associated_screenshot_paths);
-                            } catch (e) {
-                                failure.screenshot_paths = [];
-                            }
-                        }
-                    });
-                }
-
-                // Update the display
+                // Update the display with unified failures
                 displayFailedFilesResults({
-                    failed_files_count: reloadData.total_pt4_failures,
-                    failed_files: reloadData.pt4_failures
+                    failed_files_count: reloadData.total_failures,
+                    failed_files: reloadData.unified_failures
                 });
             }
         }
