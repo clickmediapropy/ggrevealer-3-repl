@@ -924,3 +924,62 @@ def get_job_outputs_path(job_id: int) -> Optional[str]:
     if outputs_path.exists():
         return str(outputs_path)
     return None
+
+
+def get_pt4_failed_files_for_job(job_id: int) -> List[Dict]:
+    """
+    Get all PT4 failed files associated with a job
+
+    Args:
+        job_id: Job ID to filter by
+
+    Returns:
+        List of dicts with failed file details
+    """
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT pff.*, pia.import_log, pia.parsed_at
+            FROM pt4_failed_files pff
+            JOIN pt4_import_attempts pia ON pff.pt4_import_attempt_id = pia.id
+            WHERE pff.associated_job_id = ?
+            ORDER BY pff.created_at DESC
+            """,
+            (job_id,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_all_pt4_failed_files() -> List[Dict]:
+    """Get all PT4 failed files across all jobs"""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT pff.*, pia.import_log, pia.parsed_at, j.created_at as job_created_at
+            FROM pt4_failed_files pff
+            JOIN pt4_import_attempts pia ON pff.pt4_import_attempt_id = pia.id
+            LEFT JOIN jobs j ON pff.associated_job_id = j.id
+            ORDER BY pff.created_at DESC
+            """
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_app_failed_files_for_job(job_id: int) -> List[Dict]:
+    """
+    Get app-detected failed files (with unmapped IDs) for a job
+
+    Args:
+        job_id: Job ID to query
+
+    Returns:
+        List of dicts with table name and unmapped_ids
+    """
+    result = get_result(job_id)
+    if not result or not result.get('stats_json'):
+        return []
+
+    import json
+    stats = json.loads(result['stats_json'])
+
+    return stats.get('failed_files', [])

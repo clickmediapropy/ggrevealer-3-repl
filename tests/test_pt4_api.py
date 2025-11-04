@@ -61,3 +61,43 @@ def test_upload_pt4_log_no_failures():
     assert data['success'] is True
     assert data['failed_files_count'] == 0
     assert len(data['failed_files']) == 0
+
+def test_get_failed_files_for_job():
+    """Test retrieving all failed files for a job"""
+    init_db()
+
+    # Create job and upload PT4 log
+    job_id = create_job()
+    add_file(job_id, "46798.txt", "txt", f"/storage/uploads/{job_id}/txt/46798.txt")
+
+    pt4_log = """06:58:32 pm: Import file: /path/46798_resolved.txt
+06:58:32 pm: Error: GG Poker: Duplicate player
+06:58:32 pm:         + Complete (0 hands, 0 summaries, 1 error, 0 duplicates)"""
+
+    # Upload log
+    upload_response = client.post(
+        "/api/pt4-log/upload",
+        data={"log_text": pt4_log, "job_id": job_id}
+    )
+    assert upload_response.status_code == 200
+
+    # Get failed files for job
+    response = client.get(f"/api/pt4-log/failed-files/{job_id}")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data['pt4_failures']) == 1
+    assert data['pt4_failures'][0]['filename'] == '46798_resolved.txt'
+    assert data['app_failures'] is not None
+
+def test_get_all_failed_files():
+    """Test retrieving all failed files across all jobs"""
+    init_db()
+
+    response = client.get("/api/pt4-log/failed-files")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert 'failed_files' in data
+    assert 'total_count' in data

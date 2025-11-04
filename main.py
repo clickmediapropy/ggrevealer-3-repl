@@ -1626,6 +1626,69 @@ async def upload_pt4_log(
     }
 
 
+@app.get("/api/pt4-log/failed-files/{job_id}")
+async def get_failed_files_for_job(job_id: int):
+    """
+    Get all failed files for a specific job
+
+    Returns both:
+    - PT4 import failures (user-reported)
+    - App-detected failures (unmapped IDs from processing)
+    """
+    from database import get_pt4_failed_files_for_job, get_app_failed_files_for_job, get_job
+    import json
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get PT4 failures
+    pt4_failures = get_pt4_failed_files_for_job(job_id)
+
+    # Parse JSON fields
+    for failure in pt4_failures:
+        if failure.get('error_details'):
+            failure['errors'] = json.loads(failure['error_details'])
+        if failure.get('associated_screenshot_paths'):
+            failure['screenshot_paths'] = json.loads(failure['associated_screenshot_paths'])
+
+    # Get app-detected failures
+    app_failures = get_app_failed_files_for_job(job_id)
+
+    return {
+        'job_id': job_id,
+        'pt4_failures': pt4_failures,
+        'app_failures': app_failures,
+        'total_pt4_failures': len(pt4_failures),
+        'total_app_failures': len(app_failures)
+    }
+
+
+@app.get("/api/pt4-log/failed-files")
+async def get_all_failed_files():
+    """
+    Get all failed files across all jobs
+
+    Useful for global "Failed Files Recovery" view
+    """
+    from database import get_all_pt4_failed_files
+    import json
+
+    failed_files = get_all_pt4_failed_files()
+
+    # Parse JSON fields
+    for failure in failed_files:
+        if failure.get('error_details'):
+            failure['errors'] = json.loads(failure['error_details'])
+        if failure.get('associated_screenshot_paths'):
+            failure['screenshot_paths'] = json.loads(failure['associated_screenshot_paths'])
+
+    return {
+        'failed_files': failed_files,
+        'total_count': len(failed_files)
+    }
+
+
 def calculate_job_cost(ocr1_count: int, ocr2_count: int) -> float:
     """Calculate total API cost for a job based on OCR operations"""
     total_images = ocr1_count + ocr2_count
