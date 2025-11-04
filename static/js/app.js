@@ -333,14 +333,6 @@ function calculateTotalSizeGlobal() {
     return total;
 }
 
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-}
-
 function updateSizeIndicator() {
     const sizeIndicator = document.getElementById('size-indicator');
     const totalSizeSpan = document.getElementById('total-size');
@@ -2267,51 +2259,6 @@ function renderLogs(logs, levelFilter = '') {
 
     // Auto-scroll to bottom to show most recent logs
     logsContainer.scrollTop = logsContainer.scrollHeight;
-}
-
-async function copyToClipboard(text, button) {
-    // Validate inputs
-    if (!text || text.trim() === '') {
-        console.error('No text to copy');
-        showCopyError(button, 'No hay texto para copiar');
-        return;
-    }
-
-    if (!button) {
-        console.error('No button element provided');
-        return;
-    }
-
-    try {
-        // Try modern clipboard API first
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(text);
-        } else {
-            // Fallback for older browsers
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-9999px';
-            textArea.style.top = '-9999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-
-            if (!successful) {
-                throw new Error('Fallback copy method failed');
-            }
-        }
-
-        // Show success feedback
-        showCopySuccess(button);
-
-    } catch (err) {
-        console.error('Error copying to clipboard:', err);
-        showCopyError(button, 'Error al copiar');
-    }
 }
 
 function showCopySuccess(button) {
