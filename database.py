@@ -892,3 +892,35 @@ def create_pt4_failed_file(
              associated_screenshot_paths, now)
         )
         return cursor.lastrowid
+
+
+def get_files_by_table_number(table_number: int) -> List[Dict]:
+    """
+    Get all files associated with a table number across all jobs
+
+    Args:
+        table_number: Table number to search for (e.g., 46798)
+
+    Returns:
+        List of dicts with job_id, filename, file_type, file_path
+    """
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT job_id, filename, file_type, file_path
+            FROM files
+            WHERE filename LIKE ? OR filename LIKE ?
+            ORDER BY job_id DESC, uploaded_at DESC
+            """,
+            (f"{table_number}.txt", f"%{table_number}%")
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_job_outputs_path(job_id: int) -> Optional[str]:
+    """Get the outputs directory path for a job"""
+    from pathlib import Path
+    outputs_path = Path("storage/outputs") / str(job_id)
+    if outputs_path.exists():
+        return str(outputs_path)
+    return None
