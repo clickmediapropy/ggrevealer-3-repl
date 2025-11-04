@@ -1,5 +1,5 @@
 import pytest
-from database import init_db, get_db, create_job, get_failed_files_for_job, create_reprocess_attempt
+from database import init_db, get_db, create_job, get_failed_files_for_job, create_reprocess_attempt, update_reprocess_attempt
 import json
 from datetime import datetime
 
@@ -80,3 +80,32 @@ def test_create_reprocess_attempt(setup_db):
     assert row[4] == '46798_resolved.txt'  # file_name
     assert row[5] == 1       # attempt_number
     assert row[6] == 'pending'  # status
+
+def test_update_reprocess_attempt(setup_db):
+    """Test updating a reprocess attempt with results"""
+    job_id = create_job(api_tier='free')
+
+    attempt_id = create_reprocess_attempt(
+        job_id=job_id,
+        file_source='pt4',
+        file_id=1,
+        file_name='46798_resolved.txt',
+        attempt_number=1
+    )
+
+    logs = "[14:30:00] Starting OCR1\n[14:30:10] OCR1 success"
+
+    update_reprocess_attempt(
+        attempt_id=attempt_id,
+        status='success',
+        logs=logs
+    )
+
+    # Verify update
+    with get_db() as db:
+        cursor = db.cursor()
+        cursor.execute('SELECT status, logs_json FROM reprocess_attempts WHERE id = ?', (attempt_id,))
+        row = cursor.fetchone()
+
+    assert row[0] == 'success'
+    assert row[1] == logs

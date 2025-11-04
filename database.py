@@ -1168,3 +1168,30 @@ def create_reprocess_attempt(
 
         db.commit()
         return cursor.lastrowid
+
+
+def update_reprocess_attempt(
+    attempt_id: int,
+    status: str,
+    logs: Optional[str] = None,
+    error_message: Optional[str] = None
+) -> None:
+    """
+    Update a reprocess attempt with results
+
+    Args:
+        attempt_id: ID of reprocess_attempts record
+        status: 'processing', 'success', or 'failed'
+        logs: Full processing logs (optional)
+        error_message: Error details if status='failed' (optional)
+    """
+    with get_db() as db:
+        cursor = db.cursor()
+
+        cursor.execute('''
+            UPDATE reprocess_attempts
+            SET status = ?, logs_json = ?, error_message = ?
+            WHERE id = ?
+        ''', (status, logs, error_message, attempt_id))
+
+        db.commit()
