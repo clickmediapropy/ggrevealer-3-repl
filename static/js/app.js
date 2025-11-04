@@ -2176,12 +2176,18 @@ function displayFailedFilesResults(data) {
     const resultsDiv = document.getElementById('failed-files-results');
     const tbody = document.getElementById('failed-files-tbody');
 
-    if (!resultsDiv || !tbody) return;
+    if (!resultsDiv || !tbody) {
+        console.error('Failed files results elements not found');
+        return;
+    }
 
     // Clear previous results
     tbody.innerHTML = '';
 
-    if (data.failed_files_count === 0) {
+    // Debug logging
+    console.log('Displaying failed files results:', data);
+
+    if (!data.failed_files || data.failed_files.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center">No se detectaron archivos fallidos</td></tr>';
         resultsDiv.style.display = 'block';
         return;
@@ -3076,6 +3082,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const data = await response.json();
+
+                // Debug: Log the response
+                console.log('PT4 Log Upload Response:', data);
+                console.log('Failed files count:', data.failed_files_count);
+                console.log('Failed files array:', data.failed_files);
 
                 // Display results
                 displayFailedFilesResults(data);
