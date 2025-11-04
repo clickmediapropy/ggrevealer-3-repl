@@ -78,6 +78,44 @@ function formatBytes(bytes) {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
+/**
+ * Show batch upload progress UI
+ */
+function showBatchProgress() {
+    document.getElementById('batchProgress').style.display = 'block';
+}
+
+/**
+ * Hide batch upload progress UI
+ */
+function hideBatchProgress() {
+    document.getElementById('batchProgress').style.display = 'none';
+}
+
+/**
+ * Update batch upload progress
+ * @param {number} current - Current batch number (1-based)
+ * @param {number} total - Total number of batches
+ * @param {string} message - Progress message
+ */
+function updateBatchProgress(current, total, message = '') {
+    const progressBar = document.getElementById('batchProgressBar');
+    const progressText = document.getElementById('batchProgressText');
+    const progressDetail = document.getElementById('batchProgressDetail');
+
+    const percentage = Math.round((current / total) * 100);
+
+    progressBar.style.width = percentage + '%';
+    progressBar.setAttribute('aria-valuenow', percentage);
+    progressBar.textContent = percentage + '%';
+
+    if (message) {
+        progressText.textContent = message;
+    }
+
+    progressDetail.textContent = `Lote ${current} de ${total}`;
+}
+
 let txtFiles = [];
 let screenshotFiles = [];
 let currentJobId = null;
