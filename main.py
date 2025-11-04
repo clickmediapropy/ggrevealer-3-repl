@@ -31,6 +31,7 @@ from matcher import find_best_matches, _build_seat_mapping_by_roles
 from writer import generate_txt_files_by_table, generate_txt_files_with_validation, validate_output_format, extract_table_name
 from models import NameMapping, ParsedHand
 from logger import get_job_logger
+from reprocess import run_reprocess_pipeline
 from google import genai
 from google.genai import types
 
