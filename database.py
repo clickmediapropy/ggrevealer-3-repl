@@ -1009,6 +1009,146 @@ def get_all_pt4_failed_files() -> List[Dict]:
         return [dict(row) for row in cursor.fetchall()]
 
 
+def get_all_unified_failed_files() -> List[Dict]:
+    """
+    Get UNIFIED failed files across ALL jobs, combining:
+    1. PT4 import failures (from pt4_failed_files table)
+    2. Initial processing failures (from results.stats_json.failed_files)
+
+    Returns:
+        List of unified failed file dicts with failure_source discriminator
+    """
+    unified = []
+
+    # 1. Get ALL PT4 import failures (already formatted)
+    pt4_failures = get_all_pt4_failed_files()
+
+    for failure in pt4_failures:
+        # Parse JSON fields
+        errors = json.loads(failure['error_details']) if failure.get('error_details') else []
+        screenshot_paths = json.loads(failure['associated_screenshot_paths']) if failure.get('associated_screenshot_paths') else []
+
+        unified.append({
+            'filename': failure['filename'],
+            'table_number': failure['table_number'],
+            'failure_source': 'pt4_import',
+            'error_count': failure['error_count'],
+            'errors': errors,
+            'unmapped_ids': None,
+            'matched_job_id': failure['associated_job_id'],
+            'original_txt_path': failure['associated_original_txt_path'],
+            'processed_txt_path': failure['associated_processed_txt_path'],
+            'screenshot_paths': screenshot_paths,
+            'job_created_at': failure.get('job_created_at')  # Include for sorting/grouping
+        })
+
+    # 2. Get ALL initial processing failures from all completed jobs
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT r.job_id, r.stats_json, j.created_at as job_created_at
+            FROM results r
+            LEFT JOIN jobs j ON r.job_id = j.id
+            WHERE r.stats_json IS NOT NULL
+            ORDER BY r.created_at DESC
+            """
+        )
+        results = cursor.fetchall()
+
+    for result_row in results:
+        result_dict = dict(result_row)  # Convert Row to dict
+        job_id = result_dict['job_id']
+        stats_json = result_dict['stats_json']
+        job_created_at = result_dict.get('job_created_at')
+
+        try:
+            stats = json.loads(stats_json)
+            failed_files = stats.get('failed_files', [])
+
+            for failure in failed_files:
+                table_name = failure['table']
+                unmapped_ids = failure.get('unmapped_ids', [])
+
+                # Extract table number
+                table_number = None
+                try:
+                    table_number = int(table_name)
+                except (ValueError, TypeError):
+                    import re
+                    match = re.search(r'\d+', str(table_name))
+                    if match:
+                        table_number = int(match.group())
+
+                # Find paths using get_job_files
+                original_txt_path = None
+                processed_txt_path = None
+                screenshot_paths = []
+
+                job_files = get_job_files(job_id)
+                outputs_path = get_job_outputs_path(job_id)
+
+                # Find original TXT
+                for file in job_files:
+                    if file['file_type'] == 'txt' and str(table_number) in file['filename']:
+                        original_txt_path = file['file_path']
+                        break
+
+                # Find processed TXT (fallado version)
+                if outputs_path and table_number:
+                    from pathlib import Path
+                    fallado_path = Path(outputs_path) / f"{table_number}_fallado.txt"
+                    if fallado_path.exists():
+                        processed_txt_path = str(fallado_path)
+
+                # Find screenshots using hand-ID-based matching
+                if original_txt_path:
+                    from pt4_matcher import _extract_hand_ids_from_txt
+                    hand_ids = _extract_hand_ids_from_txt(original_txt_path)
+
+                    # Try hand ID matching first
+                    found_by_hand_id = False
+                    if hand_ids:
+                        for file in job_files:
+                            if file['file_type'] == 'screenshot':
+                                filename_lower = file['filename'].lower()
+                                for hand_id in hand_ids:
+                                    if hand_id.lower() in filename_lower:
+                                        screenshot_paths.append(file['file_path'])
+                                        found_by_hand_id = True
+                                        break
+
+                    # Fallback to table number matching
+                    if not found_by_hand_id and table_number:
+                        for file in job_files:
+                            if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
+                                screenshot_paths.append(file['file_path'])
+
+                # Build error message
+                error_msg = f"{len(unmapped_ids)} unmapped anonymous IDs"
+
+                unified.append({
+                    'filename': f"{table_name}_fallado.txt",
+                    'table_number': table_number,
+                    'failure_source': 'initial_processing',
+                    'error_count': len(unmapped_ids),
+                    'errors': [error_msg],
+                    'unmapped_ids': unmapped_ids,
+                    'matched_job_id': job_id,
+                    'original_txt_path': original_txt_path,
+                    'processed_txt_path': processed_txt_path,
+                    'screenshot_paths': screenshot_paths,
+                    'job_created_at': job_created_at
+                })
+
+        except json.JSONDecodeError:
+            continue  # Skip malformed JSON
+
+    # Sort by job creation date (newest first)
+    unified.sort(key=lambda x: x.get('job_created_at') or '', reverse=True)
+
+    return unified
+
+
 def get_app_failed_files_for_job(job_id: int) -> List[Dict]:
     """
     Get app-detected failed files (with unmapped IDs) for a job

@@ -1791,22 +1791,28 @@ async def get_all_failed_files():
     """
     Get all failed files across all jobs
 
+    Returns UNIFIED list combining:
+    - PT4 import failures (from all jobs)
+    - Initial processing failures (from all jobs)
+
+    Each file includes 'failure_source' field: 'pt4_import' or 'initial_processing'
+
     Useful for global "Failed Files Recovery" view
     """
-    from database import get_all_pt4_failed_files
+    from database import get_all_unified_failed_files
 
-    failed_files = get_all_pt4_failed_files()
+    # Get unified failures (PT4 + initial processing from ALL jobs)
+    unified_failures = get_all_unified_failed_files()
 
-    # Parse JSON fields
-    for failure in failed_files:
-        if failure.get('error_details'):
-            failure['errors'] = json.loads(failure['error_details'])
-        if failure.get('associated_screenshot_paths'):
-            failure['screenshot_paths'] = json.loads(failure['associated_screenshot_paths'])
+    # Count by source
+    pt4_count = sum(1 for f in unified_failures if f['failure_source'] == 'pt4_import')
+    initial_count = sum(1 for f in unified_failures if f['failure_source'] == 'initial_processing')
 
     return {
-        'failed_files': failed_files,
-        'total_count': len(failed_files)
+        'failed_files': unified_failures,
+        'total_count': len(unified_failures),
+        'pt4_failures_count': pt4_count,
+        'initial_failures_count': initial_count
     }
 
 

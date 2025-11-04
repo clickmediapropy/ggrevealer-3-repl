@@ -3045,6 +3045,31 @@ function showModalError(message) {
 // FAILED FILES INTEGRATION
 // ========================================
 
+async function loadAllFailedFiles() {
+    /**
+     * Load ALL failed files from ALL jobs (for main "Archivos Fallidos" view)
+     * Fetches unified data (PT4 + initial processing) from /api/pt4-log/failed-files
+     */
+    try {
+        const response = await fetch(`${API_BASE}/api/pt4-log/failed-files`);
+
+        if (!response.ok) {
+            console.error('Failed to fetch all failed files');
+            return;
+        }
+
+        const data = await response.json();
+
+        console.log('Loaded all failed files:', data);
+
+        // Display using existing displayFailedFilesResults function
+        displayFailedFilesResults(data);
+
+    } catch (error) {
+        console.error('Error loading all failed files:', error);
+    }
+}
+
 async function loadJobFailedFiles(jobId) {
     try {
         const response = await fetch(`${API_BASE}/api/pt4-log/failed-files/${jobId}`);
@@ -3765,6 +3790,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             showFailedFilesView();
             updateSidebarActiveState('nav-failed-files');
+            // Load ALL failed files from all jobs
+            loadAllFailedFiles();
         });
     }
 
