@@ -632,15 +632,20 @@ if (uploadBtn) {
 }
 
 function startTimer() {
+    // Stop any existing timer to prevent memory leak
+    stopTimer();
+
     startTime = Date.now();
     updateTimer();
     timerInterval = setInterval(updateTimer, 1000);
+    console.log('[TIMER] Started');
 }
 
 function stopTimer() {
     if (timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
+        console.log('[TIMER] Stopped');
     }
 }
 
