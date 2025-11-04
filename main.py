@@ -1686,6 +1686,57 @@ async def get_all_failed_files():
     }
 
 
+@app.get("/api/download-file")
+async def download_file(path: str):
+    """
+    Download a file by path
+
+    Security: Only allow downloads from storage/ directory
+    """
+    file_path = Path(path)
+
+    # Security check: ensure path is within storage directory
+    storage_abs = Path("storage").resolve()
+    file_abs = file_path.resolve()
+
+    if not str(file_abs).startswith(str(storage_abs)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=file_path.name,
+        media_type='application/octet-stream'
+    )
+
+
+@app.get("/api/screenshot/{path:path}")
+async def view_screenshot(path: str):
+    """
+    View a screenshot image
+
+    Security: Only allow viewing from storage/ directory
+    """
+    file_path = Path(path)
+
+    # Security check
+    storage_abs = Path("storage").resolve()
+    file_abs = file_path.resolve()
+
+    if not str(file_abs).startswith(str(storage_abs)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type='image/png'
+    )
+
+
 def calculate_job_cost(ocr1_count: int, ocr2_count: int) -> float:
     """Calculate total API cost for a job based on OCR operations"""
     total_images = ocr1_count + ocr2_count
