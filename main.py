@@ -1884,28 +1884,47 @@ async def recalculate_screenshots(job_id: int):
 # ========================================
 
 def create_screenshot_analysis_from_ocr2_data(ocr_data: dict):
-    """Convert OCR2 raw dict to ScreenshotAnalysis object"""
+    """Convert OCR2 raw dict to ScreenshotAnalysis object
+
+    OCR2 returns:
+    {
+        "players": ["Player1", "Player2", "Player3"],
+        "hero_name": "Player1",
+        "hero_cards": "Kh Kd",
+        "board_cards": "Qh Jd Ts 4c 2s",
+        "stacks": [100.0, 250.0, 625.0],
+        "positions": [1, 2, 3],
+        "roles": {
+            "dealer": "Player3",
+            "small_blind": "Player1",
+            "big_blind": "Player2"
+        }
+    }
+    """
     from models import ScreenshotAnalysis
 
-    players = []
+    # Extract basic fields
+    player_names = ocr_data.get('players', [])
     hero_name = ocr_data.get('hero_name', 'Hero')
+    board_cards_str = ocr_data.get('board_cards', '')
 
-    if 'players' in ocr_data:
-        for player_data in ocr_data['players']:
-            players.append({
-                'name': player_data.get('name', ''),
-                'position': player_data.get('position'),
-                'stack': player_data.get('stack'),
-                'is_dealer': player_data.get('dealer', False),
-                'is_small_blind': player_data.get('small_blind', False),
-                'is_big_blind': player_data.get('big_blind', False)
-            })
+    # Parse roles from roles dict
+    roles = ocr_data.get('roles', {})
+    dealer_player = roles.get('dealer')
+    small_blind_player = roles.get('small_blind')
+    big_blind_player = roles.get('big_blind')
 
+    # Create ScreenshotAnalysis
     return ScreenshotAnalysis(
+        screenshot_id='reprocess',  # Placeholder ID
         hand_id=ocr_data.get('hand_id'),
-        players=players,
         hero_name=hero_name,
-        board_cards=ocr_data.get('board_cards')
+        hero_cards=ocr_data.get('hero_cards'),
+        player_names=player_names,
+        board_cards={'all': board_cards_str} if board_cards_str else {},
+        dealer_player=dealer_player,
+        small_blind_player=small_blind_player,
+        big_blind_player=big_blind_player
     )
 
 
