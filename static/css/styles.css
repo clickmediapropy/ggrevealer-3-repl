@@ -1,24 +1,159 @@
-/* CSS Variables for Brand Colors */
-:root {
-    --brand-green: #10b981;
-    --brand-green-hover: #059669;
-    --brand-green-light: #d1fae5;
-    --brand-green-dark: #065f46;
-    --action-blue: #0d6efd;
-    --action-blue-hover: #0a58ca;
+/* ============================================
+   CSS VARIABLES & THEMING SYSTEM
+   ============================================ */
 
-    /* Dark Premium Theme */
-    --navbar-dark: #0f172a;
-    --navbar-dark-alt: #1e293b;
-    --navbar-dark-lighter: #334155;
-    --brand-green-glow: #34d399;
-    --text-white: #f8fafc;
-    --text-gray: #94a3b8;
+:root {
+  /* Light Mode Colors */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #ffffff;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #ffffff;
+
+  --border-color: #e2e8f0;
+  --border-color-hover: #cbd5e1;
+
+  /* Brand Colors with Gradients */
+  --brand-start: #10b981;
+  --brand-end: #059669;
+  --brand-gradient: linear-gradient(135deg, var(--brand-start) 0%, var(--brand-end) 100%);
+  --brand-solid: #10b981;
+  --brand-hover: #059669;
+
+  /* Legacy brand variables (for compatibility) */
+  --brand-green: #10b981;
+  --brand-green-hover: #059669;
+  --brand-green-light: #d1fae5;
+  --brand-green-dark: #065f46;
+  --brand-green-glow: #34d399;
+
+  /* Action colors */
+  --action-blue: #0d6efd;
+  --action-blue-hover: #0a58ca;
+
+  /* Navbar dark theme (legacy) */
+  --navbar-dark: #0f172a;
+  --navbar-dark-alt: #1e293b;
+  --navbar-dark-lighter: #334155;
+  --text-white: #f8fafc;
+  --text-gray: #94a3b8;
+
+  /* Accent Colors */
+  --accent-cyan: #06b6d4;
+  --accent-purple: #8b5cf6;
+  --accent-orange: #f59e0b;
+
+  /* Semantic Colors */
+  --success: #10b981;
+  --success-bg: #d1fae5;
+  --warning: #f59e0b;
+  --warning-bg: #fef3c7;
+  --error: #ef4444;
+  --error-bg: #fee2e2;
+  --info: #3b82f6;
+  --info-bg: #dbeafe;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 300ms ease-in-out;
+  --transition-slow: 500ms ease-in-out;
+
+  /* Z-index layers */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+}
+
+/* Dark Mode - Auto-detected from OS */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark Mode Backgrounds */
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --bg-elevated: #1e293b;
+
+    /* Dark Mode Text */
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --text-inverse: #0f172a;
+
+    /* Dark Mode Borders */
+    --border-color: #334155;
+    --border-color-hover: #475569;
+
+    /* Dark Mode Brand (brighter for contrast) */
+    --brand-start: #34d399;
+    --brand-end: #10b981;
+    --brand-solid: #34d399;
+    --brand-hover: #6ee7b7;
+
+    /* Legacy brand (dark mode) */
+    --brand-green: #34d399;
+    --brand-green-hover: #6ee7b7;
+    --brand-green-glow: #6ee7b7;
+
+    /* Dark Mode Semantic Colors */
+    --success: #34d399;
+    --success-bg: #064e3b;
+    --warning: #fbbf24;
+    --warning-bg: #78350f;
+    --error: #f87171;
+    --error-bg: #7f1d1d;
+    --info: #60a5fa;
+    --info-bg: #1e3a8a;
+
+    /* Dark Mode Shadows (more subtle) */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+  }
 }
 
 body {
-    background-color: #f8f9fa;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    transition: background-color var(--transition-base), color var(--transition-base);
+    line-height: 1.6;
+}
+
+.main-content {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: all var(--transition-base);
 }
 
 .navbar {
@@ -263,12 +398,17 @@ body {
 }
 
 .card {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: box-shadow 0.3s ease;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    color: var(--text-primary);
+    transition: all var(--transition-base);
 }
 
 .card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
 }
 
 /* VIS-3: Batch progress card max-width for ultra-wide monitors */
