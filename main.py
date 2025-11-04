@@ -1814,6 +1814,27 @@ async def get_all_failed_files():
     }
 
 
+@app.get("/api/failed-files/{job_id}")
+async def get_unified_failed_files(job_id: int):
+    """
+    Get unified view of all failures (PT4 + App processing)
+
+    Returns:
+        - pt4_failures: List of PT4 import failures
+        - app_failures: List of app processing failures (unmapped IDs)
+        - total_failures: Combined count
+    """
+    from database import get_failed_files_for_job
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    failed_files = get_failed_files_for_job(job_id)
+
+    return failed_files
+
+
 @app.post("/api/pt4-log/recalculate-screenshots/{job_id}")
 async def recalculate_screenshots(job_id: int):
     """
