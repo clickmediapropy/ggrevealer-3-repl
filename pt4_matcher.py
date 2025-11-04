@@ -2,12 +2,13 @@
 Smart matcher for PT4 failed files to original GGRevealer jobs
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import re
 
-from database import get_files_by_table_number, get_job_outputs_path
+from database import get_files_by_table_number, get_job_outputs_path, get_job_files
 
 
 @dataclass
@@ -21,6 +22,40 @@ class FailedFileMatch:
     original_txt_path: Optional[str]
     processed_txt_path: Optional[str]
     screenshot_paths: List[str]
+
+
+def _extract_hand_ids_from_txt(txt_path: str) -> Set[str]:
+    r"""
+    Extract all hand IDs from a TXT file
+
+    Hand IDs are typically formatted as: SG3247289962, MT123456, etc.
+    Regex pattern: Poker Hand #(\S+):
+
+    Args:
+        txt_path: Path to TXT file
+
+    Returns:
+        Set of unique hand IDs found in the file
+    """
+    try:
+        with open(txt_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        hand_ids = set()
+        hand_id_pattern = r'Poker Hand #(\S+):'
+        for match in re.finditer(hand_id_pattern, content):
+            full_hand_id = match.group(1)
+            hand_ids.add(full_hand_id)
+
+            # Also add version without prefix for matching flexibility
+            hand_id_without_prefix = re.sub(r'^(SG|HH|MT|TT)', '', full_hand_id)
+            if hand_id_without_prefix != full_hand_id:
+                hand_ids.add(hand_id_without_prefix)
+
+        return hand_ids
+    except Exception as e:
+        print(f"Error extracting hand IDs from {txt_path}: {e}")
+        return set()
 
 
 def match_failed_files_to_jobs(failed_files: List[Dict], preferred_job_id: Optional[int] = None) -> List[FailedFileMatch]:
@@ -88,7 +123,10 @@ def match_failed_files_to_jobs(failed_files: List[Dict], preferred_job_id: Optio
             # Use most recent job (highest job_id)
             selected_job_id = max(job_files.keys())
 
-        job_file_list = job_files[selected_job_id]
+        # Get ALL files for this job (not just those matching table number)
+        # This is important for hand-ID-based matching where screenshots
+        # may not have table number in the filename
+        job_file_list = get_job_files(selected_job_id)
 
         # Extract paths
         match.matched_job_id = selected_job_id
@@ -114,10 +152,31 @@ def match_failed_files_to_jobs(failed_files: List[Dict], preferred_job_id: Optio
                     match.processed_txt_path = str(fallado_path)
 
         # Find screenshots
-        # Screenshots usually named: "screenshot_46798_001.png" or similar
-        for file in job_file_list:
-            if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
-                match.screenshot_paths.append(file['file_path'])
+        # Strategy: First try to match by hand ID, then fallback to table number
+
+        # Step 1: Extract hand IDs from the original TXT file
+        hand_ids = set()
+        if match.original_txt_path:
+            hand_ids = _extract_hand_ids_from_txt(match.original_txt_path)
+
+        # Step 2: Try to find screenshots matching hand IDs
+        found_by_hand_id = False
+        if hand_ids:
+            for file in job_file_list:
+                if file['file_type'] == 'screenshot':
+                    filename = file['filename'].lower()
+                    # Check if any hand ID appears in screenshot filename
+                    for hand_id in hand_ids:
+                        if hand_id.lower() in filename:
+                            match.screenshot_paths.append(file['file_path'])
+                            found_by_hand_id = True
+                            break
+
+        # Step 3: Fallback to table number matching if no hand ID matches found
+        if not found_by_hand_id:
+            for file in job_file_list:
+                if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
+                    match.screenshot_paths.append(file['file_path'])
 
         matches.append(match)
 
