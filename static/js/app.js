@@ -306,7 +306,7 @@ function renderScreenshotFiles() {
     updateSizeIndicator();
 }
 
-function calculateTotalSize() {
+function calculateTotalSizeGlobal() {
     let total = 0;
     txtFiles.forEach(file => total += file.size);
     screenshotFiles.forEach(file => total += file.size);
@@ -329,7 +329,7 @@ function updateSizeIndicator() {
     if (!sizeIndicator || !totalSizeSpan || !totalFilesSpan) return;
 
     const totalFiles = txtFiles.length + screenshotFiles.length;
-    const totalSize = calculateTotalSize();
+    const totalSize = calculateTotalSizeGlobal();
 
     if (totalFiles === 0) {
         sizeIndicator.style.display = 'none';
@@ -395,7 +395,7 @@ function updateUploadButton() {
     if (screenshotFiles.length > MAX_SCREENSHOT_FILES) {
         uploadBtn.disabled = true;
     }
-    if (calculateTotalSize() > MAX_UPLOAD_SIZE_BYTES) {
+    if (calculateTotalSizeGlobal() > MAX_UPLOAD_SIZE_BYTES) {
         uploadBtn.disabled = true;
     }
 }
@@ -424,7 +424,7 @@ if (uploadBtn) {
         return;
     }
 
-    const totalSize = calculateTotalSize();
+    const totalSize = calculateTotalSizeGlobal();
     if (totalSize > MAX_UPLOAD_SIZE_BYTES) {
         showWarning(`El tamaño total excede el límite de ${MAX_UPLOAD_SIZE_MB} MB (actual: ${formatBytes(totalSize)})`);
         return;
@@ -490,12 +490,15 @@ if (uploadBtn) {
 
             const batchFormData = new FormData();
 
-            // Separate files by type
+            // Separate files by type with validation
             batch.forEach(file => {
-                if (file.name.endsWith('.txt')) {
+                const fileName = file.name.toLowerCase();
+                if (fileName.endsWith('.txt')) {
                     batchFormData.append('txt_files', file);
-                } else {
+                } else if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
                     batchFormData.append('screenshots', file);
+                } else {
+                    console.warn(`Skipping unsupported file type: ${file.name}`);
                 }
             });
 
@@ -512,7 +515,7 @@ if (uploadBtn) {
             }
 
             const batchData = await batchResponse.json();
-            console.log(`Batch ${batchNum} uploaded:`, batchData);
+            console.log(`✓ Batch ${batchNum} uploaded successfully:`, batchData);
         }
 
         // Step 5: Hide batch progress
@@ -537,9 +540,21 @@ if (uploadBtn) {
     } catch (error) {
         console.error('Error:', error);
         showError('Error al subir archivos: ' + error.message);
+
+        // Cleanup: Delete the job if it was created
+        if (currentJobId) {
+            try {
+                await fetch(`${API_BASE}/api/job/${currentJobId}`, { method: 'DELETE' });
+                console.log(`Cleaned up failed job ${currentJobId}`);
+            } catch (cleanupError) {
+                console.error('Failed to cleanup job:', cleanupError);
+            }
+            currentJobId = null;
+        }
+
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
-        hideBatchProgress(); // Hide progress on error
+        hideBatchProgress();
     }
     });
 }
@@ -2450,10 +2465,12 @@ function showScreenshots(screenshotPaths) {
                     ${screenshotPaths.map(path => {
                         // Remove leading slash if present
                         const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+                        // Use query parameter to correctly handle special characters (# and spaces)
+                        const encodedPath = encodeURIComponent(cleanPath);
                         return `
                         <div class="mb-3">
                             <p class="small text-muted">${path.split('/').pop()}</p>
-                            <img src="/api/screenshot/${cleanPath}" class="img-fluid border" alt="Screenshot">
+                            <img src="/api/screenshot?path=${encodedPath}" class="img-fluid border" alt="Screenshot">
                         </div>
                     `}).join('')}
                 </div>

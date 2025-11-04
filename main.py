@@ -1897,10 +1897,13 @@ async def download_file(path: str):
     )
 
 
-@app.get("/api/screenshot/{path:path}")
+@app.get("/api/screenshot")
 async def view_screenshot(path: str):
     """
-    View a screenshot image
+    View a screenshot image via query parameter
+
+    Uses query parameter instead of path parameter to correctly handle
+    special characters like # and spaces in filenames.
 
     Security: Only allow viewing from storage/ directory
     """
