@@ -439,27 +439,87 @@ if (uploadBtn) {
         }
     }
 
-    uploadBtn.disabled = true;
-    uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Subiendo...';
-
-    const formData = new FormData();
-    txtFiles.forEach(file => formData.append('txt_files', file));
-    screenshotFiles.forEach(file => formData.append('screenshots', file));
-    formData.append('api_tier', apiTier);
-
     try {
-        const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+        // Step 1: Initialize job
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Inicializando...';
+
+        const initFormData = new FormData();
+        initFormData.append('api_tier', apiTier);
+
+        const initResponse = await fetch(`${API_BASE}/api/upload/init`, {
             method: 'POST',
-            body: formData
+            body: initFormData
         });
 
-        if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json().catch(() => ({ detail: 'Upload failed' }));
-            throw new Error(errorData.detail || 'Upload failed');
+        if (!initResponse.ok) {
+            const errorData = await initResponse.json().catch(() => ({ detail: 'Failed to initialize job' }));
+            throw new Error(errorData.detail || 'Failed to initialize job');
         }
 
-        const uploadData = await uploadResponse.json();
-        currentJobId = uploadData.job_id;
+        const initData = await initResponse.json();
+        currentJobId = initData.job_id;
+
+        // Step 2: Prepare batches
+        uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Preparando lotes...';
+
+        // Combine all files and create batches
+        const allFiles = [...txtFiles, ...screenshotFiles];
+        const fileBatches = createFileBatches(allFiles);
+
+        const totalBatches = fileBatches.length;
+        const totalSize = calculateTotalSize(allFiles);
+
+        console.log(`Uploading ${allFiles.length} files (${formatBytes(totalSize)}) in ${totalBatches} batches`);
+
+        // Step 3: Show batch progress UI
+        showBatchProgress();
+        updateBatchProgress(0, totalBatches, `Preparando ${totalBatches} lotes...`);
+
+        // Step 4: Upload batches sequentially
+        for (let i = 0; i < fileBatches.length; i++) {
+            const batch = fileBatches[i];
+            const batchNum = i + 1;
+            const batchSize = calculateTotalSize(batch);
+
+            updateBatchProgress(
+                batchNum,
+                totalBatches,
+                `Subiendo lote ${batchNum}/${totalBatches} (${formatBytes(batchSize)})`
+            );
+
+            const batchFormData = new FormData();
+
+            // Separate files by type
+            batch.forEach(file => {
+                if (file.name.endsWith('.txt')) {
+                    batchFormData.append('txt_files', file);
+                } else {
+                    batchFormData.append('screenshots', file);
+                }
+            });
+
+            const batchResponse = await fetch(`${API_BASE}/api/upload/batch/${currentJobId}`, {
+                method: 'POST',
+                body: batchFormData
+            });
+
+            if (!batchResponse.ok) {
+                const errorData = await batchResponse.json().catch(() => ({
+                    detail: `Failed to upload batch ${batchNum}`
+                }));
+                throw new Error(errorData.detail || `Failed to upload batch ${batchNum}`);
+            }
+
+            const batchData = await batchResponse.json();
+            console.log(`Batch ${batchNum} uploaded:`, batchData);
+        }
+
+        // Step 5: Hide batch progress
+        hideBatchProgress();
+
+        // Step 6: Start processing
+        uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Iniciando procesamiento...';
 
         const processResponse = await fetch(`${API_BASE}/api/process/${currentJobId}`, {
             method: 'POST',
@@ -479,6 +539,7 @@ if (uploadBtn) {
         showError('Error al subir archivos: ' + error.message);
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
+        hideBatchProgress(); // Hide progress on error
     }
     });
 }
