@@ -88,6 +88,27 @@ Use `asyncio.Semaphore(10)` for max 10 concurrent Gemini requests (critical for 
 - Add with `ALTER TABLE ... ADD COLUMN ... DEFAULT ...`
 - Prevents breaking existing rows
 
+### Testing Batch Uploads with curl
+
+```bash
+# 1. Initialize job
+JOB_ID=$(curl -s -X POST http://localhost:8000/api/upload/init -F "api_tier=free" | jq -r '.job_id')
+
+# 2. Upload batch 1
+curl -X POST http://localhost:8000/api/upload/batch/$JOB_ID \
+  -F "txt_files=@file1.txt" \
+  -F "txt_files=@file2.txt"
+
+# 3. Upload batch 2
+curl -X POST http://localhost:8000/api/upload/batch/$JOB_ID \
+  -F "screenshots=@screenshot1.png" \
+  -F "screenshots=@screenshot2.png"
+
+# 4. Start processing
+curl -X POST http://localhost:8000/api/process/$JOB_ID \
+  -H "X-Gemini-API-Key: your_key_here"
+```
+
 ## Storage Structure
 
 ```
@@ -163,6 +184,51 @@ print(f"Unmapped: {unmapped_ids}")
 ```
 
 ### API Endpoints
+
+**Core Workflow:**
+- `POST /api/upload` → Upload TXT files + screenshots, creates job (legacy single upload)
+- `POST /api/process/{job_id}` → Start background processing
+- `GET /api/status/{job_id}` → Real-time status with statistics
+- `GET /api/download/{job_id}` → Download `resolved_hands.zip`
+- `GET /api/download-fallidos/{job_id}` → Download `fallidos.zip`
+
+**Batch Upload System (Nov 2025):**
+
+**Problem**: Replit's nginx proxy has ~100 MB upload limit, causing 413 errors for large uploads even though app supports 300 MB.
+
+**Solution**: Batch upload system splits files into ~50-60 MB chunks uploaded sequentially.
+
+**Workflow:**
+1. Frontend: Split files into size-based batches using `createFileBatches()`
+2. `POST /api/upload/init` → Create job, return job_id (no files uploaded yet)
+3. Loop: `POST /api/upload/batch/{job_id}` → Upload each batch sequentially
+4. `POST /api/process/{job_id}` → Start processing after all batches uploaded
+
+**New Endpoints:**
+- `POST /api/upload/init` → Initialize job without files
+  - Input: `api_tier` (free/paid)
+  - Output: `{ job_id, status: "initialized" }`
+
+- `POST /api/upload/batch/{job_id}` → Upload file batch to existing job
+  - Input: `txt_files[]`, `screenshots[]` (multipart files)
+  - Output: `{ job_id, batch_txt_count, batch_screenshot_count, total_txt_count, total_screenshot_count }`
+  - Validates: File count limits (cumulative across all batches)
+  - Rejects: Jobs not in 'pending' or 'initialized' status
+
+**Frontend Implementation:**
+- `createFileBatches(files, maxSize)` - Split files into size-based batches
+- `calculateTotalSize(files)` - Get total size in bytes
+- `formatBytes(bytes)` - Format to human-readable (e.g., "12.5 MB")
+- Batch progress UI with animated progress bar
+- Error handling with automatic cleanup
+
+**Constants:**
+- `MAX_BATCH_SIZE_MB = 55` (55 MB to stay safely under 60 MB with overhead)
+- `MAX_BATCH_SIZE_BYTES = 55 * 1024 * 1024`
+
+**Location**: `main.py:210-350` (endpoints), `static/js/app.js:1-100,295-373` (frontend)
+
+**Debugging & Diagnostics:**
 - `POST /api/debug/{job_id}/export` - Manual debug export
 - `POST /api/debug/{job_id}/generate-prompt` - AI debugging via Gemini
 - `POST /api/validate` - Validate TXT file before processing
