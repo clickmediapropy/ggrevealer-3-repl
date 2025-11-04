@@ -208,6 +208,31 @@ async def serve_app(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.post("/api/upload/init")
+async def init_upload_job(api_tier: str = Form(default='free')):
+    """Initialize a new upload job without files (for batch uploads)"""
+    # Validate API tier
+    if api_tier not in ('free', 'paid'):
+        api_tier = 'free'
+
+    job_id = create_job(api_tier=api_tier)
+
+    # Create upload directories
+    job_upload_path = UPLOADS_PATH / str(job_id)
+    job_upload_path.mkdir(exist_ok=True)
+
+    txt_path = job_upload_path / "txt"
+    screenshots_path = job_upload_path / "screenshots"
+    txt_path.mkdir(exist_ok=True)
+    screenshots_path.mkdir(exist_ok=True)
+
+    return {
+        "job_id": job_id,
+        "status": "initialized",
+        "message": "Job creado. Ahora puedes subir archivos por lotes."
+    }
+
+
 @app.post("/api/upload")
 async def upload_files(
     txt_files: List[UploadFile] = File(...),

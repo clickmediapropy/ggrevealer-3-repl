@@ -66,10 +66,19 @@ def parse_pt4_import_log(log_text: str) -> Optional[PT4ParsedResult]:
     total_errors = 0
     total_duplicates = 0
 
+    # Debug: Log first few lines to understand format
+    print("=" * 80)
+    print("PT4 PARSER DEBUG - First 10 lines:")
+    for i, line in enumerate(lines[:10], 1):
+        print(f"{i:3d}: {repr(line)}")
+    print("=" * 80)
+
     for line in lines:
         # Match: Import file: /path/to/46798_resolved.txt
-        file_match = re.search(r'Import file:\s+(.+\.txt)$', line)
+        # Note: Allow trailing whitespace (\r\n or \n) with \s*$
+        file_match = re.search(r'Import file:\s+(.+\.txt)\s*$', line)
         if file_match:
+            print(f"✅ MATCHED Import file: {file_match.group(1)}")
             # Save previous file if it had errors
             if current_file and current_errors:
                 # extract_table_number handles path extraction
@@ -93,7 +102,8 @@ def parse_pt4_import_log(log_text: str) -> Optional[PT4ParsedResult]:
             continue
 
         # Match: Error: GG Poker: Duplicate player...
-        error_match = re.search(r'^\d{2}:\d{2}:\d{2}\s+[ap]m:\s+Error:\s+(.+)$', line)
+        # Note: Allow trailing whitespace with \s*$
+        error_match = re.search(r'^\d{2}:\d{2}:\d{2}\s+[ap]m:\s+Error:\s+(.+?)\s*$', line)
         if error_match:
             current_errors.append(error_match.group(1))
             continue
@@ -111,6 +121,9 @@ def parse_pt4_import_log(log_text: str) -> Optional[PT4ParsedResult]:
             total_hands += hands
             total_errors += errors
             total_duplicates += duplicates
+
+            # Debug: Log Complete line parsing
+            print(f"📊 Complete: {hands} hands, {errors} errors, {duplicates} dupes (current_file: {current_file})")
 
             # If errors > 0, save this file
             if errors > 0 and current_file:

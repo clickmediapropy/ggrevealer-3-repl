@@ -88,8 +88,10 @@ def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch
         match.matched_job_id = most_recent_job_id
 
         # Find original TXT (input)
+        # Match files that contain the table number in the filename
+        # Examples: "46798.txt", "GG... - 4374643746 - ... .txt"
         for file in job_file_list:
-            if file['file_type'] == 'txt' and f"{table_number}.txt" in file['filename']:
+            if file['file_type'] == 'txt' and str(table_number) in file['filename']:
                 match.original_txt_path = file['file_path']
                 break
 
@@ -106,6 +108,7 @@ def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch
                     match.processed_txt_path = str(fallado_path)
 
         # Find screenshots
+        # Screenshots usually named: "screenshot_46798_001.png" or similar
         for file in job_file_list:
             if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
                 match.screenshot_paths.append(file['file_path'])
