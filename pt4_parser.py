@@ -4,6 +4,7 @@ Extracts failed files from PT4 import logs
 """
 
 import re
+from pathlib import PureWindowsPath, PurePosixPath
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
@@ -23,13 +24,19 @@ def extract_table_number(filename: str) -> Optional[int]:
     Extract table number from filename like '46798_resolved.txt'
 
     Args:
-        filename: Filename with or without path
+        filename: Filename with or without path (supports both Unix and Windows paths)
 
     Returns:
         Table number as int, or None if not found
     """
     # Extract just the filename if path included
-    basename = filename.split('/')[-1]
+    # Handle both Windows and Unix paths
+    if '\\' in filename:
+        # Windows path
+        basename = PureWindowsPath(filename).name
+    else:
+        # Unix path or just filename
+        basename = PurePosixPath(filename).name
 
     # Match pattern: {digits}_{suffix}.txt
     match = re.match(r'^(\d+)_(?:resolved|fallado)\.txt$', basename)
@@ -65,8 +72,13 @@ def parse_pt4_import_log(log_text: str) -> Optional[PT4ParsedResult]:
         if file_match:
             # Save previous file if it had errors
             if current_file and current_errors:
-                filename = current_file.split('/')[-1]
-                table_num = extract_table_number(filename)
+                # extract_table_number handles path extraction
+                table_num = extract_table_number(current_file)
+                # Extract basename for display
+                if '\\' in current_file:
+                    filename = PureWindowsPath(current_file).name
+                else:
+                    filename = PurePosixPath(current_file).name
                 failed_files.append({
                     'filename': filename,
                     'table_number': table_num,
@@ -102,8 +114,13 @@ def parse_pt4_import_log(log_text: str) -> Optional[PT4ParsedResult]:
 
             # If errors > 0, save this file
             if errors > 0 and current_file:
-                filename = current_file.split('/')[-1]
-                table_num = extract_table_number(filename)
+                # extract_table_number handles path extraction
+                table_num = extract_table_number(current_file)
+                # Extract basename for display
+                if '\\' in current_file:
+                    filename = PureWindowsPath(current_file).name
+                else:
+                    filename = PurePosixPath(current_file).name
                 failed_files.append({
                     'filename': filename,
                     'table_number': table_num,
