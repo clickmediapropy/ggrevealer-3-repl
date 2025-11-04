@@ -1,0 +1,258 @@
+================================================================================
+                    CHECKLIST DE VALIDACION DE DISTRIBUCION
+                              GGRevealer v1.0.0
+================================================================================
+
+Este archivo es un checklist manual para verificar que el paquete de
+distribucion contiene todos los elementos necesarios y esta listo para
+entrega al usuario final.
+
+Instrucciones:
+- Marca con "X" dentro de los corchetes cuando completes cada item: [X]
+- Verifica cada fase secuencialmente
+- NO distribuir hasta que todas las fases esten marcadas como CUMPLIDO
+
+================================================================================
+FASE 1: ARCHIVOS CORE PYTHON (12 archivos)
+================================================================================
+
+Archivos principales de la aplicacion:
+
+[ ] main.py              - Servidor FastAPI y endpoints
+[ ] database.py          - Gestion de SQLite
+[ ] validator.py         - Validaciones PokerTracker 4
+[ ] matcher.py           - Matching de manos con screenshots
+[ ] ocr.py               - OCR con Google Gemini Vision
+[ ] writer.py            - Generacion de archivos de salida
+[ ] parser.py            - Parser de hand histories GGPoker
+[ ] pt4_matcher.py       - Matching para recuperacion PT4
+[ ] pt4_parser.py        - Parser de logs PT4
+[ ] models.py            - Modelos de datos
+[ ] config.py            - Configuracion de la aplicacion
+[ ] logger.py            - Sistema de logging
+
+Total: 12 archivos Python principales [ ] CUMPLIDO
+
+================================================================================
+FASE 2: DOCUMENTACION E INSTALACION (5 items)
+================================================================================
+
+Archivos de documentacion y configuracion:
+
+[ ] GUIA_INSTALACION_Y_USO.html
+    Verificar internamente:
+    [ ] Tabla de contenidos funciona (enlaces)
+    [ ] Botones "Copiar codigo" funcionan
+    [ ] Responsive (se ve bien en diferentes tamanos)
+    [ ] Imagenes/screenshots visibles
+    [ ] Seccion de solucion de problemas completa
+    [ ] Footer con informacion de contacto
+
+[ ] README.txt
+    Verificar internamente:
+    [ ] Inicio rapido visible
+    [ ] Comandos de instalacion correctos
+    [ ] Seccion de problemas comunes
+
+[ ] .env.example
+    Verificar internamente:
+    [ ] Contiene GEMINI_API_KEY con placeholder
+    [ ] Instrucciones de obtencion de API key
+
+[ ] requirements.txt     - Dependencias Python con versiones exactas
+
+[ ] pyproject.toml       - Configuracion del proyecto
+
+Total: 5 archivos [ ] CUMPLIDO
+
+================================================================================
+FASE 3: SCRIPTS WINDOWS (4 items)
+================================================================================
+
+Scripts batch para Windows:
+
+[ ] instalar.bat
+    Verificar internamente:
+    [ ] Detecta Python 3.11+
+    [ ] Crea venv correctamente
+    [ ] Instala dependencias
+    [ ] Muestra instrucciones siguientes
+    [ ] Manejo de errores con pause
+
+[ ] iniciar.bat
+    Verificar internamente:
+    [ ] Activa venv
+    [ ] Inicia servidor en puerto 8000
+    [ ] Abre navegador automaticamente
+
+[ ] detener.bat
+    Verificar internamente:
+    [ ] Busca proceso Python en puerto 8000
+    [ ] Termina proceso correctamente
+    [ ] Mensaje de confirmacion
+
+[ ] reinstalar.bat
+    Verificar internamente:
+    [ ] Elimina venv existente
+    [ ] Limpia archivos temporales
+    [ ] Llama a instalar.bat
+    [ ] Confirmacion de exito
+
+Total: 4 scripts batch [ ] CUMPLIDO
+
+================================================================================
+FASE 4: CARPETAS Y ARCHIVOS ESTATICOS (4 items)
+================================================================================
+
+Estructura de carpetas y archivos frontend:
+
+[ ] static/
+    Verificar internamente:
+    [ ] static/css/styles.css existe
+    [ ] static/js/app.js existe
+    [ ] static/images/ existe (si hay imagenes)
+
+[ ] templates/
+    Verificar internamente:
+    [ ] templates/index.html existe
+    [ ] Template correctamente formateado
+
+[ ] storage/
+    Verificar internamente:
+    [ ] Carpeta vacia creada
+    [ ] Sin archivos de prueba
+
+[ ] ggrevealer.db
+    Verificar internamente:
+    [ ] Base de datos SQLite nueva
+    [ ] Sin datos de desarrollo/prueba
+
+Total: 4 elementos [ ] CUMPLIDO
+
+================================================================================
+FASE 5: EXCLUSIONES - VERIFICAR QUE NO ESTAN (8 items)
+================================================================================
+
+Archivos y carpetas que NO deben estar en el paquete:
+
+Instruccion: Abre el archivo RAR y confirma que NO contiene:
+
+[ ] X tests/                - Carpeta de tests EXCLUIDA
+[ ] X docs/                 - Documentacion de desarrollo EXCLUIDA
+[ ] X .git/                 - Control de versiones EXCLUIDO
+[ ] X attached_assets/      - Assets de desarrollo EXCLUIDOS
+[ ] X __pycache__/          - Cache de Python EXCLUIDO
+[ ] X .replit               - Configuracion Replit EXCLUIDA
+[ ] X *.pyc                 - Archivos compilados Python EXCLUIDOS
+[ ] X .env                  - Archivo con API keys reales EXCLUIDO
+
+Verificacion: [ ] CUMPLIDO
+
+================================================================================
+FASE 6: ARCHIVO RAR FINAL (3 items)
+================================================================================
+
+Verificacion del archivo comprimido:
+
+[ ] Nombre correcto: GGRevealer_v1.0.0_Windows.rar
+
+[ ] Se puede extraer sin errores
+    [ ] WinRAR/7-Zip puede abrir el archivo
+    [ ] No hay archivos corruptos
+    [ ] No requiere contrasena
+
+[ ] Contiene carpetas y archivos correctamente
+    [ ] Estructura de carpetas preservada
+    [ ] Permisos correctos (no read-only)
+    [ ] Sin rutas absolutas
+
+Verificacion: [ ] CUMPLIDO
+
+================================================================================
+FASE 7: PRUEBA FUNCIONAL DE EXTRACCION (8 pasos)
+================================================================================
+
+Simular el flujo completo del usuario final:
+
+[ ] 1. Descargar GGRevealer_v1.0.0_Windows.rar
+
+[ ] 2. Extraer en carpeta temporal (ej: C:\Temp\GGRevealer)
+       Verificar que se extraen todos los archivos
+
+[ ] 3. Abrir GUIA_INSTALACION_Y_USO.html en navegador
+       [ ] Se visualiza correctamente
+       [ ] Enlaces internos funcionan
+
+[ ] 4. Leer README.txt en Bloc de Notas
+       [ ] Formato legible
+       [ ] Instrucciones claras
+
+[ ] 5. Ejecutar instalar.bat (doble clic)
+       [ ] Detecta Python correctamente
+       [ ] Crea venv sin errores
+       [ ] Instala todas las dependencias
+       [ ] Muestra mensaje de exito
+
+[ ] 6. Ejecutar iniciar.bat (doble clic)
+       [ ] Activa venv correctamente
+       [ ] Inicia servidor FastAPI
+       [ ] Abre http://localhost:8000 en navegador
+       [ ] Interfaz carga correctamente
+
+[ ] 7. Acceder a http://localhost:8000 y verificar:
+       [ ] Pagina principal carga
+       [ ] Formulario de upload visible
+       [ ] Sin errores en consola del navegador
+
+[ ] 8. Ejecutar detener.bat (doble clic)
+       [ ] Servidor se detiene correctamente
+       [ ] Mensaje de confirmacion visible
+
+Resultado: [ ] LISTO PARA DISTRIBUCION
+
+================================================================================
+RESUMEN FINAL
+================================================================================
+
+Total de fases completadas: _____ / 7
+
+Porcentaje de completitud: _____ %
+
+Estado final:
+[ ] APROBADO - Listo para distribucion
+[ ] PENDIENTE - Revisar items sin completar
+[ ] RECHAZADO - Requiere correccion de errores criticos
+
+================================================================================
+NOTAS ADICIONALES
+================================================================================
+
+Problemas encontrados:
+_____________________________________________________________________________
+_____________________________________________________________________________
+_____________________________________________________________________________
+
+Acciones correctivas tomadas:
+_____________________________________________________________________________
+_____________________________________________________________________________
+_____________________________________________________________________________
+
+================================================================================
+FIRMA Y FECHA
+================================================================================
+
+Validado por: _______________________________
+
+Fecha: _____ / _____ / _____
+
+Hora: _____:_____
+
+Version GGRevealer: v1.0.0
+
+Plataforma objetivo: Windows 10/11 (64-bit)
+
+Python requerido: 3.11+
+
+================================================================================
+                          FIN DEL CHECKLIST
+================================================================================
