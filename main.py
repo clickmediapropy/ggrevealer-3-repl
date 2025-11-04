@@ -1986,7 +1986,7 @@ async def reprocess_failed_file(
             failed_file = dict(cursor.fetchone() or {})
 
         if not failed_file:
-            raise HTTPException(status_code=404, detail="Failed file not found")
+            return {"success": False, "error": "Failed file not found"}
 
         job_id = failed_file['associated_job_id']
         original_txt_path = failed_file['associated_original_txt_path']
@@ -2001,10 +2001,10 @@ async def reprocess_failed_file(
                 screenshot_paths = []
 
         if not screenshot_paths:
-            raise HTTPException(status_code=400, detail="No screenshots associated with this file")
+            return {"success": False, "error": "No screenshots associated with this file"}
 
         if not original_txt_path:
-            raise HTTPException(status_code=400, detail="Original TXT file path not found")
+            return {"success": False, "error": "Original TXT file path not found"}
 
         # Normalize path: handle leading slash issue
         # Paths in database may have leading slash (old format) or without (new format)
@@ -2014,7 +2014,7 @@ async def reprocess_failed_file(
 
         # Read original TXT
         if not Path(normalized_path).exists():
-            raise HTTPException(status_code=404, detail=f"Original TXT file not found: {normalized_path}")
+            return {"success": False, "error": f"Original TXT file not found: {normalized_path}"}
 
         with open(normalized_path, 'r', encoding='utf-8') as f:
             original_txt = f.read()
@@ -2022,7 +2022,7 @@ async def reprocess_failed_file(
         # Parse hands
         hands = GGPokerParser.parse_file(original_txt)
         if not hands:
-            raise HTTPException(status_code=400, detail="Could not parse any hands from TXT file")
+            return {"success": False, "error": "Could not parse any hands from TXT file"}
 
         # Get table name from first hand
         table_name = None
@@ -2034,7 +2034,7 @@ async def reprocess_failed_file(
         # Get API key (use provided or from env)
         ocr_api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not ocr_api_key:
-            raise HTTPException(status_code=400, detail="API key required for OCR")
+            return {"success": False, "error": "API key required for OCR"}
 
         # Run OCR2 on screenshot
         screenshot_path = screenshot_paths[0]
@@ -2045,10 +2045,7 @@ async def reprocess_failed_file(
         success, ocr_data, error = await ocr_player_details(screenshot_path, ocr_api_key)
 
         if not success:
-            raise HTTPException(
-                status_code=400,
-                detail=f"OCR failed: {error}"
-            )
+            return {"success": False, "error": f"OCR failed: {error}"}
 
         # Create ScreenshotAnalysis from OCR data
         screenshot_analysis = create_screenshot_analysis_from_ocr2_data(ocr_data)
@@ -2066,10 +2063,7 @@ async def reprocess_failed_file(
             all_mappings.update(mapping)
 
         if not all_mappings:
-            raise HTTPException(
-                status_code=400,
-                detail="Could not generate player mappings from screenshot"
-            )
+            return {"success": False, "error": "Could not generate player mappings from screenshot"}
 
         # Convert to NameMapping objects
         name_mappings = convert_mapping_dict_to_name_mappings(all_mappings, table_name or str(table_number))
@@ -2116,13 +2110,11 @@ async def reprocess_failed_file(
             'mappings_count': len(all_mappings)
         }
 
-    except HTTPException as e:
-        raise e
     except Exception as e:
         print(f"Error reprocessing failed file: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+        return {"success": False, "error": f"Internal error: {str(e)}"}
 
 
 @app.get("/api/download-file")
