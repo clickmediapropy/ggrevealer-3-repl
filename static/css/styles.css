@@ -762,7 +762,7 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 12px;
     margin-bottom: 15px;
-    background-color: #fff;
+    background-color: var(--bg-secondary);
     overflow: hidden;
     transition: all 0.3s ease;
 }
@@ -811,7 +811,7 @@ body {
 .job-id {
     font-weight: 600;
     font-size: 1.1rem;
-    color: #212529;
+    color: var(--text-primary);
 }
 
 .status-badge-completed,
@@ -839,12 +839,12 @@ body {
 
 .status-badge-failed {
     background-color: var(--error-bg);
-    color: #dc3545;
+    color: var(--error);
 }
 
 .status-badge-pending {
     background-color: var(--warning-bg);
-    color: #856404;
+    color: var(--warning);
 }
 
 .job-card-right {
@@ -1445,7 +1445,7 @@ body {
 #detailed-metrics .progress {
     border-radius: 10px;
     overflow: hidden;
-    background-color: #e9ecef;
+    background-color: var(--bg-tertiary);
 }
 
 #detailed-metrics .progress-bar {
@@ -1512,7 +1512,7 @@ body {
 
 .budget-card span,
 .budget-card strong {
-    color: #212529 !important;
+    color: var(--text-primary) !important;
 }
 
 .budget-card .text-muted {
@@ -1522,7 +1522,7 @@ body {
 .budget-card .progress {
     border-radius: 10px;
     overflow: hidden;
-    background-color: #e9ecef;
+    background-color: var(--bg-tertiary);
 }
 
 .budget-card .progress-bar {
