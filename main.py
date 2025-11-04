@@ -1613,6 +1613,11 @@ async def upload_pt4_log(
     # Save each failed file match
     failed_files_response = []
     for match in matches:
+        # Debug logging
+        print(f"🔍 Match for {match.filename}:")
+        print(f"   Job: {match.matched_job_id}")
+        print(f"   Screenshots: {match.screenshot_paths} (type: {type(match.screenshot_paths)})")
+
         # Store in database
         failed_file_id = create_pt4_failed_file(
             pt4_import_attempt_id=attempt_id,
@@ -1744,9 +1749,13 @@ async def view_screenshot(path: str):
 
     Security: Only allow viewing from storage/ directory
     """
+    # Remove leading slash if present (handles both /storage/... and storage/...)
+    if path.startswith('/'):
+        path = path.lstrip('/')
+
     file_path = Path(path)
 
-    # Security check
+    # Security check: must be within storage/ directory
     storage_abs = Path("storage").resolve()
     file_abs = file_path.resolve()
 
