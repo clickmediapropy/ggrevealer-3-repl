@@ -2359,6 +2359,58 @@ function showModalError(message) {
     }
 }
 
+// ========================================
+// FAILED FILES INTEGRATION
+// ========================================
+
+async function loadJobFailedFiles(jobId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/pt4-log/failed-files/${jobId}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        const pt4Count = data.total_pt4_failures || 0;
+        const appCount = data.total_app_failures || 0;
+
+        if (pt4Count > 0 || appCount > 0) {
+            const failedFilesSection = document.getElementById('modal-job-failed-files-section');
+            const pt4CountSpan = document.getElementById('modal-job-pt4-failures-count');
+            const appCountSpan = document.getElementById('modal-job-app-failures-count');
+
+            if (failedFilesSection && pt4CountSpan && appCountSpan) {
+                failedFilesSection.style.display = 'block';
+                pt4CountSpan.textContent = pt4Count;
+                appCountSpan.textContent = appCount;
+
+                // Store for later viewing
+                window.currentJobFailedFiles = data;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading failed files:', error);
+    }
+}
+
+function viewJobFailedFiles() {
+    if (!window.currentJobFailedFiles) return;
+
+    // Close the modal first
+    if (reprocessModal) {
+        reprocessModal.hide();
+    }
+
+    // Switch to failed files view and populate with this job's data
+    showFailedFilesView();
+    updateSidebarActiveState('nav-failed-files');
+
+    // Display the failed files
+    displayFailedFilesResults({
+        failed_files_count: window.currentJobFailedFiles.total_pt4_failures,
+        failed_files: window.currentJobFailedFiles.pt4_failures
+    });
+}
+
 function formatStatus(status) {
     const statusMap = {
         'completed': '✅ Completado',
@@ -2850,6 +2902,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         throw new Error(data.error || 'Error al cargar job');
                     }
 
+                    // Hide failed files section initially
+                    const failedFilesSection = document.getElementById('modal-job-failed-files-section');
+                    if (failedFilesSection) {
+                        failedFilesSection.style.display = 'none';
+                    }
+
                     // Display job info
                     modalJobIdDisplay.textContent = jobId;
                     modalJobDetails.innerHTML = `
@@ -2864,6 +2922,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     modalJobError.classList.add('d-none');
                     modalReprocessBtn.disabled = false;
                     modalReprocessBtn.dataset.jobId = jobId;
+
+                    // Load failed files for this job
+                    await loadJobFailedFiles(jobId);
 
                 } catch (error) {
                     showModalError(error.message);

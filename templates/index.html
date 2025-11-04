@@ -640,6 +640,18 @@
                             <div id="modal-job-details">
                                 <!-- Job details will be populated here -->
                             </div>
+
+                            <!-- Failed Files Section -->
+                            <div class="mt-4" id="modal-job-failed-files-section" style="display: none;">
+                                <h6><i class="bi bi-exclamation-triangle text-warning"></i> Archivos Fallidos</h6>
+                                <div class="alert alert-warning">
+                                    <strong>PT4 Failures:</strong> <span id="modal-job-pt4-failures-count">0</span> archivo(s)<br>
+                                    <strong>App Failures:</strong> <span id="modal-job-app-failures-count">0</span> archivo(s)
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewJobFailedFiles()">
+                                    Ver Detalles
+                                </button>
+                            </div>
                         </div>
 
                         <div class="alert alert-warning">
