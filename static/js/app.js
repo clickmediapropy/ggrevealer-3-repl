@@ -403,6 +403,43 @@ function showWarning(message) {
     }, 5000);
 }
 
+/**
+ * Copy text to clipboard with proper error handling
+ * @param {string} text - Text to copy
+ * @param {HTMLElement} button - Button element to update with status
+ */
+async function copyToClipboard(text, button) {
+    if (!text || text.trim() === '') {
+        alert('No hay texto para copiar');
+        return;
+    }
+
+    const originalHTML = button.innerHTML;
+
+    try {
+        await navigator.clipboard.writeText(text);
+        button.innerHTML = '<i class="bi bi-check-circle"></i> Copiado';
+        console.log(`[CLIPBOARD] Copied ${text.length} characters`);
+
+        // Reset button after 2 seconds
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+        }, 2000);
+    } catch (error) {
+        console.error('[CLIPBOARD] Failed to copy:', error);
+        button.innerHTML = '<i class="bi bi-x-circle"></i> Error';
+
+        // Fallback: show modal with text to manually copy
+        alert('No se pudo copiar automáticamente. Por favor, selecciona y copia el texto manualmente.\n\n' +
+              'Error: ' + error.message);
+
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+        }, 3000);
+    }
+}
+
 function updateUploadButton() {
     if (!uploadBtn) return;
     
@@ -1428,19 +1465,26 @@ async function generateErrorPrompt(jobId, errorMessage) {
         // Display generated prompt
         promptText.textContent = prompt;
 
-        // Setup copy button with proper text binding
+        // Setup copy button with proper event listener
         if (copyBtn) {
             copyBtn.disabled = false;
-            // Store prompt text in button's data attribute for reliable access
-            copyBtn.setAttribute('data-prompt-text', prompt);
-            // Remove any existing event listeners to avoid duplicates
-            copyBtn.onclick = null;
-            copyBtn.onclick = function() {
-                const textToCopy = this.getAttribute('data-prompt-text');
-                console.log('Copy button clicked, text length:', textToCopy ? textToCopy.length : 0);
-                copyToClipboard(textToCopy, this);
+
+            // Remove old listener if exists
+            const oldHandler = copyBtn._clipboardHandler;
+            if (oldHandler) {
+                copyBtn.removeEventListener('click', oldHandler);
+            }
+
+            // Create new handler
+            const newHandler = function() {
+                copyToClipboard(prompt, this);
             };
-            console.log('Copy button configured for error prompt');
+
+            // Store reference and attach
+            copyBtn._clipboardHandler = newHandler;
+            copyBtn.addEventListener('click', newHandler);
+
+            console.log('[COPY] Error prompt copy button configured');
         }
 
         // Setup regenerate button
@@ -1535,19 +1579,26 @@ async function generatePartialErrorPrompt(jobId) {
         // Display generated prompt
         promptText.textContent = prompt;
 
-        // Setup copy button with proper text binding
+        // Setup copy button with proper event listener
         if (copyBtn) {
             copyBtn.disabled = false;
-            // Store prompt text in button's data attribute for reliable access
-            copyBtn.setAttribute('data-prompt-text', prompt);
-            // Remove any existing event listeners to avoid duplicates
-            copyBtn.onclick = null;
-            copyBtn.onclick = function() {
-                const textToCopy = this.getAttribute('data-prompt-text');
-                console.log('Copy button clicked, text length:', textToCopy ? textToCopy.length : 0);
-                copyToClipboard(textToCopy, this);
+
+            // Remove old listener if exists
+            const oldHandler = copyBtn._clipboardHandler;
+            if (oldHandler) {
+                copyBtn.removeEventListener('click', oldHandler);
+            }
+
+            // Create new handler
+            const newHandler = function() {
+                copyToClipboard(prompt, this);
             };
-            console.log('Copy button configured for partial error prompt');
+
+            // Store reference and attach
+            copyBtn._clipboardHandler = newHandler;
+            copyBtn.addEventListener('click', newHandler);
+
+            console.log('[COPY] Partial error prompt copy button configured');
         }
 
         // Setup regenerate button
