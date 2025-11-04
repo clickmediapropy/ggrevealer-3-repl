@@ -195,16 +195,16 @@ if (txtDropzone && txtInput) {
 if (txtDropzone) {
     txtDropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        txtDropzone.classList.add('active');
+        txtDropzone.classList.add('drag-over');
     });
 
     txtDropzone.addEventListener('dragleave', () => {
-        txtDropzone.classList.remove('active');
+        txtDropzone.classList.remove('drag-over');
     });
 
     txtDropzone.addEventListener('drop', (e) => {
         e.preventDefault();
-        txtDropzone.classList.remove('active');
+        txtDropzone.classList.remove('drag-over');
         handleTxtFiles(e.dataTransfer.files);
     });
 }
@@ -281,16 +281,16 @@ if (screenshotDropzone && screenshotInput) {
 if (screenshotDropzone) {
     screenshotDropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        screenshotDropzone.classList.add('active');
+        screenshotDropzone.classList.add('drag-over');
     });
 
     screenshotDropzone.addEventListener('dragleave', () => {
-        screenshotDropzone.classList.remove('active');
+        screenshotDropzone.classList.remove('drag-over');
     });
 
     screenshotDropzone.addEventListener('drop', (e) => {
         e.preventDefault();
-        screenshotDropzone.classList.remove('active');
+        screenshotDropzone.classList.remove('drag-over');
         handleScreenshotFiles(e.dataTransfer.files);
     });
 }

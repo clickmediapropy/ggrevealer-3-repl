@@ -415,23 +415,80 @@ body {
 }
 
 .dropzone {
-    border: 3px dashed #dee2e6;
-    border-radius: 8px;
-    padding: 40px 20px;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border: 3px dashed var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-2xl);
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    background-color: #fff;
+    transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
+}
+
+.dropzone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.dropzone:hover::before {
+    left: 100%;
 }
 
 .dropzone:hover {
-    border-color: #0d6efd;
-    background-color: #f8f9fa;
+    border-color: var(--brand-solid);
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+    transform: scale(1.02);
+    box-shadow: var(--shadow-lg);
 }
 
+.dropzone.drag-over {
+    border-color: var(--brand-solid);
+    background: var(--brand-gradient);
+    opacity: 0.9;
+    transform: scale(1.05);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 1; }
+}
+
+.dropzone-icon {
+    font-size: 4rem;
+    color: var(--brand-solid);
+    margin-bottom: var(--spacing-md);
+    transition: transform var(--transition-base);
+}
+
+.dropzone:hover .dropzone-icon {
+    transform: scale(1.2) rotate(5deg);
+}
+
+.dropzone-text {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.dropzone-subtext {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+}
+
+/* Legacy active class renamed to drag-over */
 .dropzone.active {
-    border-color: #0d6efd;
-    background-color: #e7f3ff;
+    border-color: var(--brand-solid);
+    background: var(--brand-gradient);
+    opacity: 0.9;
 }
 
 .file-item {
