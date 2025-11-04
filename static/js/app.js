@@ -122,6 +122,7 @@ let currentJobId = null;
 let statusCheckInterval = null;
 let timerInterval = null;
 let startTime = null;
+let isCheckingStatus = false;
 
 const txtDropzone = document.getElementById('txt-dropzone');
 const txtInput = document.getElementById('txt-input');
@@ -644,6 +645,14 @@ function stopStatusPolling() {
 }
 
 async function checkStatus() {
+    // Guard against concurrent status checks
+    if (isCheckingStatus) {
+        console.log('[GUARD] Skipping duplicate status check');
+        return;
+    }
+
+    isCheckingStatus = true;
+
     try {
         const response = await fetch(`${API_BASE}/api/status/${currentJobId}`);
         if (!response.ok) {
@@ -652,7 +661,7 @@ async function checkStatus() {
 
         const job = await response.json();
         console.log(`[DEBUG] Job ${job.id} status: ${job.status}`);
-        
+
         updateProcessingUI(job);
 
         if (job.status === 'completed') {
@@ -665,10 +674,12 @@ async function checkStatus() {
             console.log('[DEBUG] Job failed');
             stopStatusPolling();
             stopTimer();
-            showError(job.error_message || 'Processing failed');
+            showError(job.error_message || 'Processing failed', true);
         }
     } catch (error) {
         console.error('❌ Error checking status:', error);
+    } finally {
+        isCheckingStatus = false;
     }
 }
 
