@@ -122,6 +122,13 @@ let currentJobId = null;
 let statusCheckInterval = null;
 let timerInterval = null;
 let startTime = null;
+/**
+ * Guard flag to prevent concurrent status checks from running simultaneously.
+ * Prevents race condition where multiple setInterval callbacks could execute
+ * showResults() twice, causing duplicate UI renders.
+ *
+ * @type {boolean}
+ */
 let isCheckingStatus = false;
 
 const txtDropzone = document.getElementById('txt-dropzone');
@@ -642,6 +649,9 @@ function stopStatusPolling() {
         clearInterval(statusCheckInterval);
         statusCheckInterval = null;
     }
+    // Reset guard flag to prevent stuck state on job cancellation
+    isCheckingStatus = false;
+    console.log('[POLLING] Status polling stopped, guard flag reset');
 }
 
 async function checkStatus() {
@@ -1225,7 +1235,27 @@ function displayDetailedMetrics(metrics) {
     }
 }
 
-async function showError(message) {
+async function showError(message, shouldCleanup = false) {
+    // Clear job ID if requested
+    if (shouldCleanup && currentJobId) {
+        console.log(`[CLEANUP] Clearing failed job ID: ${currentJobId}`);
+        const failedJobId = currentJobId;
+        currentJobId = null;
+
+        // Reset guard flag to prevent stuck state
+        if (typeof isCheckingStatus !== 'undefined') {
+            isCheckingStatus = false;
+        }
+
+        // Optional: Try to delete failed job from server
+        try {
+            await fetch(`${API_BASE}/api/job/${failedJobId}`, { method: 'DELETE' });
+            console.log(`[CLEANUP] Deleted failed job ${failedJobId} from server`);
+        } catch (cleanupError) {
+            console.warn(`[CLEANUP] Could not delete job ${failedJobId}:`, cleanupError);
+        }
+    }
+
     processingSection.classList.add('d-none');
     errorSection.classList.remove('d-none');
     errorMessage.textContent = message;
