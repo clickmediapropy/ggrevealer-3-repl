@@ -3986,7 +3986,7 @@ async function handleReprocessSelected() {
         const data = await response.json();
 
         // Show success message
-        showSuccess(`Reprocessing started (ID: ${data.reprocess_id})`);
+        showToast('success', `Reprocessing started (ID: ${data.reprocess_id})`);
 
         // Clear selections
         document.querySelectorAll('input[data-source]').forEach(cb => cb.checked = false);
@@ -3999,7 +3999,7 @@ async function handleReprocessSelected() {
         setTimeout(() => loadFailedFiles(jobId), 3000);
 
     } catch (error) {
-        showError(`Reprocess error: ${error.message}`);
+        showToast('error', `Reprocess error: ${error.message}`);
         console.error('Reprocess error:', error);
     }
 }
