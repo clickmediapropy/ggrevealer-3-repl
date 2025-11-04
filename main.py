@@ -1307,6 +1307,16 @@ Genera SOLO el prompt para Claude Code (sin preamble, solo el prompt):"""
             )
         )
 
+        # Handle empty or None response from Gemini
+        if not response or not response.text:
+            print("⚠️  Gemini returned empty response, using fallback prompt")
+            return {
+                "success": False,
+                "message": "Gemini returned empty response",
+                "prompt": _generate_fallback_prompt(context, detailed_analysis),
+                "debug_json_path": debug_json_path
+            }
+
         generated_prompt = response.text.strip()
 
         # Validate the generated prompt
@@ -2797,7 +2807,8 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
             debug_export = _export_debug_json(job_id)
             if debug_export:
                 logger.info(f"📋 Debug JSON exported automatically: {debug_export['filename']}")
-                print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
+                # Use logger instead of print to avoid BrokenPipeError when client disconnects
+                logger.info(f"📋 Debug JSON exported: {debug_export['filepath']}")
         except Exception as e:
             logger.warning(f"Failed to export debug JSON: {str(e)}")
 
@@ -2818,7 +2829,8 @@ def run_processing_pipeline(job_id: int, api_key: str = None):
             debug_export = _export_debug_json(job_id)
             if debug_export:
                 logger.info(f"📋 Debug JSON exported automatically: {debug_export['filename']}")
-                print(f"[JOB {job_id}] 📋 Debug JSON exported: {debug_export['filepath']}")
+                # Use logger instead of print to avoid BrokenPipeError when client disconnects
+                logger.info(f"📋 Debug JSON exported: {debug_export['filepath']}")
         except Exception as e:
             logger.warning(f"Failed to export debug JSON: {str(e)}")
 
