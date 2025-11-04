@@ -1901,18 +1901,31 @@ def create_screenshot_analysis_from_ocr2_data(ocr_data: dict):
         }
     }
     """
-    from models import ScreenshotAnalysis
+    from models import ScreenshotAnalysis, PlayerStack
 
     # Extract basic fields
     player_names = ocr_data.get('players', [])
     hero_name = ocr_data.get('hero_name', 'Hero')
     board_cards_str = ocr_data.get('board_cards', '')
+    stacks = ocr_data.get('stacks', [])
+    positions = ocr_data.get('positions', [])
 
     # Parse roles from roles dict
     roles = ocr_data.get('roles', {})
     dealer_player = roles.get('dealer')
     small_blind_player = roles.get('small_blind')
     big_blind_player = roles.get('big_blind')
+
+    # Build all_player_stacks (CRITICAL FIX)
+    all_player_stacks = []
+    for i, player_name in enumerate(player_names):
+        stack = stacks[i] if i < len(stacks) else 0.0
+        position = positions[i] if i < len(positions) else (i + 1)
+        all_player_stacks.append(PlayerStack(
+            player_name=player_name,
+            stack=stack,
+            position=position
+        ))
 
     # Create ScreenshotAnalysis
     return ScreenshotAnalysis(
@@ -1922,6 +1935,7 @@ def create_screenshot_analysis_from_ocr2_data(ocr_data: dict):
         hero_cards=ocr_data.get('hero_cards'),
         player_names=player_names,
         board_cards={'all': board_cards_str} if board_cards_str else {},
+        all_player_stacks=all_player_stacks,  # CRITICAL: Add this field
         dealer_player=dealer_player,
         small_blind_player=small_blind_player,
         big_blind_player=big_blind_player
@@ -2044,23 +2058,62 @@ async def reprocess_failed_file(
 
         success, ocr_data, error = await ocr_player_details(screenshot_path, ocr_api_key)
 
+        # Debug: Log OCR2 response
+        print(f"[DEBUG] ===== OCR2 Response Debug =====")
+        print(f"[DEBUG] OCR2 Success: {success}")
+        print(f"[DEBUG] OCR2 Error: {error}")
+        if success and ocr_data:
+            print(f"[DEBUG] OCR2 Raw Data: {json.dumps(ocr_data, indent=2)}")
+            print(f"[DEBUG] OCR2 Players: {ocr_data.get('players', [])}")
+            print(f"[DEBUG] OCR2 Stacks: {ocr_data.get('stacks', [])}")
+            print(f"[DEBUG] OCR2 Positions: {ocr_data.get('positions', [])}")
+            print(f"[DEBUG] OCR2 Roles: {ocr_data.get('roles', {})}")
+        print(f"[DEBUG] ================================")
+
         if not success:
             return {"success": False, "error": f"OCR failed: {error}"}
 
         # Create ScreenshotAnalysis from OCR data
         screenshot_analysis = create_screenshot_analysis_from_ocr2_data(ocr_data)
 
+        # Debug: Log ScreenshotAnalysis object
+        print(f"[DEBUG] ===== ScreenshotAnalysis Object Debug =====")
+        print(f"[DEBUG] screenshot_id: {screenshot_analysis.screenshot_id}")
+        print(f"[DEBUG] player_names: {screenshot_analysis.player_names}")
+        print(f"[DEBUG] hero_name: {screenshot_analysis.hero_name}")
+        print(f"[DEBUG] dealer_player: {screenshot_analysis.dealer_player}")
+        print(f"[DEBUG] small_blind_player: {screenshot_analysis.small_blind_player}")
+        print(f"[DEBUG] big_blind_player: {screenshot_analysis.big_blind_player}")
+        print(f"[DEBUG] all_player_stacks: {[(ps.player_name, ps.stack, ps.position) for ps in screenshot_analysis.all_player_stacks] if screenshot_analysis.all_player_stacks else []}")
+        print(f"[DEBUG] all_player_stacks length: {len(screenshot_analysis.all_player_stacks) if screenshot_analysis.all_player_stacks else 0}")
+        print(f"[DEBUG] ============================================")
+
         # Generate mappings for each hand
         all_mappings = {}  # {anon_id: real_name}
 
-        for hand in hands:
+        print(f"[DEBUG] ===== Mapping Generation Debug =====")
+        print(f"[DEBUG] Total hands to process: {len(hands)}")
+
+        for i, hand in enumerate(hands):
+            print(f"[DEBUG] --- Processing Hand {i+1}/{len(hands)} ---")
+            print(f"[DEBUG] Hand ID: {hand.hand_id}")
+            print(f"[DEBUG] Hand seats: {[(s.seat_number, s.player_id, s.stack) for s in hand.seats]}")
+
             # Build seat mapping for this hand using role-based method
             mapping = _build_seat_mapping_by_roles(
                 screenshot_analysis,
                 hand,
                 None  # logger (optional)
             )
+
+            print(f"[DEBUG] Mapping result: {mapping}")
+            print(f"[DEBUG] Mapping size: {len(mapping)}")
+
             all_mappings.update(mapping)
+
+        print(f"[DEBUG] Final all_mappings: {all_mappings}")
+        print(f"[DEBUG] Total mappings generated: {len(all_mappings)}")
+        print(f"[DEBUG] =====================================")
 
         if not all_mappings:
             return {"success": False, "error": "Could not generate player mappings from screenshot"}

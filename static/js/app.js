@@ -2516,28 +2516,54 @@ function downloadFile(filepath) {
 }
 
 async function reprocessFailedFile(failedFileId, tableNumber) {
+    console.log('[REPROCESS] ===== Starting Reprocess =====');
+    console.log('[REPROCESS] Failed file ID:', failedFileId);
+    console.log('[REPROCESS] Table number:', tableNumber);
+
     const button = document.querySelector(`button[data-file-id="${failedFileId}"]`);
     const spinner = document.getElementById(`spinner-${failedFileId}`);
 
-    if (!button) return;
+    if (!button) {
+        console.error('[REPROCESS] Button not found for failed file ID:', failedFileId);
+        return;
+    }
 
     // Show loading state
     button.disabled = true;
     button.classList.add('d-none');
     spinner.classList.remove('d-none');
 
+    console.log('[REPROCESS] Sending request to server...');
+
     try {
         const formData = new FormData();
         formData.append('pt4_failed_file_id', failedFileId);
+
+        // Check if API key is available and add it
+        const apiKeyInput = document.getElementById('api-key-input');
+        if (apiKeyInput && apiKeyInput.value) {
+            formData.append('api_key', apiKeyInput.value);
+            console.log('[REPROCESS] API Key included: Yes');
+        } else {
+            console.log('[REPROCESS] API Key included: No (using server environment key)');
+        }
 
         const response = await fetch('/api/reprocess-failed-file', {
             method: 'POST',
             body: formData
         });
 
+        console.log('[REPROCESS] Response status:', response.status);
+        console.log('[REPROCESS] Response OK:', response.ok);
+
         const data = await response.json();
+        console.log('[REPROCESS] Response data:', data);
 
         if (data.success) {
+            console.log('[REPROCESS] ✅ Success!');
+            console.log('[REPROCESS] Corrected file path:', data.corrected_file_path);
+            console.log('[REPROCESS] Mappings count:', data.mappings_count);
+
             // Change row state to "Corregido"
             const cell = button.parentElement;
             cell.innerHTML = `
@@ -2550,6 +2576,18 @@ async function reprocessFailedFile(failedFileId, tableNumber) {
             // Show success notification
             alert(`✅ Mesa ${tableNumber} corregida exitosamente!\n\nMappings: ${data.mappings_count} jugadores`);
         } else {
+            console.error('[REPROCESS] ❌ Failed!');
+            console.error('[REPROCESS] Error:', data.error);
+
+            if (data.unmapped_ids) {
+                console.error('[REPROCESS] Unmapped IDs:', data.unmapped_ids);
+                console.error('[REPROCESS] Unmapped count:', data.unmapped_ids.length);
+            }
+
+            if (data.details) {
+                console.log('[REPROCESS] Details:', data.details);
+            }
+
             // Show error with unmapped IDs
             spinner.classList.add('d-none');
             button.classList.remove('d-none');
@@ -2562,13 +2600,17 @@ async function reprocessFailedFile(failedFileId, tableNumber) {
             alert(errorMsg);
         }
     } catch (error) {
+        console.error('[REPROCESS] ❌ Network/Parse Error:', error);
+        console.error('[REPROCESS] Error stack:', error.stack);
+
         spinner.classList.add('d-none');
         button.classList.remove('d-none');
         button.disabled = false;
 
-        console.error('Error reprocessing failed file:', error);
         alert(`❌ Error de red: ${error.message}`);
     }
+
+    console.log('[REPROCESS] ===== End Reprocess =====');
 }
 
 function showScreenshots(screenshotPaths) {
