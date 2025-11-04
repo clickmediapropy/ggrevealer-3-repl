@@ -154,6 +154,34 @@ Violations #1 or #10 cause rejection.
   - Solution: Extract hand IDs from TXT, search screenshots by hand ID, fallback to table number
   - Status: TODO - implement in pt4_matcher.py
 
+## UI/UX Bug Fixes (January 2025)
+
+### Fixed Critical Bugs
+- **JS-1:** Race condition in status polling (guard flag pattern)
+- **JS-2:** Stale currentJobId after errors (cleanup in showError)
+- **UX-2:** Wrong file removal (dynamic index lookup)
+- **UX-4:** No cancel from error state (added button)
+
+### Performance Improvements
+- **JS-7:** Reduced DOM thrashing (incremental updates)
+- **JS-5:** Debounced loadJobs() (300ms)
+- **JS-3:** Fixed timer memory leak (cleanup on start)
+
+### UX Enhancements
+- **UX-3:** Retry countdown feedback
+- **UX-5:** Upload button tooltips
+- **UX-7:** Non-blocking time warning with suppress
+- **UX-8:** Batch failure context in errors
+
+### Visual Fixes
+- **VIS-1:** Fixed sidebar overlap on tablet (768-991px)
+- **VIS-2-7:** Various responsive layout improvements
+
+### Code Quality
+- Removed duplicate functions
+- Added retry logic with exponential backoff
+- Improved clipboard copy with error handling
+
 ## Known Issues Fixed (Oct 2025)
 
 | Issue | Root Cause | Fix | Impact |
