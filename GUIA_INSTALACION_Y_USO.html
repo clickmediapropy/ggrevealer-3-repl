@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGRevealer v1.0.0 - Guía de Instalación y Uso</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header .version {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .toc {
+            background: #ecf0f1;
+            border-left: 4px solid #27ae60;
+            padding: 20px 25px;
+            margin-bottom: 40px;
+            border-radius: 5px;
+        }
+
+        .toc h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .toc ul {
+            list-style: none;
+        }
+
+        .toc li {
+            margin: 10px 0;
+        }
+
+        .toc a {
+            color: #27ae60;
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .toc a:hover {
+            color: #229954;
+            padding-left: 10px;
+        }
+
+        section {
+            margin-bottom: 50px;
+            scroll-margin-top: 20px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #27ae60;
+        }
+
+        h3 {
+            color: #34495e;
+            font-size: 1.4em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        p {
+            margin-bottom: 15px;
+            font-size: 1.05em;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning {
+            background: #f8d7da;
+            border-left: 4px solid #e74c3c;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #27ae60;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 15px 0;
+            position: relative;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            display: block;
+            white-space: pre;
+            font-size: 0.95em;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #229954;
+            transform: scale(1.05);
+        }
+
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+
+        .copy-btn.copied {
+            background: #3498db;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background: #27ae60;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .step h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            padding-left: 10px;
+            font-size: 1.2em;
+        }
+
+        .step p {
+            margin-left: 10px;
+        }
+
+        .troubleshoot-item {
+            background: #f8f9fa;
+            border-left: 4px solid #e67e22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .troubleshoot-item h4 {
+            color: #e67e22;
+            margin-bottom: 10px;
+        }
+
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            margin: 8px 0;
+            font-size: 1.05em;
+        }
+
+        a {
+            color: #3498db;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        a:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+
+        .link-button {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+
+        .link-button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+        }
+
+        .icon {
+            font-style: normal;
+            margin-right: 5px;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+
+            .copy-btn {
+                display: none;
+            }
+
+            section {
+                page-break-inside: avoid;
+            }
+
+            h2 {
+                page-break-after: avoid;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .content {
+                padding: 20px 15px;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            h2 {
+                font-size: 1.5em;
+            }
+
+            .code-block {
+                padding: 15px;
+                font-size: 0.85em;
+            }
+
+            .copy-btn {
+                position: static;
+                display: block;
+                width: 100%;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="icon">🎮</span> GGRevealer</h1>
+            <p class="version">Versión 1.0.0 - Guía de Instalación y Uso para Windows</p>
+        </header>
+
+        <div class="content">
+            <!-- Tabla de Contenidos -->
+            <nav class="toc">
+                <h2><span class="icon">📑</span> Tabla de Contenidos</h2>
+                <ul>
+                    <li><a href="#requisitos"><span class="icon">✓</span> Requisitos Previos</a></li>
+                    <li><a href="#instalacion"><span class="icon">⬇️</span> Instalación Paso a Paso</a></li>
+                    <li><a href="#uso"><span class="icon">▶️</span> Uso Diario</a></li>
+                    <li><a href="#problemas"><span class="icon">🔧</span> Solución de Problemas</a></li>
+                    <li><a href="#mantenimiento"><span class="icon">💾</span> Mantenimiento</a></li>
+                    <li><a href="#contacto"><span class="icon">📧</span> Contacto y Soporte</a></li>
+                </ul>
+            </nav>
+
+            <!-- Sección 1: Requisitos Previos -->
+            <section id="requisitos">
+                <h2><span class="icon">✓</span> Requisitos Previos</h2>
+
+                <h3>Software Necesario</h3>
+                <p>Antes de instalar GGRevealer, necesitas tener Python 3.11 o superior instalado en tu computadora Windows.</p>
+
+                <h3>¿Cómo verificar si tienes Python instalado?</h3>
+                <p>Abre una terminal (Command Prompt o PowerShell) y ejecuta:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                    <code>python --version</code>
+                </div>
+
+                <div class="success">
+                    <p><strong><span class="icon">✓</span> Si ves algo como:</strong> <code>Python 3.11.x</code> o <code>Python 3.12.x</code>, ¡estás listo!</p>
+                </div>
+
+                <div class="warning">
+                    <p><strong><span class="icon">⚠️</span> Si ves un error o una versión inferior a 3.11:</strong></p>
+                    <p>Necesitas descargar e instalar Python desde:</p>
+                    <a href="https://www.python.org/downloads/" class="link-button" target="_blank">
+                        <span class="icon">🔗</span> Descargar Python (python.org)
+                    </a>
+                </div>
+
+                <div class="highlight">
+                    <p><strong><span class="icon">💡</span> Consejo importante:</strong> Durante la instalación de Python, asegúrate de marcar la casilla <strong>"Add Python to PATH"</strong> para que Python sea accesible desde cualquier terminal.</p>
+                </div>
+
+                <h3>API Key de Google Gemini</h3>
+                <p>GGRevealer utiliza la API de Google Gemini para procesar las imágenes. Necesitarás obtener una clave API gratuita:</p>
+                <a href="https://makersuite.google.com/app/apikey" class="link-button" target="_blank">
+                    <span class="icon">🔑</span> Obtener API Key de Gemini
+                </a>
+                <p style="margin-top: 10px;"><strong>Guarda esta clave en un lugar seguro</strong>, la necesitarás durante la instalación.</p>
+            </section>
+
+            <!-- Sección 2: Instalación Paso a Paso -->
+            <section id="instalacion">
+                <h2><span class="icon">⬇️</span> Instalación Paso a Paso</h2>
+
+                <p>Sigue estos 6 pasos cuidadosamente para instalar GGRevealer en tu computadora:</p>
+
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h4>Descomprimir el archivo RAR</h4>
+                    <p>Extrae el contenido del archivo <code>GGRevealer-v1.0.0.rar</code> en una carpeta de tu elección. Por ejemplo: <code>C:\GGRevealer</code></p>
+                    <div class="info">
+                        <p><span class="icon">💡</span> Recomendamos usar una ruta sin espacios ni caracteres especiales para evitar problemas.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h4>Abrir terminal en la carpeta del proyecto</h4>
+                    <p>Navega a la carpeta donde extrajiste GGRevealer:</p>
+                    <ul>
+                        <li><strong>Opción A:</strong> En el Explorador de Windows, mantén presionada la tecla <code>Shift</code> y haz clic derecho dentro de la carpeta, luego selecciona "Abrir ventana de PowerShell aquí" o "Abrir en Terminal"</li>
+                        <li><strong>Opción B:</strong> Abre Command Prompt o PowerShell y usa el comando <code>cd</code>:</li>
+                    </ul>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                        <code>cd C:\GGRevealer</code>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h4>Crear entorno virtual</h4>
+                    <p>Crea un entorno virtual de Python para aislar las dependencias del proyecto:</p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                        <code>python -m venv venv</code>
+                    </div>
+                    <p style="margin-top: 10px;">Este comando creará una carpeta llamada <code>venv</code> con un entorno Python limpio.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h4>Activar el entorno virtual</h4>
+                    <p>Activa el entorno virtual que acabas de crear:</p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                        <code>venv\Scripts\activate</code>
+                    </div>
+                    <div class="success">
+                        <p><strong><span class="icon">✓</span> Cuando esté activado correctamente:</strong> Verás <code>(venv)</code> al principio de la línea de comando.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h4>Instalar dependencias</h4>
+                    <p>Instala todas las librerías necesarias desde el archivo <code>requirements.txt</code>:</p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                        <code>pip install -r requirements.txt</code>
+                    </div>
+                    <p style="margin-top: 10px;">Este proceso puede tomar varios minutos dependiendo de tu conexión a internet.</p>
+                    <div class="warning">
+                        <p><span class="icon">⚠️</span> <strong>Si ves errores:</strong> Asegúrate de que el entorno virtual esté activado (debe aparecer <code>(venv)</code> al inicio de la línea).</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <h4>Configurar archivo .env</h4>
+                    <p>Crea un archivo llamado <code>.env</code> en la carpeta raíz del proyecto con el siguiente contenido:</p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                        <code>GEMINI_API_KEY=tu_clave_api_aqui</code>
+                    </div>
+                    <p style="margin-top: 10px;">Reemplaza <code>tu_clave_api_aqui</code> con la API Key de Gemini que obtuviste en los requisitos previos.</p>
+                    <div class="highlight">
+                        <p><span class="icon">💡</span> <strong>Importante:</strong> El archivo <code>.env</code> debe estar en la misma carpeta que <code>main.py</code>, no dentro de subcarpetas.</p>
+                    </div>
+                </div>
+
+                <div class="success" style="margin-top: 30px;">
+                    <h3><span class="icon">🎉</span> ¡Instalación Completada!</h3>
+                    <p>GGRevealer está listo para usar. Continúa con la siguiente sección para aprender cómo iniciarlo.</p>
+                </div>
+            </section>
+
+            <!-- Sección 3: Uso Diario -->
+            <section id="uso">
+                <h2><span class="icon">▶️</span> Uso Diario</h2>
+
+                <h3>Iniciar GGRevealer</h3>
+                <p>Cada vez que quieras usar GGRevealer, sigue estos pasos:</p>
+
+                <ol>
+                    <li>Abre una terminal en la carpeta del proyecto (como en el Paso 2 de instalación)</li>
+                    <li>Activa el entorno virtual:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                    <code>venv\Scripts\activate</code>
+                </div>
+
+                <ol start="3">
+                    <li>Inicia el servidor:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                    <code>python main.py</code>
+                </div>
+
+                <div class="success">
+                    <p><strong><span class="icon">✓</span> El servidor está corriendo cuando veas:</strong></p>
+                    <p><code>Uvicorn running on http://localhost:8000</code></p>
+                </div>
+
+                <ol start="4">
+                    <li>Abre tu navegador y visita:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                    <code>http://localhost:8000</code>
+                </div>
+
+                <div class="info">
+                    <p><span class="icon">💡</span> <strong>Consejo:</strong> Guarda esta URL en tus favoritos para acceder rápidamente.</p>
+                </div>
+
+                <h3>Detener GGRevealer</h3>
+                <p>Para cerrar el servidor de forma segura:</p>
+                <ul>
+                    <li>En la terminal donde está corriendo, presiona <code>Ctrl + C</code></li>
+                    <li>Espera unos segundos hasta que veas el mensaje de cierre</li>
+                    <li>Puedes cerrar la terminal</li>
+                </ul>
+
+                <div class="warning">
+                    <p><span class="icon">⚠️</span> <strong>Importante:</strong> No cierres la ventana de la terminal mientras el servidor esté procesando archivos, podrías perder el progreso.</p>
+                </div>
+
+                <h3>Reiniciar GGRevealer</h3>
+                <p>Si necesitas reiniciar el servidor (por ejemplo, después de cambiar la API Key):</p>
+                <ol>
+                    <li>Detén el servidor con <code>Ctrl + C</code></li>
+                    <li>Espera a que se cierre completamente</li>
+                    <li>Vuelve a iniciar con <code>python main.py</code></li>
+                </ol>
+
+                <h3>Flujo de Trabajo Típico</h3>
+                <div class="highlight">
+                    <ol>
+                        <li><strong>Preparar archivos:</strong> Ten listos tus hand histories (.txt) y screenshots de PokerCraft (.png o .jpg)</li>
+                        <li><strong>Subir archivos:</strong> En la interfaz web, carga los archivos usando los botones de upload</li>
+                        <li><strong>Procesar:</strong> Haz clic en "Procesar Job" e ingresa tu API Key de Gemini</li>
+                        <li><strong>Esperar:</strong> El procesamiento puede tomar varios minutos dependiendo de la cantidad de archivos</li>
+                        <li><strong>Descargar:</strong> Una vez completado, descarga los archivos procesados</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Sección 4: Solución de Problemas -->
+            <section id="problemas">
+                <h2><span class="icon">🔧</span> Solución de Problemas</h2>
+
+                <div class="troubleshoot-item">
+                    <h4><span class="icon">❌</span> Error: "python no se reconoce como comando"</h4>
+                    <p><strong>Causa:</strong> Python no está en el PATH del sistema.</p>
+                    <p><strong>Solución:</strong></p>
+                    <ul>
+                        <li>Reinstala Python y marca "Add Python to PATH" durante la instalación</li>
+                        <li>O agrega manualmente Python al PATH de Windows</li>
+                        <li>Reinicia la terminal después de modificar el PATH</li>
+                    </ul>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4><span class="icon">❌</span> Error: "pip install" falla con errores de permisos</h4>
+                    <p><strong>Causa:</strong> Falta de permisos de escritura o antivirus bloqueando.</p>
+                    <p><strong>Solución:</strong></p>
+                    <ul>
+                        <li>Ejecuta la terminal como Administrador</li>
+                        <li>Desactiva temporalmente el antivirus durante la instalación</li>
+                        <li>Verifica que el entorno virtual esté activado</li>
+                    </ul>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4><span class="icon">❌</span> Error: "Port 8000 already in use"</h4>
+                    <p><strong>Causa:</strong> Otro programa o instancia de GGRevealer está usando el puerto 8000.</p>
+                    <p><strong>Solución:</strong></p>
+                    <ul>
+                        <li>Cierra todas las instancias previas de GGRevealer</li>
+                        <li>O encuentra y mata el proceso usando el puerto:</li>
+                    </ul>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                        <code>netstat -ano | findstr :8000
+taskkill /PID [número_de_proceso] /F</code>
+                    </div>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4><span class="icon">❌</span> Error: "Invalid API Key" al procesar</h4>
+                    <p><strong>Causa:</strong> La API Key de Gemini es incorrecta o ha expirado.</p>
+                    <p><strong>Solución:</strong></p>
+                    <ul>
+                        <li>Verifica que copiaste la API Key completa sin espacios</li>
+                        <li>Genera una nueva API Key en <a href="https://makersuite.google.com/app/apikey" target="_blank">makersuite.google.com</a></li>
+                        <li>Actualiza el archivo <code>.env</code> con la nueva clave</li>
+                        <li>Reinicia el servidor</li>
+                    </ul>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4><span class="icon">❌</span> El navegador muestra "No se puede acceder al sitio"</h4>
+                    <p><strong>Causa:</strong> El servidor no está corriendo o hay un problema de conexión.</p>
+                    <p><strong>Solución:</strong></p>
+                    <ul>
+                        <li>Verifica que el servidor esté corriendo en la terminal</li>
+                        <li>Asegúrate de usar <code>http://localhost:8000</code> (no https)</li>
+                        <li>Prueba con <code>http://127.0.0.1:8000</code> como alternativa</li>
+                        <li>Desactiva VPN o proxy si los tienes activos</li>
+                    </ul>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4><span class="icon">❌</span> Archivos procesados salen con errores o incompletos</h4>
+                    <p><strong>Causa:</strong> Screenshots de mala calidad o hand histories corruptos.</p>
+                    <p><strong>Solución:</strong></p>
+                    <ul>
+                        <li>Asegúrate de que los screenshots sean claros y legibles</li>
+                        <li>Verifica que los archivos .txt sean hand histories válidos de GGPoker</li>
+                        <li>Revisa los archivos <code>_fallado.txt</code> en la carpeta de outputs</li>
+                        <li>Sube más screenshots para mejorar la tasa de matching</li>
+                    </ul>
+                </div>
+
+                <div class="info" style="margin-top: 30px;">
+                    <h3><span class="icon">🆘</span> ¿Sigues teniendo problemas?</h3>
+                    <p>Si ninguna de estas soluciones funciona, consulta la sección de <a href="#contacto">Contacto y Soporte</a> para obtener ayuda personalizada.</p>
+                </div>
+            </section>
+
+            <!-- Sección 5: Mantenimiento -->
+            <section id="mantenimiento">
+                <h2><span class="icon">💾</span> Mantenimiento</h2>
+
+                <h3>Actualizar GGRevealer</h3>
+                <p>Cuando salga una nueva versión de GGRevealer:</p>
+                <ol>
+                    <li>Descarga el nuevo archivo RAR</li>
+                    <li>Guarda una copia de tu archivo <code>.env</code> actual</li>
+                    <li>Descomprime la nueva versión en la misma carpeta (o una nueva)</li>
+                    <li>Copia tu archivo <code>.env</code> de vuelta a la carpeta</li>
+                    <li>Activa el entorno virtual y actualiza las dependencias:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Copiar</button>
+                    <code>venv\Scripts\activate
+pip install -r requirements.txt --upgrade</code>
+                </div>
+
+                <h3>Respaldar tus datos</h3>
+                <p>Es importante mantener copias de seguridad de tus trabajos. Los datos importantes están en:</p>
+                <ul>
+                    <li><code>storage/outputs/</code> - Archivos procesados</li>
+                    <li><code>ggrevealer.db</code> - Base de datos con historial de jobs</li>
+                    <li><code>.env</code> - Tu configuración (API Key)</li>
+                </ul>
+                <div class="highlight">
+                    <p><span class="icon">💡</span> <strong>Recomendación:</strong> Haz respaldos semanales de estas carpetas en un disco externo o servicio en la nube.</p>
+                </div>
+
+                <h3>Limpiar archivos antiguos</h3>
+                <p>Con el tiempo, la carpeta <code>storage/</code> puede crecer mucho. Para liberar espacio:</p>
+                <ul>
+                    <li><strong>Eliminar uploads antiguos:</strong> Borra carpetas en <code>storage/uploads/</code> de jobs que ya no necesitas</li>
+                    <li><strong>Eliminar outputs descargados:</strong> Borra carpetas en <code>storage/outputs/</code> de jobs que ya procesaste</li>
+                    <li><strong>Limpiar debug logs:</strong> Borra archivos antiguos en <code>storage/debug/</code></li>
+                </ul>
+                <div class="warning">
+                    <p><span class="icon">⚠️</span> <strong>Advertencia:</strong> Solo elimina archivos de jobs que ya hayas descargado y respaldado. No hay forma de recuperar datos eliminados.</p>
+                </div>
+
+                <h3>Verificar salud del sistema</h3>
+                <p>Periódicamente, verifica que todo funcione correctamente:</p>
+                <ol>
+                    <li>Inicia GGRevealer</li>
+                    <li>Procesa un job pequeño de prueba (2-3 archivos)</li>
+                    <li>Verifica que los outputs sean correctos</li>
+                    <li>Revisa que no haya errores en la terminal</li>
+                </ol>
+
+                <h3>Actualizar Python</h3>
+                <p>Si sale una nueva versión menor de Python (ej: de 3.11.5 a 3.11.8):</p>
+                <ol>
+                    <li>Descarga e instala la nueva versión desde <a href="https://www.python.org/downloads/" target="_blank">python.org</a></li>
+                    <li>Elimina el entorno virtual antiguo: <code>rmdir /s venv</code></li>
+                    <li>Crea uno nuevo siguiendo los pasos de instalación (Pasos 3-5)</li>
+                </ol>
+                <div class="info">
+                    <p><span class="icon">💡</span> <strong>Nota:</strong> No es necesario actualizar Python frecuentemente. Solo hazlo si experimentas problemas o necesitas nuevas características.</p>
+                </div>
+            </section>
+
+            <!-- Sección 6: Contacto y Soporte -->
+            <section id="contacto">
+                <h2><span class="icon">📧</span> Contacto y Soporte</h2>
+
+                <h3>Canales de Soporte</h3>
+                <p>Si necesitas ayuda, tienes varias opciones:</p>
+
+                <div class="info">
+                    <h4><span class="icon">📖</span> Documentación Técnica</h4>
+                    <p>Lee el archivo <code>CLAUDE.md</code> incluido en el paquete para documentación técnica detallada sobre la arquitectura y funcionamiento interno.</p>
+                </div>
+
+                <div class="info">
+                    <h4><span class="icon">🐛</span> Reportar Bugs</h4>
+                    <p>Si encuentras un error o comportamiento inesperado:</p>
+                    <ul>
+                        <li>Anota exactamente qué hiciste antes del error</li>
+                        <li>Copia el mensaje de error completo de la terminal</li>
+                        <li>Revisa la carpeta <code>storage/debug/</code> para logs detallados</li>
+                        <li>Contacta al desarrollador con toda esta información</li>
+                    </ul>
+                </div>
+
+                <div class="info">
+                    <h4><span class="icon">💬</span> Sugerencias y Mejoras</h4>
+                    <p>Si tienes ideas para mejorar GGRevealer o necesitas nuevas funcionalidades, compártelas con el equipo de desarrollo.</p>
+                </div>
+
+                <h3>Información del Sistema</h3>
+                <p>Cuando solicites soporte, es útil incluir esta información:</p>
+                <ul>
+                    <li><strong>Versión de GGRevealer:</strong> 1.0.0</li>
+                    <li><strong>Versión de Python:</strong> (ejecuta <code>python --version</code>)</li>
+                    <li><strong>Sistema Operativo:</strong> Windows 10/11</li>
+                    <li><strong>Descripción del problema:</strong> Sé lo más específico posible</li>
+                    <li><strong>Logs de error:</strong> Adjunta los mensajes de la terminal</li>
+                </ul>
+
+                <h3>Preguntas Frecuentes</h3>
+
+                <div class="troubleshoot-item">
+                    <h4>¿Es seguro usar mi API Key de Gemini?</h4>
+                    <p>Sí, GGRevealer solo usa tu API Key para comunicarse con Google Gemini. La clave nunca se comparte con terceros y permanece en tu computadora en el archivo <code>.env</code>.</p>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4>¿Cuánto cuesta usar la API de Gemini?</h4>
+                    <p>Google Gemini tiene un tier gratuito generoso que es suficiente para la mayoría de usuarios. Consulta los precios actuales en <a href="https://ai.google.dev/pricing" target="_blank">ai.google.dev/pricing</a>.</p>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4>¿Puedo usar GGRevealer sin internet?</h4>
+                    <p>No, GGRevealer requiere conexión a internet para comunicarse con la API de Google Gemini que procesa las imágenes.</p>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4>¿Los archivos procesados son compatibles con PokerTracker 4?</h4>
+                    <p>Sí, GGRevealer genera archivos que cumplen con las 12 validaciones de PokerTracker 4. Si tienes problemas al importar, revisa los archivos <code>_fallado.txt</code> en tus outputs.</p>
+                </div>
+
+                <div class="troubleshoot-item">
+                    <h4>¿Puedo procesar hand histories de otros sitios además de GGPoker?</h4>
+                    <p>No, actualmente GGRevealer solo soporta formato de hand histories de GGPoker.</p>
+                </div>
+
+                <div class="success" style="margin-top: 30px;">
+                    <h3><span class="icon">🙏</span> ¡Gracias por usar GGRevealer!</h3>
+                    <p>Esperamos que esta herramienta te ayude a analizar tus manos de póker de manera más efectiva. ¡Buena suerte en las mesas!</p>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p><strong>GGRevealer v1.0.0</strong> - Herramienta de De-anonimización de Hand Histories</p>
+            <p style="margin-top: 10px; opacity: 0.8;">© 2025 - Todos los derechos reservados</p>
+        </footer>
+    </div>
+
+    <script>
+        // Función para copiar código al portapapeles
+        function copyCode(button) {
+            const codeBlock = button.parentElement;
+            const code = codeBlock.querySelector('code').textContent;
+
+            navigator.clipboard.writeText(code).then(() => {
+                // Cambiar texto del botón temporalmente
+                const originalText = button.textContent;
+                button.textContent = '✓ Copiado!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Error al copiar:', err);
+                alert('No se pudo copiar al portapapeles. Por favor, copia el texto manualmente.');
+            });
+        }
+
+        // Smooth scroll para los enlaces de la tabla de contenidos
+        document.querySelectorAll('.toc a').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+
+                if (targetElement) {
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Destacar sección activa en la tabla de contenidos
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('.toc a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= (sectionTop - 100)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.style.fontWeight = 'normal';
+                if (link.getAttribute('href') === '#' + current) {
+                    link.style.fontWeight = 'bold';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
