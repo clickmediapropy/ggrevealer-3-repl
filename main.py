@@ -1923,6 +1923,30 @@ async def reprocess_failed_files(job_id: int, request: dict, background_tasks: B
     }
 
 
+@app.get("/api/reprocess-history/{job_id}")
+async def get_reprocess_history(job_id: int):
+    """
+    Get all reprocess attempt history for a job with full logs
+
+    Returns:
+        - attempts: List of all reprocess attempts (newest first)
+        - total_attempts: Count of attempts
+    """
+    from database import get_reprocess_attempts
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    attempts = get_reprocess_attempts(job_id)
+
+    return {
+        'job_id': job_id,
+        'total_attempts': len(attempts),
+        'attempts': attempts
+    }
+
+
 @app.post("/api/pt4-log/recalculate-screenshots/{job_id}")
 async def recalculate_screenshots(job_id: int):
     """
