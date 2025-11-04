@@ -430,6 +430,57 @@ function showWarning(message) {
 }
 
 /**
+ * Delete job with retry logic
+ * @param {number} jobId - Job ID to delete
+ * @param {string} reason - Reason for deletion (for logging)
+ * @returns {Promise<boolean>} True if deleted successfully
+ */
+async function deleteJobWithRetry(jobId, reason = 'unknown') {
+    const MAX_RETRIES = 2;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch(`${API_BASE}/api/job/${jobId}`, {
+                method: 'DELETE',
+                headers: { 'X-Cleanup-Reason': reason }
+            });
+
+            if (response.ok) {
+                console.log(`[CLEANUP] Successfully deleted job ${jobId} (reason: ${reason})`);
+                return true;
+            }
+
+            // If 404, job already deleted
+            if (response.status === 404) {
+                console.log(`[CLEANUP] Job ${jobId} already deleted`);
+                return true;
+            }
+
+            // Server error - retry
+            if (response.status >= 500 && attempt < MAX_RETRIES) {
+                console.warn(`[CLEANUP] Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for job ${jobId}, retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1))); // Exponential backoff
+                continue;
+            }
+
+            throw new Error(`DELETE failed with status ${response.status}`);
+
+        } catch (error) {
+            if (attempt === MAX_RETRIES) {
+                console.error(`[CLEANUP] Failed to delete job ${jobId} after ${MAX_RETRIES + 1} attempts:`, error);
+                // Log to monitoring service if available
+                if (window.logToMonitoring) {
+                    window.logToMonitoring('orphaned_job', { job_id: jobId, error: error.message, reason });
+                }
+                return false;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
  * Copy text to clipboard with proper error handling
  * @param {string} text - Text to copy
  * @param {HTMLElement} button - Button element to update with status
@@ -710,12 +761,7 @@ if (uploadBtn) {
 
         // Cleanup: Delete the job if it was created
         if (currentJobId) {
-            try {
-                await fetch(`${API_BASE}/api/job/${currentJobId}`, { method: 'DELETE' });
-                console.log(`Cleaned up failed job ${currentJobId}`);
-            } catch (cleanupError) {
-                console.error('Failed to cleanup job:', cleanupError);
-            }
+            await deleteJobWithRetry(currentJobId, 'upload_failed');
             currentJobId = null;
         }
 
@@ -1431,12 +1477,7 @@ async function showError(message, shouldCleanup = false) {
         }
 
         // Optional: Try to delete failed job from server
-        try {
-            await fetch(`${API_BASE}/api/job/${failedJobId}`, { method: 'DELETE' });
-            console.log(`[CLEANUP] Deleted failed job ${failedJobId} from server`);
-        } catch (cleanupError) {
-            console.warn(`[CLEANUP] Could not delete job ${failedJobId}:`, cleanupError);
-        }
+        await deleteJobWithRetry(failedJobId, 'job_failed');
     }
 
     processingSection.classList.add('d-none');
@@ -1463,12 +1504,9 @@ async function cancelJob() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/api/job/${currentJobId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            throw new Error('Error al cancelar job');
+        const success = await deleteJobWithRetry(currentJobId, 'user_cancelled');
+        if (!success) {
+            throw new Error('Failed to delete job');
         }
 
         // Stop polling
@@ -1512,12 +1550,9 @@ async function cancelJobById(jobId, buttonElement) {
     buttonElement.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Cancelando...';
 
     try {
-        const response = await fetch(`${API_BASE}/api/job/${jobId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            throw new Error('Error al cancelar job');
+        const success = await deleteJobWithRetry(jobId, 'user_cancelled');
+        if (!success) {
+            throw new Error('Failed to delete job');
         }
 
         // Show success message
@@ -1814,7 +1849,7 @@ if (cancelErrorJobBtn) {
         cancelErrorJobBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Eliminando...';
 
         try {
-            await fetch(`${API_BASE}/api/job/${jobIdToDelete}`, { method: 'DELETE' });
+            await deleteJobWithRetry(jobIdToDelete, 'error_job_cancelled');
             console.log(`[CANCEL] Deleted failed job ${jobIdToDelete}`);
 
             showWelcomeSection();
