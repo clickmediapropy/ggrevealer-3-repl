@@ -808,7 +808,72 @@ body {
 }
 
 /* Mobile Responsive Design */
-@media (max-width: 991px) {
+/* Tablet Layout (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+    .main-layout {
+        flex-direction: column;
+        padding-top: 70px;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        top: auto;
+        left: auto;
+        bottom: auto;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        padding: 0;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        flex: 1;
+        padding: 0;
+    }
+
+    .sidebar-link {
+        flex: 1;
+        text-align: center;
+        padding: 16px 12px;
+        border-left: none;
+        border-bottom: 3px solid transparent;
+    }
+
+    .sidebar-link.active {
+        border-left: none;
+        border-bottom-color: var(--brand-green);
+    }
+
+    .sidebar-section {
+        display: none; /* Hide API config, budget, recent jobs on tablet */
+    }
+
+    .sidebar-header {
+        display: none;
+    }
+
+    .sidebar-divider {
+        display: none;
+    }
+
+    .main-content {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .nav-tabs .nav-link {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Mobile Layout (< 768px) */
+@media (max-width: 767px) {
     .main-layout {
         flex-direction: column;
         padding-top: 70px;
@@ -824,35 +889,15 @@ body {
     }
 
     .sidebar-section {
-        display: none; /* Hide recent jobs on mobile */
+        display: none;
     }
 
     .main-content {
         width: 100%;
-        margin-left: 0; /* Remove sidebar margin on mobile */
+        margin-left: 0;
     }
 
-    .nav-tabs .nav-link {
-        padding: 10px 12px;
-        font-size: 0.9rem;
-    }
-}
-
-@media (max-width: 768px) {
-    .stats-grid,
-    .job-stats-grid,
-    .job-details-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .phases-container {
-        flex-direction: column;
-    }
-
-    .timer-display {
-        font-size: 1.5rem;
-    }
-
+    /* Mobile navigation styles */
     .sidebar-nav {
         display: flex;
         justify-content: space-around;
@@ -880,6 +925,20 @@ body {
 
     .sidebar-divider {
         display: none;
+    }
+
+    .stats-grid,
+    .job-stats-grid,
+    .job-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .phases-container {
+        flex-direction: column;
+    }
+
+    .timer-display {
+        font-size: 1.5rem;
     }
 
     /* Premium Navbar Mobile Adjustments */
