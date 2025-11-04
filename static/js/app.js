@@ -2169,6 +2169,167 @@ function showFailedFilesView() {
 }
 
 // ========================================
+// PT4 LOG SUBMISSION HANDLER
+// ========================================
+
+function displayFailedFilesResults(data) {
+    const resultsDiv = document.getElementById('failed-files-results');
+    const tbody = document.getElementById('failed-files-tbody');
+
+    if (!resultsDiv || !tbody) return;
+
+    // Clear previous results
+    tbody.innerHTML = '';
+
+    if (data.failed_files_count === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No se detectaron archivos fallidos</td></tr>';
+        resultsDiv.style.display = 'block';
+        return;
+    }
+
+    // Populate table
+    data.failed_files.forEach(file => {
+        const row = document.createElement('tr');
+
+        // Filename
+        const filenameCell = document.createElement('td');
+        filenameCell.textContent = file.filename;
+        row.appendChild(filenameCell);
+
+        // Table number
+        const tableCell = document.createElement('td');
+        tableCell.textContent = file.table_number || 'N/A';
+        row.appendChild(tableCell);
+
+        // Error count
+        const errorCell = document.createElement('td');
+        errorCell.innerHTML = `<span class="error-badge">${file.error_count} error(es)</span>`;
+        row.appendChild(errorCell);
+
+        // Original TXT
+        const originalCell = document.createElement('td');
+        if (file.original_txt_path) {
+            originalCell.innerHTML = `<button class="btn btn-sm btn-outline-primary btn-download" onclick="downloadFile('${file.original_txt_path}')">
+                <i class="bi bi-download"></i> Descargar
+            </button>`;
+        } else {
+            originalCell.innerHTML = '<span class="text-muted">No encontrado</span>';
+        }
+        row.appendChild(originalCell);
+
+        // Processed TXT
+        const processedCell = document.createElement('td');
+        if (file.processed_txt_path) {
+            processedCell.innerHTML = `<button class="btn btn-sm btn-outline-primary btn-download" onclick="downloadFile('${file.processed_txt_path}')">
+                <i class="bi bi-download"></i> Descargar
+            </button>`;
+        } else {
+            processedCell.innerHTML = '<span class="text-muted">No encontrado</span>';
+        }
+        row.appendChild(processedCell);
+
+        // Screenshots
+        const screenshotsCell = document.createElement('td');
+        if (file.screenshot_paths && file.screenshot_paths.length > 0) {
+            screenshotsCell.innerHTML = `<span class="badge bg-info">${file.screenshot_paths.length} screenshot(s)</span>
+                <button class="btn btn-sm btn-link" onclick='showScreenshots(${JSON.stringify(file.screenshot_paths)})'>
+                    Ver
+                </button>`;
+        } else {
+            screenshotsCell.innerHTML = '<span class="text-muted">No encontrados</span>';
+        }
+        row.appendChild(screenshotsCell);
+
+        tbody.appendChild(row);
+    });
+
+    // Show results table
+    resultsDiv.style.display = 'block';
+
+    // Scroll to results
+    resultsDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+function downloadFile(filepath) {
+    // Create temporary link to download file
+    const link = document.createElement('a');
+    link.href = '/api/download-file?path=' + encodeURIComponent(filepath);
+    link.download = filepath.split('/').pop();
+    link.click();
+}
+
+function showScreenshots(screenshotPaths) {
+    // Create modal to display screenshots
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Screenshots Asociados</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ${screenshotPaths.map(path => `
+                        <div class="mb-3">
+                            <p class="small text-muted">${path.split('/').pop()}</p>
+                            <img src="/api/screenshot/${encodeURIComponent(path)}" class="img-fluid border" alt="Screenshot">
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+
+    // Clean up when closed
+    modal.addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+    });
+}
+
+function showToast(type, message) {
+    // Create toast element
+    const toastContainer = document.getElementById('toast-container') || createToastContainer();
+
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+
+    toastContainer.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+
+    // Remove toast element after it's hidden
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+    return container;
+}
+
+// ========================================
 // REPROCESS MODAL
 // ========================================
 
@@ -2814,6 +2975,62 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleApiKeyBtn = document.getElementById('toggle-api-key-visibility');
     if (toggleApiKeyBtn) {
         toggleApiKeyBtn.addEventListener('click', toggleApiKeyVisibility);
+    }
+
+    // PT4 Log Form Submission
+    const pt4LogForm = document.getElementById('pt4-log-form');
+    if (pt4LogForm) {
+        pt4LogForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const logText = document.getElementById('pt4-log-text').value.trim();
+            const jobId = document.getElementById('pt4-job-id').value.trim();
+
+            if (!logText) {
+                showToast('error', 'Por favor ingresa el log de PokerTracker');
+                return;
+            }
+
+            // Disable submit button
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analizando...';
+
+            try {
+                // Upload PT4 log
+                const formData = new FormData();
+                formData.append('log_text', logText);
+                if (jobId) {
+                    formData.append('job_id', jobId);
+                }
+
+                const response = await fetch('/api/pt4-log/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al analizar el log');
+                }
+
+                const data = await response.json();
+
+                // Display results
+                displayFailedFilesResults(data);
+
+                // Show success message
+                showToast('success', `${data.failed_files_count} archivo(s) fallido(s) detectado(s)`);
+
+            } catch (error) {
+                console.error('Error uploading PT4 log:', error);
+                showToast('error', 'Error al analizar el log de PokerTracker');
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
     }
 
     // Check API key status on startup
