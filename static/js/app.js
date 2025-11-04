@@ -2149,6 +2149,13 @@ function showWelcomeSection() {
     welcomeSection.classList.remove('d-none');
 }
 
+function showFailedFilesView() {
+    // Placeholder function for Task 7
+    // Will be implemented in Task 8 (Failed Files View Container)
+    alert('Archivos Fallidos view - Coming soon in Task 8!');
+    console.log('showFailedFilesView() called - to be implemented in Task 8');
+}
+
 // ========================================
 // REPROCESS MODAL
 // ========================================
@@ -2757,6 +2764,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 updateSidebarActiveState('nav-history');
             }
+        });
+    }
+
+    const navFailedFiles = document.getElementById('nav-failed-files');
+    if (navFailedFiles) {
+        navFailedFiles.addEventListener('click', (e) => {
+            e.preventDefault();
+            showFailedFilesView();
+            updateSidebarActiveState('nav-failed-files');
         });
     }
 
