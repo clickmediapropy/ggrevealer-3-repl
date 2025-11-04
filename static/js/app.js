@@ -502,16 +502,53 @@ if (uploadBtn) {
                 }
             });
 
-            const batchResponse = await fetch(`${API_BASE}/api/upload/batch/${currentJobId}`, {
-                method: 'POST',
-                body: batchFormData
-            });
+            // Retry logic for batch upload
+            const MAX_RETRIES = 3;
+            let batchResponse = null;
+            let lastError = null;
 
-            if (!batchResponse.ok) {
-                const errorData = await batchResponse.json().catch(() => ({
-                    detail: `Failed to upload batch ${batchNum}`
-                }));
-                throw new Error(errorData.detail || `Failed to upload batch ${batchNum}`);
+            for (let retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
+                try {
+                    if (retryCount > 0) {
+                        updateBatchProgress(
+                            batchNum,
+                            totalBatches,
+                            `Reintentando lote ${batchNum}/${totalBatches} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`
+                        );
+                        // Wait 2 seconds before retry
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+
+                    batchResponse = await fetch(`${API_BASE}/api/upload/batch/${currentJobId}`, {
+                        method: 'POST',
+                        body: batchFormData
+                    });
+
+                    if (batchResponse.ok) {
+                        break; // Success, exit retry loop
+                    }
+
+                    // Non-network error (e.g., 400, 404) - don't retry
+                    if (batchResponse.status < 500) {
+                        const errorData = await batchResponse.json().catch(() => ({
+                            detail: `Failed to upload batch ${batchNum}`
+                        }));
+                        throw new Error(errorData.detail || `Failed to upload batch ${batchNum}`);
+                    }
+
+                    // Server error (5xx) - retry
+                    lastError = new Error(`Server error (${batchResponse.status}) uploading batch ${batchNum}`);
+
+                } catch (error) {
+                    lastError = error;
+                    if (retryCount === MAX_RETRIES) {
+                        throw error; // Give up after max retries
+                    }
+                }
+            }
+
+            if (!batchResponse || !batchResponse.ok) {
+                throw lastError || new Error(`Failed to upload batch ${batchNum}`);
             }
 
             const batchData = await batchResponse.json();
