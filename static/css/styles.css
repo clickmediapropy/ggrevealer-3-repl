@@ -107,7 +107,7 @@
     --text-primary: #f1f5f9;
     --text-secondary: #cbd5e1;
     --text-tertiary: #94a3b8;
-    --text-inverse: #0f172a;
+    --text-inverse: #ffffff;
 
     /* Dark Mode Borders */
     --border-color: #334155;
@@ -481,7 +481,8 @@ body {
 
 .dropzone-subtext {
     font-size: 0.875rem;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
+    opacity: 0.85;
 }
 
 /* Legacy active class renamed to drag-over */
