@@ -486,6 +486,94 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Failed Files Section -->
+                <div id="failedFilesSection" style="display:none;" class="mt-4">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">Archivos Fallidos</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Tab Navigation -->
+                            <ul class="nav nav-tabs mb-3" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button
+                                        class="nav-link active"
+                                        id="pt4-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#pt4-content"
+                                        type="button"
+                                        role="tab"
+                                    >
+                                        PT4 Imports
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button
+                                        class="nav-link"
+                                        id="app-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#app-content"
+                                        type="button"
+                                        role="tab"
+                                    >
+                                        Procesamiento Inicial
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <!-- Tab Content -->
+                            <div class="tab-content">
+                                <!-- PT4 Tab -->
+                                <div class="tab-pane fade show active" id="pt4-content" role="tabpanel">
+                                    <div id="pt4FailuresList" class="failure-list">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+
+                                <!-- App Tab -->
+                                <div class="tab-pane fade" id="app-content" role="tabpanel">
+                                    <div id="appFailuresList" class="failure-list">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="mt-3">
+                                <button
+                                    id="reprocessButton"
+                                    class="btn btn-warning"
+                                    disabled
+                                    onclick="handleReprocessSelected()"
+                                >
+                                    Reprocesar Seleccionados (0)
+                                </button>
+                                <button
+                                    id="historyButton"
+                                    class="btn btn-secondary ms-2"
+                                    onclick="toggleReprocessHistory()"
+                                >
+                                    Ver Historial de Intentos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reprocess History Section -->
+                    <div id="historySection" style="display:none;" class="mt-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Historial de Intentos</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="historyList">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

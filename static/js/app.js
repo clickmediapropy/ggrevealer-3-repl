@@ -3852,3 +3852,211 @@ document.addEventListener('DOMContentLoaded', () => {
     // Refresh budget info every minute
     setInterval(loadBudgetInfo, 60000);
 });
+
+// Track selected failed files for reprocessing
+let selectedFailures = {
+    pt4: [],
+    app: []
+};
+
+async function loadFailedFiles(jobId) {
+    /**Load and display failed files for a job**/
+    try {
+        const response = await fetch(`/api/failed-files/${jobId}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+
+        if (data.total_failures === 0) {
+            document.getElementById('failedFilesSection').style.display = 'none';
+            return;
+        }
+
+        // Show section
+        document.getElementById('failedFilesSection').style.display = 'block';
+
+        // Render PT4 failures
+        renderPT4Failures(data.pt4_failures);
+
+        // Render App failures
+        renderAppFailures(data.app_failures);
+
+        // Load history
+        await loadReprocessHistory(jobId);
+
+    } catch (error) {
+        console.error('Error loading failed files:', error);
+    }
+}
+
+function renderPT4Failures(failures) {
+    const container = document.getElementById('pt4FailuresList');
+
+    if (failures.length === 0) {
+        container.innerHTML = '<p class="text-muted">No hay fallos de PT4</p>';
+        return;
+    }
+
+    container.innerHTML = failures.map((failure, idx) => `
+        <div class="failure-item pt4">
+            <input
+                type="checkbox"
+                id="pt4-${failure.id}"
+                onchange="updateSelectedFailures()"
+                data-source="pt4"
+                data-id="${failure.id}"
+            />
+            <div class="failure-item-content">
+                <div class="failure-item-name">${failure.filename}</div>
+                <div class="failure-item-error">${failure.error_message || 'Error unknown'}</div>
+                <div class="failure-item-meta">
+                    Intentos: ${failure.reprocess_count} |
+                    Tabla: ${failure.table_number}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderAppFailures(failures) {
+    const container = document.getElementById('appFailuresList');
+
+    if (failures.length === 0) {
+        container.innerHTML = '<p class="text-muted">No hay fallos de procesamiento</p>';
+        return;
+    }
+
+    container.innerHTML = failures.map((failure, idx) => `
+        <div class="failure-item app">
+            <input
+                type="checkbox"
+                id="app-${failure.table_name}"
+                onchange="updateSelectedFailures()"
+                data-source="app"
+                data-table="${failure.table_name}"
+            />
+            <div class="failure-item-content">
+                <div class="failure-item-name">Tabla ${failure.table_name}</div>
+                <div class="failure-item-error">
+                    IDs sin mapear: ${failure.unmapped_ids.join(', ')}
+                </div>
+                <div class="failure-item-meta">
+                    Intentos: ${failure.reprocess_count} |
+                    Count: ${failure.unmapped_count}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateSelectedFailures() {
+    selectedFailures = { pt4: [], app: [] };
+
+    // Gather PT4 selections
+    document.querySelectorAll('input[data-source="pt4"]:checked').forEach(cb => {
+        selectedFailures.pt4.push({ source: 'pt4', id: parseInt(cb.dataset.id) });
+    });
+
+    // Gather App selections
+    document.querySelectorAll('input[data-source="app"]:checked').forEach(cb => {
+        selectedFailures.app.push({ source: 'app', table_name: cb.dataset.table });
+    });
+
+    const total = selectedFailures.pt4.length + selectedFailures.app.length;
+    const btn = document.getElementById('reprocessButton');
+    btn.disabled = total === 0;
+    btn.textContent = `Reprocesar Seleccionados (${total})`;
+}
+
+async function handleReprocessSelected() {
+    const jobId = currentJobId; // Assumes global currentJobId exists
+    const files = [...selectedFailures.pt4, ...selectedFailures.app];
+
+    if (files.length === 0) return;
+
+    try {
+        const response = await fetch(`/api/reprocess/${jobId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files })
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+
+        // Show success message
+        showSuccess(`Reprocessing started (ID: ${data.reprocess_id})`);
+
+        // Clear selections
+        document.querySelectorAll('input[data-source]').forEach(cb => cb.checked = false);
+        updateSelectedFailures();
+
+        // Reload history
+        await loadReprocessHistory(jobId);
+
+        // Poll status
+        setTimeout(() => loadFailedFiles(jobId), 3000);
+
+    } catch (error) {
+        showError(`Reprocess error: ${error.message}`);
+        console.error('Reprocess error:', error);
+    }
+}
+
+async function loadReprocessHistory(jobId) {
+    try {
+        const response = await fetch(`/api/reprocess-history/${jobId}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        renderReprocessHistory(data.attempts);
+
+    } catch (error) {
+        console.error('Error loading history:', error);
+    }
+}
+
+function renderReprocessHistory(attempts) {
+    const container = document.getElementById('historyList');
+
+    if (attempts.length === 0) {
+        container.innerHTML = '<p class="text-muted">No hay intentos de reproceso</p>';
+        return;
+    }
+
+    container.innerHTML = attempts.map((attempt, idx) => `
+        <div class="history-item ${attempt.status}">
+            <div class="history-item-header" onclick="toggleHistoryLogs(this)">
+                <div>
+                    <strong>${attempt.created_at}</strong> -
+                    Intento #${attempt.attempt_number}
+                    (${attempt.file_source.toUpperCase()}: ${attempt.file_name})
+                </div>
+                <span class="history-item-status ${attempt.status}">
+                    ${attempt.status.toUpperCase()}
+                </span>
+            </div>
+            ${attempt.error_message ? `
+                <div class="text-danger" style="font-size: 0.9em;">
+                    ${attempt.error_message}
+                </div>
+            ` : ''}
+            <div class="history-item-logs" onclick="event.stopPropagation()">
+                ${attempt.logs || '[No logs available]'}
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleHistoryLogs(headerElement) {
+    const logsDiv = headerElement.nextElementSibling?.nextElementSibling;
+    if (logsDiv && logsDiv.classList.contains('history-item-logs')) {
+        logsDiv.style.display = logsDiv.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function toggleReprocessHistory() {
+    const section = document.getElementById('historySection');
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+}

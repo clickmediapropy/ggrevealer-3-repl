@@ -2908,3 +2908,111 @@ html {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* Failed Files UI */
+.failure-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.failure-item {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.failure-item.pt4 {
+    background-color: #fff3cd;
+}
+
+.failure-item.app {
+    background-color: #e7f3ff;
+}
+
+.failure-item input[type="checkbox"] {
+    margin-top: 4px;
+    cursor: pointer;
+}
+
+.failure-item-content {
+    flex: 1;
+}
+
+.failure-item-name {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.failure-item-error {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.failure-item-meta {
+    font-size: 0.85em;
+    color: #999;
+}
+
+.history-item {
+    border-left: 4px solid #007bff;
+    padding: 12px;
+    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.history-item.success {
+    border-left-color: #28a745;
+}
+
+.history-item.failed {
+    border-left-color: #dc3545;
+}
+
+.history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.history-item-header:hover {
+    background-color: #e9ecef;
+}
+
+.history-item-status {
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.history-item-status.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.history-item-status.failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.history-item-logs {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    padding: 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.85em;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin-top: 8px;
+    display: none;
+}
