@@ -596,18 +596,7 @@ if (uploadBtn) {
 
     } catch (error) {
         console.error('Error:', error);
-        showError('Error al subir archivos: ' + error.message);
-
-        // Cleanup: Delete the job if it was created
-        if (currentJobId) {
-            try {
-                await fetch(`${API_BASE}/api/job/${currentJobId}`, { method: 'DELETE' });
-                console.log(`Cleaned up failed job ${currentJobId}`);
-            } catch (cleanupError) {
-                console.error('Failed to cleanup job:', cleanupError);
-            }
-            currentJobId = null;
-        }
+        showError('Error al subir archivos: ' + error.message, true); // Clear job on upload failure
 
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
@@ -888,7 +877,7 @@ async function showResults(job) {
     console.log('[DEBUG] showResults() completed successfully');
     } catch (error) {
         console.error('❌ Error in showResults():', error);
-        showError('Error al mostrar resultados: ' + error.message);
+        showError('Error al mostrar resultados: ' + error.message, false); // Keep job for debugging
     }
 }
 
@@ -2988,7 +2977,7 @@ async function loadJobDetails(jobId) {
             showProcessing();
             checkStatus(jobId);
         } else if (data.status === 'failed') {
-            showError(data.error || 'Job falló');
+            showError(data.error || 'Job falló', false); // Keep job - user is viewing historical failure
         }
 
         scrollToTop();
