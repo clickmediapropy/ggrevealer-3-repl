@@ -204,14 +204,22 @@ function renderTxtFiles() {
         div.className = 'file-item';
         div.innerHTML = `
             <span><i class="bi bi-file-text"></i> ${file.name}</span>
-            <i class="bi bi-x-circle remove-btn" data-index="${index}"></i>
+            <i class="bi bi-x-circle remove-btn"></i>
         `;
-        div.querySelector('.remove-btn').addEventListener('click', () => {
-            txtFiles.splice(index, 1);
-            renderTxtFiles();
-            updateUploadButton();
-            updateSizeIndicator();
+
+        // Use closure with current file reference, not index
+        const removeBtn = div.querySelector('.remove-btn');
+        removeBtn.addEventListener('click', () => {
+            // Find current index dynamically to avoid stale closure
+            const currentIndex = txtFiles.indexOf(file);
+            if (currentIndex !== -1) {
+                txtFiles.splice(currentIndex, 1);
+                renderTxtFiles();
+                updateUploadButton();
+                updateSizeIndicator();
+            }
         });
+
         txtFilesList.appendChild(div);
     });
 
@@ -223,11 +231,9 @@ function renderTxtFiles() {
 
         // Add visual warning if exceeds limit
         if (count > MAX_TXT_FILES) {
-            txtCountBadge.classList.remove('bg-secondary');
-            txtCountBadge.classList.add('bg-danger');
+            txtCountBadge.className = 'badge bg-danger text-white';
         } else {
-            txtCountBadge.classList.remove('bg-danger');
-            txtCountBadge.classList.add('bg-secondary');
+            txtCountBadge.className = 'badge bg-light text-brand';
         }
     }
 
@@ -284,14 +290,22 @@ function renderScreenshotFiles() {
         div.className = 'file-item';
         div.innerHTML = `
             <span><i class="bi bi-image"></i> ${file.name}</span>
-            <i class="bi bi-x-circle remove-btn" data-index="${index}"></i>
+            <i class="bi bi-x-circle remove-btn"></i>
         `;
-        div.querySelector('.remove-btn').addEventListener('click', () => {
-            screenshotFiles.splice(index, 1);
-            renderScreenshotFiles();
-            updateUploadButton();
-            updateSizeIndicator();
+
+        // Use closure with current file reference, not index
+        const removeBtn = div.querySelector('.remove-btn');
+        removeBtn.addEventListener('click', () => {
+            // Find current index dynamically to avoid stale closure
+            const currentIndex = screenshotFiles.indexOf(file);
+            if (currentIndex !== -1) {
+                screenshotFiles.splice(currentIndex, 1);
+                renderScreenshotFiles();
+                updateUploadButton();
+                updateSizeIndicator();
+            }
         });
+
         screenshotFilesList.appendChild(div);
     });
 
@@ -303,11 +317,9 @@ function renderScreenshotFiles() {
 
         // Add visual warning if exceeds limit
         if (count > MAX_SCREENSHOT_FILES) {
-            screenshotCountBadge.classList.remove('bg-secondary');
-            screenshotCountBadge.classList.add('bg-danger');
+            screenshotCountBadge.className = 'badge bg-danger text-white';
         } else {
-            screenshotCountBadge.classList.remove('bg-danger');
-            screenshotCountBadge.classList.add('bg-secondary');
+            screenshotCountBadge.className = 'badge bg-light text-success';
         }
     }
 
