@@ -434,19 +434,43 @@ async function copyToClipboard(text, button) {
 
 function updateUploadButton() {
     if (!uploadBtn) return;
-    
-    uploadBtn.disabled = txtFiles.length === 0 || screenshotFiles.length === 0;
 
-    // Show warnings if limits are exceeded
-    if (txtFiles.length > MAX_TXT_FILES) {
-        uploadBtn.disabled = true;
+    let tooltipMessage = '';
+    let isDisabled = false;
+
+    // Check validation rules and build appropriate tooltip
+    if (txtFiles.length === 0 && screenshotFiles.length === 0) {
+        isDisabled = true;
+        tooltipMessage = 'Debes subir archivos TXT y screenshots';
+    } else if (txtFiles.length === 0) {
+        isDisabled = true;
+        tooltipMessage = 'Debes subir al menos 1 archivo TXT';
+    } else if (screenshotFiles.length === 0) {
+        isDisabled = true;
+        tooltipMessage = 'Debes subir al menos 1 screenshot';
+    } else if (txtFiles.length > MAX_TXT_FILES) {
+        isDisabled = true;
+        tooltipMessage = `Excede el límite de archivos TXT (${txtFiles.length}/${MAX_TXT_FILES})`;
+    } else if (screenshotFiles.length > MAX_SCREENSHOT_FILES) {
+        isDisabled = true;
+        tooltipMessage = `Excede el límite de screenshots (${screenshotFiles.length}/${MAX_SCREENSHOT_FILES})`;
+    } else if (calculateTotalSizeGlobal() > MAX_UPLOAD_SIZE_BYTES) {
+        const currentSize = formatBytes(calculateTotalSizeGlobal());
+        isDisabled = true;
+        tooltipMessage = `Tamaño total excede ${MAX_UPLOAD_SIZE_MB} MB (actual: ${currentSize})`;
+    } else {
+        tooltipMessage = 'Subir archivos y comenzar procesamiento';
     }
-    if (screenshotFiles.length > MAX_SCREENSHOT_FILES) {
-        uploadBtn.disabled = true;
+
+    uploadBtn.disabled = isDisabled;
+    uploadBtn.setAttribute('title', tooltipMessage);
+
+    // Reinitialize Bootstrap tooltip to update text
+    const existingTooltip = bootstrap.Tooltip.getInstance(uploadBtn);
+    if (existingTooltip) {
+        existingTooltip.dispose();
     }
-    if (calculateTotalSizeGlobal() > MAX_UPLOAD_SIZE_BYTES) {
-        uploadBtn.disabled = true;
-    }
+    new bootstrap.Tooltip(uploadBtn);
 }
 
 if (uploadBtn) {
@@ -3646,6 +3670,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check API key status on startup
     checkApiKeyOnStartup();
+
+    // Initialize Bootstrap tooltips
+    const uploadButton = document.getElementById('upload-btn');
+    if (uploadButton) {
+        new bootstrap.Tooltip(uploadButton);
+    }
 
     // Load initial data
     loadJobs();
