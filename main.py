@@ -1739,8 +1739,91 @@ async def upload_pt4_log(
             'matched_job_id': match.matched_job_id,
             'original_txt_path': match.original_txt_path,
             'processed_txt_path': match.processed_txt_path,
-            'screenshot_paths': match.screenshot_paths
+            'screenshot_paths': match.screenshot_paths,
+            'failure_source': 'pt4_import'  # Add source discriminator
         })
+
+    # 🎯 AGREGAR archivos de initial_processing si hay job_id
+    if job_id:
+        from database import get_app_failed_files_for_job, get_job_files, get_job_outputs_path
+        from pathlib import Path
+
+        initial_failures = get_app_failed_files_for_job(job_id)
+
+        for failure in initial_failures:
+            table_name = failure['table']
+            unmapped_ids = failure.get('unmapped_ids', [])
+
+            # Extract table number
+            table_number = None
+            try:
+                table_number = int(table_name)
+            except (ValueError, TypeError):
+                import re
+                match_num = re.search(r'\d+', str(table_name))
+                if match_num:
+                    table_number = int(match_num.group())
+
+            # Find paths
+            original_txt_path = None
+            processed_txt_path = None
+            screenshot_paths = []
+
+            job_files = get_job_files(job_id)
+            outputs_path = get_job_outputs_path(job_id)
+
+            # Find original TXT
+            for file in job_files:
+                if file['file_type'] == 'txt' and str(table_number) in file['filename']:
+                    original_txt_path = file['file_path']
+                    break
+
+            # Find processed TXT (fallado version)
+            if outputs_path and table_number:
+                fallado_path = Path(outputs_path) / f"{table_number}_fallado.txt"
+                if fallado_path.exists():
+                    processed_txt_path = str(fallado_path)
+
+            # Find screenshots using hand-ID-based matching
+            if original_txt_path:
+                from pt4_matcher import _extract_hand_ids_from_txt
+                hand_ids = _extract_hand_ids_from_txt(original_txt_path)
+
+                # Try hand ID matching first
+                found_by_hand_id = False
+                if hand_ids:
+                    for file in job_files:
+                        if file['file_type'] == 'screenshot':
+                            filename_lower = file['filename'].lower()
+                            for hand_id in hand_ids:
+                                if hand_id.lower() in filename_lower:
+                                    screenshot_paths.append(file['file_path'])
+                                    found_by_hand_id = True
+                                    break
+
+                # Fallback to table number matching
+                if not found_by_hand_id and table_number:
+                    for file in job_files:
+                        if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
+                            screenshot_paths.append(file['file_path'])
+
+            # Build error message
+            error_msg = f"{len(unmapped_ids)} unmapped anonymous IDs"
+
+            # Add to response
+            failed_files_response.append({
+                'id': None,  # No database ID for initial_processing files
+                'filename': f"{table_name}_fallado.txt",
+                'table_number': table_number,
+                'error_count': len(unmapped_ids),
+                'errors': [error_msg],
+                'matched_job_id': job_id,
+                'original_txt_path': original_txt_path,
+                'processed_txt_path': processed_txt_path,
+                'screenshot_paths': screenshot_paths,
+                'failure_source': 'initial_processing',  # Add source discriminator
+                'unmapped_ids': unmapped_ids  # Include unmapped IDs
+            })
 
     return {
         'success': True,
@@ -1748,8 +1831,10 @@ async def upload_pt4_log(
         'total_files': parsed_result.total_files,
         'total_hands_imported': parsed_result.total_hands_imported,
         'total_errors': parsed_result.total_errors,
-        'failed_files_count': len(parsed_result.failed_files),
-        'failed_files': failed_files_response
+        'failed_files_count': len(failed_files_response),  # Updated to include initial_processing
+        'failed_files': failed_files_response,
+        'pt4_failures_count': len(matches),  # Original PT4 count
+        'initial_failures_count': len(failed_files_response) - len(matches)  # Initial processing count
     }
 
 
