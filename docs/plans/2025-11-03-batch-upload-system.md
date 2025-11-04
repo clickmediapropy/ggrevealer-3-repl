@@ -913,6 +913,24 @@ git add main.py
 git commit -m "docs: document backward compatibility for upload endpoints"
 ```
 
+**Verification Results (Nov 3, 2025)**
+
+✅ Original `/api/upload` endpoint exists at line 317 in main.py
+✅ Endpoint accepts txt_files, screenshots, and api_tier parameters
+✅ Successfully tested with small upload (1 file):
+   - Job 91 created successfully
+   - Response: {"job_id":91,"txt_files_count":1,"screenshot_files_count":1}
+✅ Successfully tested with multiple files (3 txt + 1 screenshot):
+   - Job 92 created with api_tier='paid'
+   - Response: {"job_id":92,"txt_files_count":3,"screenshot_files_count":1}
+✅ Successfully tested with large file (107MB):
+   - Job 93 created and accepted (backend has no size limit)
+   - Frontend enforces 100MB limit for better UX
+✅ `calculateTotalSize()` function exists in static/js/app.js (line 64)
+✅ No interference between old endpoint and new batch system
+
+**Conclusion**: Original upload endpoint remains fully functional. Both upload methods (legacy single-upload and new batch system) work independently without conflicts.
+
 ---
 
 ## Task 10: Error Handling - Retry Failed Batches

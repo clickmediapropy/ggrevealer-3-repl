@@ -314,13 +314,20 @@ async def upload_batch(
     }
 
 
+# Legacy single-upload endpoint (backward compatible)
+# For large uploads (>100 MB), use /api/upload/init + /api/upload/batch instead
 @app.post("/api/upload")
 async def upload_files(
     txt_files: List[UploadFile] = File(...),
     screenshots: List[UploadFile] = File(...),
     api_tier: str = Form(default='free')
 ):
-    """Upload TXT files and screenshots for a new job"""
+    """Upload TXT files and screenshots for a new job (legacy method)
+
+    This is the original single-upload endpoint that processes all files in one request.
+    For uploads >100 MB, use the batch upload system (/api/upload/init + /api/upload/batch).
+    Both methods remain fully functional and independent.
+    """
     # Validate API tier
     if api_tier not in ('free', 'paid'):
         api_tier = 'free'
