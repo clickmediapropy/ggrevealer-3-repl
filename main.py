@@ -1539,6 +1539,93 @@ async def delete_job_endpoint(job_id: int):
     return {"message": "Job deleted"}
 
 
+@app.post("/api/pt4-log/upload")
+async def upload_pt4_log(
+    log_text: str = Form(...),
+    job_id: Optional[int] = Form(None)
+):
+    """
+    Upload and parse PokerTracker 4 import log
+
+    This endpoint:
+    1. Parses PT4 log to extract failed files
+    2. Matches failed files to original jobs by table number
+    3. Stores PT4 import attempt and failed files in database
+    4. Returns matched files with paths to original TXT, processed TXT, and screenshots
+    """
+    from pt4_parser import parse_pt4_import_log
+    from pt4_matcher import match_failed_files_to_jobs
+    from database import create_pt4_import_attempt, create_pt4_failed_file
+    import json
+
+    # Parse PT4 log
+    parsed_result = parse_pt4_import_log(log_text)
+
+    if not parsed_result:
+        raise HTTPException(status_code=400, detail="Invalid PT4 log format")
+
+    # Match failed files to jobs
+    matches = match_failed_files_to_jobs(parsed_result.failed_files)
+
+    # Determine job_id to use
+    resolved_job_id = job_id
+    if not resolved_job_id and matches:
+        resolved_job_id = matches[0].matched_job_id
+
+    # If still no job_id, we need to create a dummy job or skip storing attempt
+    # For now, if no job_id can be determined, we still need one for the NOT NULL constraint
+    # We'll use 0 as a sentinel value for "unknown job"
+    if not resolved_job_id:
+        resolved_job_id = 0
+
+    # Create PT4 import attempt record (use provided job_id if available)
+    attempt_id = create_pt4_import_attempt(
+        job_id=resolved_job_id,
+        import_log=log_text,
+        total_files=parsed_result.total_files,
+        failed_files_count=len(parsed_result.failed_files)
+    )
+
+    # Save each failed file match
+    failed_files_response = []
+    for match in matches:
+        # Store in database
+        failed_file_id = create_pt4_failed_file(
+            pt4_import_attempt_id=attempt_id,
+            filename=match.filename,
+            table_number=match.table_number,
+            error_count=match.error_count,
+            error_details=json.dumps(match.errors),
+            associated_job_id=match.matched_job_id,
+            associated_original_txt_path=match.original_txt_path,
+            associated_processed_txt_path=match.processed_txt_path,
+            associated_screenshot_paths=json.dumps(match.screenshot_paths)
+        )
+
+        # Build response
+        failed_files_response.append({
+            'id': failed_file_id,
+            'filename': match.filename,
+            'table_number': match.table_number,
+            'error_count': match.error_count,
+            'errors': match.errors,
+            'matched_job_id': match.matched_job_id,
+            'original_txt_path': match.original_txt_path,
+            'processed_txt_path': match.processed_txt_path,
+            'screenshot_paths': match.screenshot_paths
+        })
+
+    return {
+        'success': True,
+        'attempt_id': attempt_id,
+        'total_files': parsed_result.total_files,
+        'total_hands_imported': parsed_result.total_hands_imported,
+        'total_errors': parsed_result.total_errors,
+        'failed_files_count': len(parsed_result.failed_files),
+        'failed_files': failed_files_response
+    }
+
+
 def calculate_job_cost(ocr1_count: int, ocr2_count: int) -> float:
     """Calculate total API cost for a job based on OCR operations"""
     total_images = ocr1_count + ocr2_count
