@@ -2363,13 +2363,34 @@ body {
 
 /* Fix card styling in modals */
 .modal-body .card-header {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-    border-color: var(--border-color);
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.modal-body .card-header.bg-light {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
 }
 
 .modal-body .card-header strong {
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
+}
+
+.modal-body .card-header i {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure all card elements in modal maintain theme colors */
+.modal-body .card {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-body .card-body {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
 }
 
 .modal-message {
