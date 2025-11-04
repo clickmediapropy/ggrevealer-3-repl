@@ -2248,6 +2248,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 .modal-title {
@@ -2257,6 +2259,10 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
+}
+
+.modal-title i {
+    color: var(--text-primary);
 }
 
 .modal-title-icon {
