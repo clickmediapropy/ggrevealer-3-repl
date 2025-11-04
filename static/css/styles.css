@@ -1565,3 +1565,389 @@ body {
     border-radius: 0.25rem;
     font-size: 0.875rem;
 }
+
+/* ============================================
+   LOTE 2: Processing Screen & Results Redesign
+   Tasks 5-8: Spinner, Stats, Progress, Downloads
+   ============================================ */
+
+/* Task 5: Custom Gradient Spinner */
+.spinner-gradient {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        var(--brand-start) 0deg,
+        var(--brand-end) 120deg,
+        transparent 120deg,
+        transparent 360deg
+    );
+    animation: spin 1.2s linear infinite;
+    position: relative;
+}
+
+.spinner-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spinner-gradient-lg {
+    width: 80px;
+    height: 80px;
+}
+
+.spinner-gradient-lg::before {
+    inset: 10px;
+}
+
+.spinner-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-xl);
+}
+
+.spinner-text {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    animation: pulse-text 2s ease-in-out infinite;
+}
+
+@keyframes pulse-text {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
+
+/* Task 6: Animated Stats Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+    margin: var(--spacing-xl) 0;
+}
+
+.stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--brand-gradient);
+    transition: width var(--transition-base);
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+}
+
+.stat-card:hover::before {
+    width: 100%;
+    opacity: 0.1;
+}
+
+.stat-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.stat-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--text-inverse);
+    background: var(--brand-gradient);
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: var(--spacing-xs);
+}
+
+.stat-card-label {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+}
+
+.stat-card.stat-success .stat-card-icon {
+    background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+}
+
+.stat-card.stat-info .stat-card-icon {
+    background: linear-gradient(135deg, var(--info) 0%, #2563eb 100%);
+}
+
+.stat-card.stat-warning .stat-card-icon {
+    background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+}
+
+.stat-card.stat-error .stat-card-icon {
+    background: linear-gradient(135deg, var(--error) 0%, #dc2626 100%);
+}
+
+/* Task 7: Animated Progress Bar */
+.progress-container {
+    margin: var(--spacing-xl) 0;
+}
+
+.progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.progress-label-text {
+    color: var(--text-primary);
+}
+
+.progress-label-percentage {
+    color: var(--brand-solid);
+}
+
+.progress {
+    height: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar-gradient {
+    background: var(--brand-gradient);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+    transition: width 0.6s ease-out;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.progress-bar-gradient::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 30px 30px;
+    animation: stripes 1s linear infinite;
+}
+
+@keyframes stripes {
+    from { background-position: 0 0; }
+    to { background-position: 30px 0; }
+}
+
+/* Task 8: Enhanced Download Buttons */
+.download-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    margin: var(--spacing-xl) 0;
+}
+
+.download-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-base);
+}
+
+.download-card:hover {
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-4px);
+    border-color: var(--brand-solid);
+}
+
+.download-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+}
+
+.download-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.download-card-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    background: var(--brand-gradient);
+    color: var(--text-inverse);
+    box-shadow: var(--shadow-md);
+}
+
+.download-card-badge {
+    font-size: 0.875rem;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-weight: 600;
+}
+
+.download-card-body {
+    margin-bottom: var(--spacing-lg);
+}
+
+.download-card-description {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: var(--spacing-md);
+}
+
+.download-card-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.download-stat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-tertiary);
+    font-size: 0.875rem;
+}
+
+.download-stat i {
+    color: var(--brand-solid);
+}
+
+.download-btn-large {
+    width: 100%;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    font-size: 1.125rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    background: var(--brand-gradient);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    transition: all var(--transition-base);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.download-btn-large::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.download-btn-large:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+    filter: brightness(1.1);
+}
+
+.download-btn-large:active::before {
+    width: 400px;
+    height: 400px;
+}
+
+.download-btn-large i {
+    font-size: 1.5rem;
+    animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+.download-btn-secondary {
+    background: transparent;
+    border: 2px solid var(--brand-solid);
+    color: var(--brand-solid);
+}
+
+.download-btn-secondary:hover {
+    background: var(--brand-gradient);
+    color: var(--text-inverse);
+    border-color: transparent;
+}
