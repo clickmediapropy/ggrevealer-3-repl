@@ -6,6 +6,78 @@ const MAX_SCREENSHOT_FILES = 300;
 const MAX_UPLOAD_SIZE_MB = 300;
 const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 
+// Batch upload constants
+const MAX_BATCH_SIZE_MB = 55; // 55 MB to stay safely under 60 MB limit
+const MAX_BATCH_SIZE_BYTES = MAX_BATCH_SIZE_MB * 1024 * 1024;
+
+/**
+ * Split files into batches based on size limit
+ * @param {File[]} files - Array of File objects
+ * @param {number} maxBatchSize - Maximum batch size in bytes
+ * @returns {File[][]} Array of file batches
+ */
+function createFileBatches(files, maxBatchSize = MAX_BATCH_SIZE_BYTES) {
+    const batches = [];
+    let currentBatch = [];
+    let currentBatchSize = 0;
+
+    for (const file of files) {
+        const fileSize = file.size;
+
+        // If single file exceeds limit, put it in its own batch
+        if (fileSize > maxBatchSize) {
+            // Flush current batch if not empty
+            if (currentBatch.length > 0) {
+                batches.push(currentBatch);
+                currentBatch = [];
+                currentBatchSize = 0;
+            }
+            // Add large file as single-file batch
+            batches.push([file]);
+            continue;
+        }
+
+        // If adding this file would exceed limit, start new batch
+        if (currentBatchSize + fileSize > maxBatchSize && currentBatch.length > 0) {
+            batches.push(currentBatch);
+            currentBatch = [];
+            currentBatchSize = 0;
+        }
+
+        currentBatch.push(file);
+        currentBatchSize += fileSize;
+    }
+
+    // Add remaining files
+    if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+    }
+
+    return batches;
+}
+
+/**
+ * Calculate total size of files in bytes
+ * @param {File[]} files - Array of File objects
+ * @returns {number} Total size in bytes
+ */
+function calculateTotalSize(files) {
+    return files.reduce((total, file) => total + file.size, 0);
+}
+
+/**
+ * Format bytes to human-readable size
+ * @param {number} bytes - Size in bytes
+ * @returns {string} Formatted size (e.g., "12.5 MB")
+ */
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
 let txtFiles = [];
 let screenshotFiles = [];
 let currentJobId = null;
