@@ -2295,6 +2295,77 @@ body {
     padding: var(--spacing-xl);
 }
 
+/* Fix Bootstrap text colors in modals for theme compatibility */
+.modal-body p,
+.modal-body li,
+.modal-body span,
+.modal-body strong,
+.modal-body h6 {
+    color: var(--text-primary);
+}
+
+.modal-body .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+.modal-body .card-body {
+    color: var(--text-primary);
+}
+
+.modal-body .card-body p,
+.modal-body .card-body li,
+.modal-body .card-body h6 {
+    color: var(--text-primary);
+}
+
+.modal-body .alert-info {
+    background-color: var(--info-bg);
+    color: var(--text-primary);
+    border-color: var(--info);
+}
+
+.modal-body .alert-success {
+    background-color: var(--success-bg);
+    color: var(--text-primary);
+    border-color: var(--success);
+}
+
+.modal-body .alert-warning {
+    background-color: var(--warning-bg);
+    color: var(--text-primary);
+    border-color: var(--warning);
+}
+
+.modal-body .alert-danger {
+    background-color: var(--error-bg);
+    color: var(--text-primary);
+    border-color: var(--error);
+}
+
+.modal-body .alert strong,
+.modal-body .alert i {
+    color: var(--text-primary);
+}
+
+.modal-body .form-label {
+    color: var(--text-primary);
+}
+
+.modal-body .form-check-label {
+    color: var(--text-primary);
+}
+
+/* Fix card styling in modals */
+.modal-body .card-header {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.modal-body .card-header strong {
+    color: var(--text-primary);
+}
+
 .modal-message {
     font-size: 1rem;
     line-height: 1.6;
