@@ -233,6 +233,73 @@ async def init_upload_job(api_tier: str = Form(default='free')):
     }
 
 
+@app.post("/api/upload/batch/{job_id}")
+async def upload_batch(
+    job_id: int,
+    txt_files: List[UploadFile] = File(default=[]),
+    screenshots: List[UploadFile] = File(default=[])
+):
+    """Upload a batch of files to an existing job"""
+    # Verify job exists
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado")
+
+    if job['status'] not in ['pending', 'initialized']:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pueden subir archivos a un job con estado '{job['status']}'"
+        )
+
+    job_upload_path = UPLOADS_PATH / str(job_id)
+    txt_path = job_upload_path / "txt"
+    screenshots_path = job_upload_path / "screenshots"
+
+    # Ensure directories exist
+    txt_path.mkdir(parents=True, exist_ok=True)
+    screenshots_path.mkdir(parents=True, exist_ok=True)
+
+    txt_count = 0
+    screenshot_count = 0
+
+    # Save TXT files
+    for txt_file in txt_files:
+        if not txt_file.filename:
+            continue
+        file_path = txt_path / txt_file.filename
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(txt_file.file, f)
+        add_file(job_id, txt_file.filename, "txt", str(file_path))
+        txt_count += 1
+
+    # Save screenshot files
+    for screenshot in screenshots:
+        if not screenshot.filename:
+            continue
+        file_path = screenshots_path / screenshot.filename
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(screenshot.file, f)
+        add_file(job_id, screenshot.filename, "screenshot", str(file_path))
+        screenshot_count += 1
+
+    # Get current file counts from database
+    job_files = get_job_files(job_id)
+    total_txt = len([f for f in job_files if f['file_type'] == 'txt'])
+    total_screenshots = len([f for f in job_files if f['file_type'] == 'screenshot'])
+
+    # Update job file counts
+    update_job_file_counts(job_id, total_txt, total_screenshots)
+
+    return {
+        "job_id": job_id,
+        "batch_txt_count": txt_count,
+        "batch_screenshot_count": screenshot_count,
+        "total_txt_count": total_txt,
+        "total_screenshot_count": total_screenshots,
+        "message": f"Lote subido: {txt_count} TXT, {screenshot_count} screenshots"
+    }
+
+
 @app.post("/api/upload")
 async def upload_files(
     txt_files: List[UploadFile] = File(...),
