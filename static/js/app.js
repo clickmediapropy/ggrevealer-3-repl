@@ -2591,6 +2591,76 @@ function viewJobFailedFiles() {
     });
 }
 
+async function recalculateScreenshots() {
+    // Get job ID from the input field
+    const jobIdInput = document.getElementById('job-id-input');
+    if (!jobIdInput || !jobIdInput.value) {
+        alert('Por favor ingresa un Job ID primero');
+        return;
+    }
+
+    const jobId = parseInt(jobIdInput.value);
+    const btn = document.getElementById('recalculate-btn');
+
+    // Disable button and show loading state
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Recalculando...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/pt4-log/recalculate-screenshots/${jobId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Show success message
+        alert(`✅ Recálculo completado!\n\nTotal de archivos: ${data.total_files}\nActualizados: ${data.updated_count}`);
+
+        // Reload the failed files view to show updated screenshots
+        if (window.currentJobFailedFiles) {
+            const reloadResponse = await fetch(`${API_BASE}/api/pt4-log/failed-files/${jobId}`);
+            if (reloadResponse.ok) {
+                const reloadData = await reloadResponse.json();
+                window.currentJobFailedFiles = reloadData;
+
+                // Parse JSON fields
+                if (reloadData.pt4_failures) {
+                    reloadData.pt4_failures.forEach(failure => {
+                        if (failure.associated_screenshot_paths) {
+                            try {
+                                failure.screenshot_paths = JSON.parse(failure.associated_screenshot_paths);
+                            } catch (e) {
+                                failure.screenshot_paths = [];
+                            }
+                        }
+                    });
+                }
+
+                // Update the display
+                displayFailedFilesResults({
+                    failed_files_count: reloadData.total_pt4_failures,
+                    failed_files: reloadData.pt4_failures
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error recalculating screenshots:', error);
+        alert(`❌ Error: ${error.message}`);
+    } finally {
+        // Re-enable button
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Recalcular Screenshots';
+        }
+    }
+}
+
 function formatStatus(status) {
     const statusMap = {
         'completed': '✅ Completado',
