@@ -92,6 +92,24 @@ CREATE TABLE IF NOT EXISTS logs (
 CREATE INDEX IF NOT EXISTS idx_logs_job_id ON logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 
+-- Reprocess attempts audit trail
+CREATE TABLE IF NOT EXISTS reprocess_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    file_source TEXT NOT NULL,
+    file_id INTEGER,
+    file_name TEXT NOT NULL,
+    attempt_number INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    error_message TEXT,
+    logs_json TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_reprocess_job ON reprocess_attempts(job_id);
+CREATE INDEX IF NOT EXISTS idx_reprocess_status ON reprocess_attempts(status);
+
 -- PT4 import attempts table (second-stage failure tracking)
 CREATE TABLE IF NOT EXISTS pt4_import_attempts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1026,3 +1044,64 @@ def get_app_failed_files_for_job(job_id: int) -> List[Dict]:
     stats = json.loads(result['stats_json'])
 
     return stats.get('failed_files', [])
+
+
+def get_failed_files_for_job(job_id: int) -> Dict:
+    """
+    Get unified view of all failures for a job (both PT4 and App sources)
+
+    Args:
+        job_id: Job ID to query
+
+    Returns:
+        Dict with 'pt4_failures' and 'app_failures' lists
+    """
+    db = get_db()
+    cursor = db.cursor()
+
+    # Get PT4 failures
+    cursor.execute('''
+        SELECT id, filename, table_number, error_message, error_count,
+               reprocess_count, last_reprocess_attempt_id
+        FROM pt4_failed_files
+        WHERE job_id = ?
+        ORDER BY id DESC
+    ''', (job_id,))
+
+    pt4_failures = []
+    for row in cursor.fetchall():
+        pt4_failures.append({
+            'id': row[0],
+            'filename': row[1],
+            'table_number': row[2],
+            'error_message': row[3],
+            'error_count': row[4],
+            'reprocess_count': row[5],
+            'last_reprocess_attempt_id': row[6],
+            'status': 'failed'
+        })
+
+    # Get App failures from results stats_json
+    result = get_result(job_id)
+    app_failures = []
+
+    if result and result.get('stats_json'):
+        stats = json.loads(result['stats_json'])
+        if stats.get('failed_files'):
+            for failed_file in stats['failed_files']:
+                app_failures.append({
+                    'table_name': failed_file.get('table_name'),
+                    'unmapped_ids': failed_file.get('unmapped_ids', []),
+                    'unmapped_count': len(failed_file.get('unmapped_ids', [])),
+                    'reprocess_count': 0,
+                    'last_reprocess_attempt_id': None,
+                    'status': 'failed'
+                })
+
+    return {
+        'pt4_failures': pt4_failures,
+        'app_failures': app_failures,
+        'total_pt4_failures': len(pt4_failures),
+        'total_app_failures': len(app_failures),
+        'total_failures': len(pt4_failures) + len(app_failures)
+    }
