@@ -271,6 +271,13 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
+/* VIS-3: Batch progress card max-width for ultra-wide monitors */
+#batchProgress .card {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .timer-display {
     display: flex;
     align-items: center;
@@ -391,6 +398,21 @@ body {
     margin-top: 5px;
 }
 
+/* VIS-6: Size indicator responsive */
+@media (max-width: 576px) {
+    #size-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        text-align: center;
+    }
+
+    #size-indicator .mx-2 {
+        display: none;
+    }
+}
+
 .job-card {
     border: 1px solid #dee2e6;
     border-radius: 12px;
@@ -415,6 +437,24 @@ body {
 
 .job-card-header:hover {
     background-color: #f8f9fa;
+}
+
+/* VIS-5: Job card mobile wrap */
+@media (max-width: 480px) {
+    .job-card-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .job-card-left {
+        flex: 1 1 100%;
+    }
+
+    .job-card-right {
+        flex: 0 0 auto;
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 
 .job-card-left {
@@ -946,6 +986,7 @@ body {
     .job-details-grid {
         grid-template-columns: 1fr;
     }
+}
 
     .phases-container {
         flex-direction: column;
@@ -1010,6 +1051,12 @@ body {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
+/* VIS-7: Ensure equal heights for detailed metrics cards */
+#detailed-metrics .card {
+    height: 100%;
+    min-height: 280px;
+}
+
 #detailed-metrics .card-title {
     font-size: 0.95rem;
     font-weight: 600;
@@ -1069,6 +1116,14 @@ body {
 
     .metric-value {
         font-size: 1.5rem;
+    }
+}
+
+/* VIS-4: API Key modal responsive */
+@media (max-height: 900px) {
+    #apiKeyModal .modal-body {
+        max-height: 60vh;
+        overflow-y: auto;
     }
 }
 
