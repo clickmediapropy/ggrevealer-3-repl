@@ -2623,6 +2623,277 @@ small,
     color: var(--text-secondary) !important;
 }
 
+/* ============================================
+   COMPREHENSIVE BOOTSTRAP COLOR OVERRIDES
+   ============================================ */
+
+/* Text Color Utilities */
+.text-dark {
+    color: var(--text-primary) !important;
+}
+
+.text-body {
+    color: var(--text-primary) !important;
+}
+
+.text-muted {
+    color: var(--text-secondary) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+.text-success {
+    color: var(--success) !important;
+}
+
+.text-danger,
+.text-danger-emphasis {
+    color: var(--error) !important;
+}
+
+.text-warning,
+.text-warning-emphasis {
+    color: var(--warning) !important;
+}
+
+.text-info,
+.text-info-emphasis {
+    color: var(--info) !important;
+}
+
+/* Background Color Utilities */
+.bg-white {
+    background-color: var(--bg-secondary) !important;
+}
+
+.bg-body {
+    background-color: var(--bg-primary) !important;
+}
+
+.bg-body-secondary {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.bg-success {
+    background-color: var(--success-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+.bg-danger {
+    background-color: var(--error-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+.bg-warning {
+    background-color: var(--warning-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+.bg-info {
+    background-color: var(--info-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Button Utilities - All variants */
+.btn-secondary {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.btn-secondary:hover {
+    background-color: var(--border-color) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.btn-outline-secondary {
+    color: var(--text-secondary) !important;
+    border-color: var(--text-secondary) !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--text-secondary) !important;
+    color: white !important;
+}
+
+.btn-outline-success {
+    color: var(--success) !important;
+    border-color: var(--success) !important;
+}
+
+.btn-outline-success:hover {
+    background-color: var(--success) !important;
+    color: white !important;
+}
+
+.btn-outline-danger {
+    color: var(--error) !important;
+    border-color: var(--error) !important;
+}
+
+.btn-outline-danger:hover {
+    background-color: var(--error) !important;
+    color: white !important;
+}
+
+.btn-outline-warning {
+    color: var(--warning) !important;
+    border-color: var(--warning) !important;
+}
+
+.btn-outline-warning:hover {
+    background-color: var(--warning) !important;
+    color: white !important;
+}
+
+/* Badge Utilities */
+.badge {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+
+.badge.bg-primary {
+    background-color: var(--info) !important;
+    color: white !important;
+}
+
+.badge.bg-success {
+    background-color: var(--success) !important;
+    color: white !important;
+}
+
+.badge.bg-danger {
+    background-color: var(--error) !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background-color: var(--warning) !important;
+    color: var(--text-primary) !important;
+}
+
+.badge.bg-info {
+    background-color: var(--info) !important;
+    color: white !important;
+}
+
+/* Border Utilities */
+.border {
+    border-color: var(--border-color) !important;
+}
+
+.border-top {
+    border-top-color: var(--border-color) !important;
+}
+
+.border-end {
+    border-right-color: var(--border-color) !important;
+}
+
+.border-bottom {
+    border-bottom-color: var(--border-color) !important;
+}
+
+.border-start {
+    border-left-color: var(--border-color) !important;
+}
+
+.border-success {
+    border-color: var(--success) !important;
+}
+
+.border-danger {
+    border-color: var(--error) !important;
+}
+
+.border-warning {
+    border-color: var(--warning) !important;
+}
+
+.border-info {
+    border-color: var(--info) !important;
+}
+
+/* Form Control Utilities */
+.form-control,
+.form-select {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--info) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control::placeholder {
+    color: var(--text-tertiary) !important;
+}
+
+.form-check-input {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.form-check-input:checked {
+    background-color: var(--info) !important;
+    border-color: var(--info) !important;
+}
+
+/* Table Utilities */
+.table {
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.table-dark {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.table-light {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Code/Syntax Highlighting */
+code {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+
+pre {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Link Colors */
+a {
+    color: var(--info) !important;
+}
+
+a:hover {
+    color: var(--brand-solid) !important;
+}
+
+/* Blockquote */
+blockquote {
+    border-color: var(--border-color) !important;
+}
+
+/* hr */
+hr {
+    border-color: var(--border-color) !important;
+    opacity: 1;
+}
+
 html {
     scroll-behavior: smooth;
 }
