@@ -58,6 +58,56 @@ def _extract_hand_ids_from_txt(txt_path: str) -> Set[str]:
         return set()
 
 
+def recalculate_screenshots_for_failed_file(table_number: int, job_id: int) -> List[str]:
+    r"""
+    Recalculate screenshot paths for a specific failed file using latest matching logic
+
+    This is used to update failed files that were matched before the hand-ID-based
+    screenshot search was implemented.
+
+    Args:
+        table_number: Table number from failed file
+        job_id: Job ID to search for screenshots
+
+    Returns:
+        List of screenshot paths found
+    """
+    # Get ALL files for this job
+    job_files = get_job_files(job_id)
+
+    # Find the original TXT file for this table
+    original_txt_path = None
+    for file in job_files:
+        if file['file_type'] == 'txt' and str(table_number) in file['filename']:
+            original_txt_path = file['file_path']
+            break
+
+    screenshot_paths = []
+
+    # If we found the TXT file, try hand-ID-based matching first
+    if original_txt_path:
+        hand_ids = _extract_hand_ids_from_txt(original_txt_path)
+
+        # Try to find screenshots matching hand IDs
+        if hand_ids:
+            for file in job_files:
+                if file['file_type'] == 'screenshot':
+                    filename = file['filename'].lower()
+                    # Check if any hand ID appears in screenshot filename
+                    for hand_id in hand_ids:
+                        if hand_id.lower() in filename:
+                            screenshot_paths.append(file['file_path'])
+                            break
+
+    # Fallback to table number matching if no hand ID matches found
+    if not screenshot_paths:
+        for file in job_files:
+            if file['file_type'] == 'screenshot' and str(table_number) in file['filename']:
+                screenshot_paths.append(file['file_path'])
+
+    return screenshot_paths
+
+
 def match_failed_files_to_jobs(failed_files: List[Dict], preferred_job_id: Optional[int] = None) -> List[FailedFileMatch]:
     """
     Match PT4 failed files to original GGRevealer jobs

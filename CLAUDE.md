@@ -188,3 +188,4 @@ print(f"Unmapped: {unmapped_ids}")
 - Git: commit + push after each feature (siempre hacer commit y push)
 - Paths with leading slashes need special handling (JavaScript/FastAPI interop)
 - Never lose hands: all input hands appear in output (_resolved.txt or _fallado.txt)
+- use restart.sh to restart the server. we use port 8000 for local development, and 5000 for replit. so you should always use only 8000

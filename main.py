@@ -1796,6 +1796,81 @@ async def get_all_failed_files():
     }
 
 
+@app.post("/api/pt4-log/recalculate-screenshots/{job_id}")
+async def recalculate_screenshots(job_id: int):
+    """
+    Recalculate and update screenshots for existing PT4 failed files using hand-ID-based matching
+
+    This endpoint:
+    1. Gets all failed files for a job
+    2. Recalculates screenshot matches using the latest hand-ID-based logic
+    3. Updates the database with newly found screenshots
+    4. Returns updated failed files
+
+    Useful for failed files that were saved before hand-ID-based matching was implemented.
+    """
+    from database import (
+        get_pt4_failed_files_for_job, update_pt4_failed_file_screenshots, get_db
+    )
+    from pt4_matcher import recalculate_screenshots_for_failed_file
+
+    # Get all failed files for this job
+    failed_files = get_pt4_failed_files_for_job(job_id)
+
+    if not failed_files:
+        raise HTTPException(status_code=404, detail=f"No failed files found for job {job_id}")
+
+    updated_count = 0
+    results = []
+
+    for failed_file in failed_files:
+        table_number = failed_file['table_number']
+
+        if not table_number:
+            results.append({
+                'filename': failed_file['filename'],
+                'status': 'skipped',
+                'reason': 'No table number'
+            })
+            continue
+
+        # Recalculate screenshots using new logic
+        screenshot_paths = recalculate_screenshots_for_failed_file(table_number, job_id)
+
+        # Update database if we found screenshots
+        if screenshot_paths:
+            try:
+                update_pt4_failed_file_screenshots(
+                    failed_file_id=failed_file['id'],
+                    screenshot_paths=screenshot_paths
+                )
+                updated_count += 1
+                results.append({
+                    'filename': failed_file['filename'],
+                    'status': 'updated',
+                    'screenshot_count': len(screenshot_paths),
+                    'screenshots': screenshot_paths
+                })
+            except Exception as e:
+                results.append({
+                    'filename': failed_file['filename'],
+                    'status': 'error',
+                    'error': str(e)
+                })
+        else:
+            results.append({
+                'filename': failed_file['filename'],
+                'status': 'no_screenshots_found'
+            })
+
+    return {
+        'job_id': job_id,
+        'total_files': len(failed_files),
+        'updated_count': updated_count,
+        'results': results
+    }
+
+
 @app.get("/api/download-file")
 async def download_file(path: str):
     """

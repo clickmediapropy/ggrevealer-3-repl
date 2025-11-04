@@ -894,6 +894,34 @@ def create_pt4_failed_file(
         return cursor.lastrowid
 
 
+def update_pt4_failed_file_screenshots(
+    failed_file_id: int,
+    screenshot_paths: List[str]
+) -> bool:
+    """
+    Update the screenshot paths for an existing PT4 failed file
+
+    Args:
+        failed_file_id: ID of the PT4 failed file record
+        screenshot_paths: List of screenshot paths to associate
+
+    Returns:
+        True if update was successful
+    """
+    import json
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE pt4_failed_files
+            SET associated_screenshot_paths = ?
+            WHERE id = ?
+            """,
+            (json.dumps(screenshot_paths), failed_file_id)
+        )
+        return cursor.rowcount > 0
+
+
 def get_files_by_table_number(table_number: int) -> List[Dict]:
     """
     Get all files associated with a table number across all jobs
