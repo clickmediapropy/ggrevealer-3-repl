@@ -557,6 +557,31 @@ Result: Player count mismatch → match accepted → mapping fails
 ### Duplicate Role Prevention (Oct 2025) 🆕
 **Problem Solved**: OCR2 extracted the same player name for both SB and BB roles (e.g., "50Zoos" for both), which correctly triggered duplicate detection but prevented valid mapping. This occurred when OCR read from the action history panel at the bottom of screenshots instead of visual role indicators on the poker table itself. **Solution**: Enhanced OCR2 prompt with explicit instructions to extract role indicators ONLY from the poker table visual layout (player avatars with D/SB/BB badges) and ignore the action history panel. Added concrete examples showing correct vs incorrect role extraction patterns. This eliminated all duplicate role assignments and improved mapping reliability. Implementation: `ocr.py:145-163` (enhanced role extraction instructions).
 
+### PT4 Failed Files Recovery (Nov 2025) 🆕
+**Feature**: PokerTracker import log parsing and smart file matching system
+- **Purpose**: Identify files rejected by PokerTracker during import and match them to original screenshots for manual correction
+- **Two-Phase Tracking**: App-detected failures (unmapped IDs during processing) + User-reported failures (PT4 import errors)
+- **Smart Matching**: Automatic extraction of table numbers from failed filenames (e.g., `46798_resolved.txt` → table 46798)
+- **Database Tables**: `pt4_import_attempts` (tracks import sessions), `pt4_failed_files` (individual failed files with error details)
+- **API Endpoints**:
+  - `POST /api/pt4-log/upload` - Upload and parse PT4 import log, extract failed files
+  - `GET /api/pt4-log/failed-files/{job_id}` - Get all failed files for specific job
+  - `GET /api/pt4-log/failed-files` - Get all failed files across all jobs
+- **Frontend**: "Archivos Fallidos" sidebar navigation with log upload form, failed files table displaying:
+  - Original TXT file (input)
+  - Processed TXT file (output)
+  - Associated screenshots (all screenshots matching table number)
+  - PT4 error details
+- **Workflow**:
+  1. User processes files with GGRevealer
+  2. User imports to PokerTracker, copies import log
+  3. User uploads log to "Archivos Fallidos" section
+  4. System parses log, extracts failed files, matches to original jobs by table number
+  5. User downloads original/processed files and views screenshots for manual correction
+- **Implementation**: `pt4_parser.py` (log parser), `pt4_matcher.py` (smart matcher), `database.py` (new tables and queries), `main.py` (API endpoints), `templates/index.html` + `static/js/app.js` (UI)
+- **Testing**: `tests/test_pt4_import_tracking.py`, `tests/test_pt4_parser.py`, `tests/test_pt4_matcher.py`, `tests/test_pt4_api.py`
+- **Documentation**: `docs/pt4-failed-files-recovery.md` (user guide)
+
 ## PT4 Validation System (Oct 2025) 🆕
 
 **Feature**: Comprehensive PokerTracker 4 validation system with 12 critical validations
