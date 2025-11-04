@@ -23,7 +23,7 @@ class FailedFileMatch:
     screenshot_paths: List[str]
 
 
-def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch]:
+def match_failed_files_to_jobs(failed_files: List[Dict], preferred_job_id: Optional[int] = None) -> List[FailedFileMatch]:
     """
     Match PT4 failed files to original GGRevealer jobs
 
@@ -36,6 +36,7 @@ def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch
 
     Args:
         failed_files: List of dicts from PT4 parser
+        preferred_job_id: Optional job ID to prefer when multiple jobs have same table
 
     Returns:
         List of FailedFileMatch objects with matched paths
@@ -72,7 +73,7 @@ def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch
             matches.append(match)
             continue
 
-        # Group files by job_id (prefer most recent job)
+        # Group files by job_id
         job_files = {}
         for file in files:
             job_id = file['job_id']
@@ -80,12 +81,17 @@ def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch
                 job_files[job_id] = []
             job_files[job_id].append(file)
 
-        # Use most recent job (highest job_id)
-        most_recent_job_id = max(job_files.keys())
-        job_file_list = job_files[most_recent_job_id]
+        # Select job: prefer user-specified job_id, fallback to most recent
+        if preferred_job_id and preferred_job_id in job_files:
+            selected_job_id = preferred_job_id
+        else:
+            # Use most recent job (highest job_id)
+            selected_job_id = max(job_files.keys())
+
+        job_file_list = job_files[selected_job_id]
 
         # Extract paths
-        match.matched_job_id = most_recent_job_id
+        match.matched_job_id = selected_job_id
 
         # Find original TXT (input)
         # Match files that contain the table number in the filename
@@ -96,7 +102,7 @@ def match_failed_files_to_jobs(failed_files: List[Dict]) -> List[FailedFileMatch
                 break
 
         # Find processed TXT (output)
-        outputs_path = get_job_outputs_path(most_recent_job_id)
+        outputs_path = get_job_outputs_path(selected_job_id)
         if outputs_path:
             processed_path = Path(outputs_path) / f"{table_number}_resolved.txt"
             if processed_path.exists():
