@@ -2537,6 +2537,63 @@ input:focus-visible {
 }
 
 /* Smooth scrolling */
+/* Fix remaining Bootstrap hardcoded colors for theme compatibility */
+
+/* Override .bg-light class everywhere to use theme colors */
+.bg-light {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+
+.bg-light h6 {
+    color: var(--text-primary) !important;
+}
+
+.bg-light p,
+.bg-light li,
+.bg-light small {
+    color: var(--text-primary) !important;
+}
+
+.bg-light .small {
+    color: var(--text-primary) !important;
+}
+
+.bg-light ol,
+.bg-light ul {
+    color: var(--text-primary) !important;
+}
+
+.bg-light ol li,
+.bg-light ul li {
+    color: var(--text-primary) !important;
+}
+
+.bg-light i {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure form labels are always visible */
+.form-label {
+    color: var(--text-primary) !important;
+}
+
+.form-label strong {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure input placeholders are visible */
+.form-control::placeholder {
+    color: var(--text-tertiary);
+    opacity: 0.8;
+}
+
+/* Ensure small text is visible */
+small,
+.small {
+    color: var(--text-secondary) !important;
+}
+
 html {
     scroll-behavior: smooth;
 }
