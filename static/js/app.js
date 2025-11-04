@@ -497,7 +497,9 @@ if (uploadBtn) {
         updateBatchProgress(0, totalBatches, `Preparando ${totalBatches} lotes...`);
 
         // Step 4: Upload batches sequentially
+        let currentBatchIndex = 0; // Track for error reporting
         for (let i = 0; i < fileBatches.length; i++) {
+            currentBatchIndex = i; // Update before processing each batch
             const batch = fileBatches[i];
             const batchNum = i + 1;
             const batchSize = calculateTotalSize(batch);
@@ -596,7 +598,31 @@ if (uploadBtn) {
 
     } catch (error) {
         console.error('Error:', error);
-        showError('Error al subir archivos: ' + error.message, true); // Clear job on upload failure
+
+        // Construct detailed error message with batch context
+        let errorMessage = 'Error al subir archivos: ' + error.message;
+
+        // Add batch context if we know which batch failed
+        if (typeof currentBatchIndex !== 'undefined' && typeof fileBatches !== 'undefined' && fileBatches.length > 1) {
+            const completedBatches = currentBatchIndex; // Loop index before error
+            errorMessage = `Error al subir lote ${currentBatchIndex + 1}/${fileBatches.length}\n\n` +
+                          `Lotes completados exitosamente: ${completedBatches}/${fileBatches.length}\n` +
+                          `Archivos subidos: ~${Math.round((completedBatches / fileBatches.length) * 100)}%\n\n` +
+                          `Detalles: ${error.message}`;
+        }
+
+        showError(errorMessage, true);
+
+        // Cleanup: Delete the job if it was created
+        if (currentJobId) {
+            try {
+                await fetch(`${API_BASE}/api/job/${currentJobId}`, { method: 'DELETE' });
+                console.log(`Cleaned up failed job ${currentJobId}`);
+            } catch (cleanupError) {
+                console.error('Failed to cleanup job:', cleanupError);
+            }
+            currentJobId = null;
+        }
 
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Subir y Procesar';
