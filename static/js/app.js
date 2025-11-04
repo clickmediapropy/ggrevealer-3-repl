@@ -3072,31 +3072,56 @@ async function loadAllFailedFiles() {
 
 async function loadJobFailedFiles(jobId) {
     try {
+        console.log(`🔍 [Job ${jobId}] Cargando archivos fallidos...`);
+
         const response = await fetch(`${API_BASE}/api/pt4-log/failed-files/${jobId}`);
-        if (!response.ok) return;
+
+        console.log(`🔍 [Job ${jobId}] Response status: ${response.status}`);
+
+        if (!response.ok) {
+            console.log(`❌ [Job ${jobId}] Response not OK`);
+            return;
+        }
 
         const data = await response.json();
+
+        console.log(`📊 [Job ${jobId}] Data recibida:`, data);
 
         const pt4Count = data.pt4_failures_count || 0;
         const initialCount = data.initial_failures_count || 0;
         const totalCount = data.total_failures || 0;
+
+        console.log(`📊 [Job ${jobId}] PT4: ${pt4Count}, Initial: ${initialCount}, Total: ${totalCount}`);
 
         if (totalCount > 0) {
             const failedFilesSection = document.getElementById('modal-job-failed-files-section');
             const pt4CountSpan = document.getElementById('modal-job-pt4-failures-count');
             const appCountSpan = document.getElementById('modal-job-app-failures-count');
 
+            console.log(`🔍 [Job ${jobId}] Elementos encontrados:`, {
+                failedFilesSection: !!failedFilesSection,
+                pt4CountSpan: !!pt4CountSpan,
+                appCountSpan: !!appCountSpan
+            });
+
             if (failedFilesSection && pt4CountSpan && appCountSpan) {
+                console.log(`✅ [Job ${jobId}] Mostrando sección de archivos fallidos`);
                 failedFilesSection.style.display = 'block';
                 pt4CountSpan.textContent = pt4Count;
                 appCountSpan.textContent = initialCount;
 
                 // Store for later viewing
                 window.currentJobFailedFiles = data;
+
+                console.log(`✅ [Job ${jobId}] Data guardada en window.currentJobFailedFiles`);
+            } else {
+                console.log(`❌ [Job ${jobId}] Algunos elementos no encontrados en DOM`);
             }
+        } else {
+            console.log(`ℹ️ [Job ${jobId}] No hay archivos fallidos (total = 0)`);
         }
     } catch (error) {
-        console.error('Error loading failed files:', error);
+        console.error(`❌ [Job ${jobId}] Error loading failed files:`, error);
     }
 }
 
