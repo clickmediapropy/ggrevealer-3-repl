@@ -3304,43 +3304,57 @@ function calculateEstimatedTime(screenshotCount, apiTier = null) {
     };
 }
 
-function showProcessingTimeWarning(estimatedMinutes, apiTier) {
+/**
+ * Show processing time warning with option to suppress
+ * @param {number} estimatedMinutes - Estimated processing time
+ * @param {string} apiTier - 'free' or 'paid'
+ * @returns {Promise<boolean>} True if user wants to proceed
+ */
+async function showProcessingTimeWarning(estimatedMinutes, apiTier) {
+    // Check if user has suppressed this warning
+    if (localStorage.getItem('suppress_time_warning') === 'true') {
+        console.log('[WARNING] Time warning suppressed by user preference');
+        return true;
+    }
+
     return new Promise((resolve) => {
         // Create modal HTML
-        const warningHtml = `
-            <div class="modal fade" id="timeWarningModal" tabindex="-1" aria-hidden="true">
+        const modalHTML = `
+            <div class="modal fade" id="timeWarningModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-warning">
                             <h5 class="modal-title">
-                                <i class="bi bi-exclamation-triangle-fill"></i>
-                                Procesamiento Lento
+                                <i class="bi bi-clock-history"></i> Procesamiento Lento Detectado
                             </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <p><strong>Tu API Key es TIER GRATIS</strong></p>
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle"></i>
-                                <strong>Tiempo estimado: ~${estimatedMinutes} minutos</strong>
-                                <br>
-                                <small>Los screenshots se procesarán a 14 requests/minuto</small>
+                            <p><strong>Tiempo estimado:</strong> ~${estimatedMinutes} minutos</p>
+                            <p>Tu API Key está en modo <strong>${apiTier === 'free' ? 'Gratis (14 req/min)' : 'Pago'}</strong>.</p>
+
+                            ${apiTier === 'free' ? `
+                                <div class="alert alert-info">
+                                    <strong>💡 Sugerencia:</strong> Configura facturación en Google Cloud para procesamiento ilimitado (hasta 10x más rápido).
+                                    <br><a href="https://console.cloud.google.com/billing" target="_blank">Configurar ahora →</a>
+                                </div>
+                            ` : ''}
+
+                            <p>¿Deseas continuar de todos modos?</p>
+
+                            <div class="form-check mt-3">
+                                <input class="form-check-input" type="checkbox" id="suppress-time-warning-checkbox">
+                                <label class="form-check-label" for="suppress-time-warning-checkbox">
+                                    No mostrar esta advertencia de nuevo
+                                </label>
                             </div>
-                            <p class="mb-2">El procesamiento será más lento, pero completará correctamente.</p>
-                            <p class="text-muted small mb-0">
-                                <i class="bi bi-lightning-fill"></i>
-                                <strong>Quieres procesar más rápido?</strong>
-                                <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener">
-                                    Configura facturación en Google Cloud
-                                </a>
-                            </p>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancel-warning">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="time-warning-cancel">
                                 Cancelar
                             </button>
-                            <button type="button" class="btn btn-warning" id="continue-warning">
-                                <i class="bi bi-play-fill"></i> Continuar
+                            <button type="button" class="btn btn-warning" id="time-warning-proceed">
+                                Continuar de Todos Modos
                             </button>
                         </div>
                     </div>
@@ -3348,31 +3362,35 @@ function showProcessingTimeWarning(estimatedMinutes, apiTier) {
             </div>
         `;
 
-        // Remove if exists
-        const existing = document.getElementById('timeWarningModal');
-        if (existing) existing.remove();
+        // Append modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-        // Add to body
-        document.body.insertAdjacentHTML('beforeend', warningHtml);
+        const modalElement = document.getElementById('timeWarningModal');
+        const modal = new bootstrap.Modal(modalElement);
 
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('timeWarningModal'));
+        // Handle proceed button
+        document.getElementById('time-warning-proceed').addEventListener('click', () => {
+            // Check if suppress checkbox is checked
+            const suppressCheckbox = document.getElementById('suppress-time-warning-checkbox');
+            if (suppressCheckbox.checked) {
+                localStorage.setItem('suppress_time_warning', 'true');
+                console.log('[WARNING] User suppressed future time warnings');
+            }
 
-        // Handle buttons
-        document.getElementById('cancel-warning').addEventListener('click', () => {
-            modal.hide();
-            resolve(false);
-        });
-
-        document.getElementById('continue-warning').addEventListener('click', () => {
             modal.hide();
             resolve(true);
         });
 
-        // Resolve false if modal is dismissed
-        document.getElementById('timeWarningModal').addEventListener('hidden.bs.modal', () => {
+        // Handle cancel button
+        document.getElementById('time-warning-cancel').addEventListener('click', () => {
+            modal.hide();
             resolve(false);
-        }, { once: true });
+        });
+
+        // Handle X button (treat as cancel)
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+        });
 
         modal.show();
     });
