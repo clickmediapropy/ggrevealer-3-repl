@@ -561,13 +561,21 @@ if (uploadBtn) {
             for (let retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
                 try {
                     if (retryCount > 0) {
+                        // Show countdown for 2 seconds
+                        for (let countdown = 2; countdown >= 1; countdown--) {
+                            updateBatchProgress(
+                                batchNum,
+                                totalBatches,
+                                `Reintentando en ${countdown}s... (intento ${retryCount + 1}/${MAX_RETRIES + 1})`
+                            );
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+
                         updateBatchProgress(
                             batchNum,
                             totalBatches,
-                            `Reintentando lote ${batchNum}/${totalBatches} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`
+                            `Subiendo lote ${batchNum}/${totalBatches} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`
                         );
-                        // Wait 2 seconds before retry
-                        await new Promise(resolve => setTimeout(resolve, 2000));
                     }
 
                     batchResponse = await fetch(`${API_BASE}/api/upload/batch/${currentJobId}`, {
