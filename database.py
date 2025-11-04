@@ -262,6 +262,22 @@ def init_db():
         if dual_ocr_migrations:
             print(f"✅ Applied {len(dual_ocr_migrations)} dual OCR migrations")
 
+        # PT4 failed files corrections migration
+        cursor = conn.execute("PRAGMA table_info(pt4_failed_files)")
+        pt4_columns = [row[1] for row in cursor.fetchall()]
+
+        pt4_migrations = []
+        if 'corrected_file_path' not in pt4_columns:
+            pt4_migrations.append(
+                "ALTER TABLE pt4_failed_files ADD COLUMN corrected_file_path TEXT"
+            )
+
+        for migration in pt4_migrations:
+            conn.execute(migration)
+
+        if pt4_migrations:
+            print(f"✅ Applied {len(pt4_migrations)} PT4 failed files migrations")
+
     print("✅ Database initialized")
 
 

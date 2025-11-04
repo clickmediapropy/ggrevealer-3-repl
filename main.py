@@ -6,6 +6,7 @@ import os
 import asyncio
 import json
 import re
+import urllib.parse
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -1869,6 +1870,224 @@ async def recalculate_screenshots(job_id: int):
         'updated_count': updated_count,
         'results': results
     }
+
+
+# ========================================
+# REPROCESS FAILED FILES
+# ========================================
+
+def create_screenshot_analysis_from_ocr2_data(ocr_data: dict):
+    """Convert OCR2 raw dict to ScreenshotAnalysis object"""
+    from models import ScreenshotAnalysis
+
+    players = []
+    hero_name = ocr_data.get('hero_name', 'Hero')
+
+    if 'players' in ocr_data:
+        for player_data in ocr_data['players']:
+            players.append({
+                'name': player_data.get('name', ''),
+                'position': player_data.get('position'),
+                'stack': player_data.get('stack'),
+                'is_dealer': player_data.get('dealer', False),
+                'is_small_blind': player_data.get('small_blind', False),
+                'is_big_blind': player_data.get('big_blind', False)
+            })
+
+    return ScreenshotAnalysis(
+        hand_id=ocr_data.get('hand_id'),
+        players=players,
+        hero_name=hero_name,
+        board_cards=ocr_data.get('board_cards')
+    )
+
+
+def convert_mapping_dict_to_name_mappings(mapping_dict: dict, table_name: str):
+    """Convert {anon_id: real_name} dict to List[NameMapping]"""
+    from models import NameMapping
+
+    name_mappings = []
+    for anon_id, real_name in mapping_dict.items():
+        name_mappings.append(NameMapping(
+            anonymized_identifier=anon_id,
+            resolved_name=real_name,
+            confidence=100.0,  # 100% confidence for manual reprocess
+            source='reprocess_ocr2',
+            table_name=table_name
+        ))
+
+    return name_mappings
+
+
+@app.post("/api/reprocess-failed-file")
+async def reprocess_failed_file(
+    pt4_failed_file_id: int = Form(...),
+    api_key: Optional[str] = Form(None)
+):
+    """
+    Reprocess a PT4 failed file with its associated screenshot
+
+    Steps:
+    1. Get original TXT + screenshot from database
+    2. Parse original TXT file
+    3. Run OCR2 on screenshot to extract player names
+    4. Generate seat mappings using OCR2 data
+    5. Apply mappings to generate corrected TXT
+    6. Validate that NO unmapped IDs remain
+    7. Save to storage/corrections/{job_id}/{table}_corregido.txt
+
+    Returns download URL on success, error with unmapped IDs on failure
+    """
+    from database import (
+        get_db, get_pt4_failed_files_for_job, update_pt4_failed_file_screenshots
+    )
+    from parser import GGPokerParser
+    from ocr import ocr_player_details
+    from matcher import _build_seat_mapping
+    from writer import (
+        generate_final_txt, detect_unmapped_ids_in_text,
+        validate_output_hand_history
+    )
+    from pathlib import Path
+    import asyncio
+
+    try:
+        # Get the failed file from database
+        with get_db() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM pt4_failed_files WHERE id = ?",
+                (pt4_failed_file_id,)
+            )
+            failed_file = dict(cursor.fetchone() or {})
+
+        if not failed_file:
+            raise HTTPException(status_code=404, detail="Failed file not found")
+
+        job_id = failed_file['associated_job_id']
+        original_txt_path = failed_file['associated_original_txt_path']
+        table_number = failed_file['table_number']
+
+        # Parse screenshot paths
+        screenshot_paths = []
+        if failed_file.get('associated_screenshot_paths'):
+            try:
+                screenshot_paths = json.loads(failed_file['associated_screenshot_paths'])
+            except:
+                screenshot_paths = []
+
+        if not screenshot_paths:
+            raise HTTPException(status_code=400, detail="No screenshots associated with this file")
+
+        if not original_txt_path:
+            raise HTTPException(status_code=400, detail="Original TXT file path not found")
+
+        # Read original TXT
+        if not Path(original_txt_path).exists():
+            raise HTTPException(status_code=404, detail="Original TXT file not found")
+
+        with open(original_txt_path, 'r', encoding='utf-8') as f:
+            original_txt = f.read()
+
+        # Parse hands
+        hands = GGPokerParser.parse_file(original_txt)
+        if not hands:
+            raise HTTPException(status_code=400, detail="Could not parse any hands from TXT file")
+
+        # Get table name from first hand
+        table_name = None
+        if hands:
+            match = re.search(r"Table '([^']+)'", hands[0].raw_text)
+            if match:
+                table_name = match.group(1)
+
+        # Get API key (use provided or from env)
+        ocr_api_key = api_key or os.getenv('GEMINI_API_KEY')
+        if not ocr_api_key:
+            raise HTTPException(status_code=400, detail="API key required for OCR")
+
+        # Run OCR2 on screenshot
+        screenshot_path = screenshot_paths[0]
+        success, ocr_data, error = await ocr_player_details(screenshot_path, ocr_api_key)
+
+        if not success:
+            raise HTTPException(
+                status_code=400,
+                detail=f"OCR failed: {error}"
+            )
+
+        # Create ScreenshotAnalysis from OCR data
+        screenshot_analysis = create_screenshot_analysis_from_ocr2_data(ocr_data)
+
+        # Generate mappings for each hand
+        all_mappings = {}  # {anon_id: real_name}
+
+        for hand in hands:
+            # Build seat mapping for this hand
+            mapping = _build_seat_mapping(
+                screenshot_analysis,
+                hand,
+                None  # logger (optional)
+            )
+            all_mappings.update(mapping)
+
+        if not all_mappings:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not generate player mappings from screenshot"
+            )
+
+        # Convert to NameMapping objects
+        name_mappings = convert_mapping_dict_to_name_mappings(all_mappings, table_name or str(table_number))
+
+        # Generate final TXT with mappings
+        final_txt, _ = generate_final_txt(original_txt, name_mappings)
+
+        # Validate: Check for unmapped IDs
+        unmapped_ids = detect_unmapped_ids_in_text(final_txt)
+
+        if unmapped_ids:
+            # Return error with unmapped IDs
+            return {
+                'success': False,
+                'error': 'El archivo todavía contiene IDs sin mapear después del reprocesamiento',
+                'unmapped_ids': list(unmapped_ids),
+                'details': f'OCR extrajo {len(all_mappings)} jugadores pero el archivo contiene {len(unmapped_ids)} IDs sin mapear'
+            }
+
+        # Save corrected file
+        corrections_dir = Path(f"storage/corrections/{job_id}")
+        corrections_dir.mkdir(parents=True, exist_ok=True)
+
+        corrected_file_path = corrections_dir / f"{table_number}_corregido.txt"
+        with open(corrected_file_path, 'w', encoding='utf-8') as f:
+            f.write(final_txt)
+
+        # Update database
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE pt4_failed_files SET corrected_file_path = ? WHERE id = ?",
+                    (str(corrected_file_path), pt4_failed_file_id)
+                )
+        except Exception as e:
+            print(f"Warning: Could not update database: {e}")
+
+        return {
+            'success': True,
+            'message': 'Archivo corregido exitosamente',
+            'corrected_file_path': str(corrected_file_path),
+            'download_url': f'/api/download-file?path={urllib.parse.quote(str(corrected_file_path))}',
+            'table_number': table_number,
+            'mappings_count': len(all_mappings)
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error reprocessing failed file: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 @app.get("/api/download-file")

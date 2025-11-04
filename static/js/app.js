@@ -2374,7 +2374,7 @@ function displayFailedFilesResults(data) {
     console.log('Displaying failed files results:', data);
 
     if (!data.failed_files || data.failed_files.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No se detectaron archivos fallidos</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No se detectaron archivos fallidos</td></tr>';
         resultsDiv.style.display = 'block';
         return;
     }
@@ -2432,6 +2432,34 @@ function displayFailedFilesResults(data) {
         }
         row.appendChild(screenshotsCell);
 
+        // Reprocesar button
+        const reprocessCell = document.createElement('td');
+        if (file.screenshot_paths && file.screenshot_paths.length > 0) {
+            if (file.corrected_file_path) {
+                // Already corrected - show download button
+                reprocessCell.innerHTML = `
+                    <span class="badge bg-success">✓ Corregido</span>
+                    <button class="btn btn-sm btn-success mt-2" onclick="downloadFile('${file.corrected_file_path}')">
+                        <i class="bi bi-download"></i> Descargar
+                    </button>
+                `;
+            } else {
+                // Not corrected - show Reprocesar button
+                reprocessCell.innerHTML = `
+                    <button class="btn btn-sm btn-warning reprocess-btn"
+                            data-file-id="${file.id}"
+                            data-table="${file.table_number}"
+                            onclick="reprocessFailedFile(${file.id}, ${file.table_number})">
+                        <i class="bi bi-arrow-clockwise"></i> Reprocesar
+                    </button>
+                    <div class="spinner-border spinner-border-sm d-none mt-2" role="status" id="spinner-${file.id}"></div>
+                `;
+            }
+        } else {
+            reprocessCell.innerHTML = '<span class="text-muted">Sin screenshots</span>';
+        }
+        row.appendChild(reprocessCell);
+
         tbody.appendChild(row);
     });
 
@@ -2448,6 +2476,62 @@ function downloadFile(filepath) {
     link.href = '/api/download-file?path=' + encodeURIComponent(filepath);
     link.download = filepath.split('/').pop();
     link.click();
+}
+
+async function reprocessFailedFile(failedFileId, tableNumber) {
+    const button = document.querySelector(`button[data-file-id="${failedFileId}"]`);
+    const spinner = document.getElementById(`spinner-${failedFileId}`);
+
+    if (!button) return;
+
+    // Show loading state
+    button.disabled = true;
+    button.classList.add('d-none');
+    spinner.classList.remove('d-none');
+
+    try {
+        const formData = new FormData();
+        formData.append('pt4_failed_file_id', failedFileId);
+
+        const response = await fetch('/api/reprocess-failed-file', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Change row state to "Corregido"
+            const cell = button.parentElement;
+            cell.innerHTML = `
+                <span class="badge bg-success">✓ Corregido</span>
+                <button class="btn btn-sm btn-success mt-2" onclick="downloadFile('${data.corrected_file_path}')">
+                    <i class="bi bi-download"></i> Descargar
+                </button>
+            `;
+
+            // Show success notification
+            alert(`✅ Mesa ${tableNumber} corregida exitosamente!\n\nMappings: ${data.mappings_count} jugadores`);
+        } else {
+            // Show error with unmapped IDs
+            spinner.classList.add('d-none');
+            button.classList.remove('d-none');
+            button.disabled = false;
+
+            const errorMsg = data.unmapped_ids
+                ? `❌ Error: IDs sin mapear (${data.unmapped_ids.join(', ')})\n\n${data.details}`
+                : `❌ Error: ${data.error}`;
+
+            alert(errorMsg);
+        }
+    } catch (error) {
+        spinner.classList.add('d-none');
+        button.classList.remove('d-none');
+        button.disabled = false;
+
+        console.error('Error reprocessing failed file:', error);
+        alert(`❌ Error de red: ${error.message}`);
+    }
 }
 
 function showScreenshots(screenshotPaths) {
