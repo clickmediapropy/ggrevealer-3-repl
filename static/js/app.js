@@ -2150,10 +2150,22 @@ function showWelcomeSection() {
 }
 
 function showFailedFilesView() {
-    // Placeholder function for Task 7
-    // Will be implemented in Task 8 (Failed Files View Container)
-    alert('Archivos Fallidos view - Coming soon in Task 8!');
-    console.log('showFailedFilesView() called - to be implemented in Task 8');
+    // Hide all views
+    const welcomeSection = document.getElementById('welcome-section');
+    const processingSection = document.getElementById('processing-section');
+    const resultsSection = document.getElementById('results-section');
+    const errorSection = document.getElementById('error-section');
+    const historySection = document.getElementById('history-section');
+    const failedFilesView = document.getElementById('failed-files-view');
+
+    if (welcomeSection) welcomeSection.classList.add('d-none');
+    if (processingSection) processingSection.classList.add('d-none');
+    if (resultsSection) resultsSection.classList.add('d-none');
+    if (errorSection) errorSection.classList.add('d-none');
+    if (historySection) historySection.style.display = 'none';
+
+    // Show failed files view
+    if (failedFilesView) failedFilesView.style.display = 'block';
 }
 
 // ========================================

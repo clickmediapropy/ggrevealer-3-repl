@@ -1064,3 +1064,29 @@ body {
     background-color: #6c757d;
     color: white;
 }
+
+/* Failed Files View */
+#failed-files-view .view-container {
+    padding: 2rem;
+}
+
+#failed-files-view .font-monospace {
+    font-size: 0.9rem;
+}
+
+#failed-files-view .table {
+    font-size: 0.9rem;
+}
+
+#failed-files-view .btn-download {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.error-badge {
+    background-color: #dc3545;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}

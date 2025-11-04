@@ -508,6 +508,102 @@
                         <div id="jobs-list"></div>
                     </div>
                 </div>
+
+                <!-- Failed Files Recovery View -->
+                <div id="failed-files-view" class="view-container" style="display: none;">
+                    <div class="container-fluid">
+                        <div class="row mb-4">
+                            <div class="col">
+                                <h2><i class="bi bi-exclamation-triangle text-warning"></i> Recuperación de Archivos Fallidos</h2>
+                                <p class="text-muted">Sube el log de importación de PokerTracker para identificar archivos que fallaron y encontrar sus screenshots asociados.</p>
+                            </div>
+                        </div>
+
+                        <!-- Upload PT4 Log Section -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="bi bi-upload"></i> Subir Log de PokerTracker</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="pt4-log-form">
+                                            <div class="mb-3">
+                                                <label for="pt4-log-text" class="form-label">Pega el log de importación de PT4:</label>
+                                                <textarea
+                                                    class="form-control font-monospace"
+                                                    id="pt4-log-text"
+                                                    rows="10"
+                                                    placeholder="06:58:32 pm: Import file: /path/46798_resolved.txt
+06:58:32 pm: Error: GG Poker: Duplicate player...
+06:58:32 pm:         + Complete (0 hands, 0 summaries, 5 errors, 0 duplicates)"
+                                                    required
+                                                ></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="pt4-job-id" class="form-label">Job ID (opcional):</label>
+                                                <input
+                                                    type="number"
+                                                    class="form-control"
+                                                    id="pt4-job-id"
+                                                    placeholder="Dejar vacío para auto-detectar"
+                                                >
+                                                <small class="text-muted">Si conoces el Job ID que generó estos archivos, ingrésalo para mejor precisión.</small>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-search"></i> Analizar Log
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-info-circle"></i> ¿Cómo funciona?</h6>
+                                        <ol class="small">
+                                            <li>Copia el log de importación de PokerTracker</li>
+                                            <li>Pégalo en el área de texto</li>
+                                            <li>El sistema extrae los archivos que fallaron</li>
+                                            <li>Busca automáticamente los screenshots asociados</li>
+                                            <li>Muestra todo en una tabla para corrección manual</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Failed Files Table -->
+                        <div class="row" id="failed-files-results" style="display: none;">
+                            <div class="col">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="bi bi-table"></i> Archivos Fallidos Detectados</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Archivo</th>
+                                                        <th>Mesa</th>
+                                                        <th>Errores</th>
+                                                        <th>TXT Original</th>
+                                                        <th>TXT Procesado</th>
+                                                        <th>Screenshots</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="failed-files-tbody">
+                                                    <!-- Populated by JavaScript -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <!-- End Main Content -->
