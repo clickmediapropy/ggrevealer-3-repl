@@ -430,6 +430,24 @@ function showWarning(message) {
 }
 
 /**
+ * Debounce function calls
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Wait time in ms
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait = 300) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+/**
  * Delete job with retry logic
  * @param {number} jobId - Job ID to delete
  * @param {string} reason - Reason for deletion (for logging)
@@ -1873,7 +1891,7 @@ async function downloadFailedFiles(jobId) {
     window.location.href = `${API_BASE}/api/download-fallidos/${jobId}`;
 }
 
-async function loadJobs() {
+async function loadJobsImmediate() {
     try {
         const response = await fetch(`${API_BASE}/api/jobs`);
         if (!response.ok) {
@@ -1886,6 +1904,9 @@ async function loadJobs() {
         console.error('Error loading jobs:', error);
     }
 }
+
+// Debounced version (use this in most places)
+const loadJobs = debounce(loadJobsImmediate, 300);
 
 function renderJobs(jobs) {
     if (!jobsList) return;
