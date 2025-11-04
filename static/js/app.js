@@ -3103,6 +3103,17 @@ async function loadJobFailedFiles(jobId) {
 function viewJobFailedFiles() {
     if (!window.currentJobFailedFiles) return;
 
+    // DEBUG LOG for Job 96
+    console.log('🔍 viewJobFailedFiles() - Data:', window.currentJobFailedFiles);
+    console.log('🔍 Total failures:', window.currentJobFailedFiles.total_failures);
+    console.log('🔍 PT4 count:', window.currentJobFailedFiles.pt4_failures_count);
+    console.log('🔍 Initial count:', window.currentJobFailedFiles.initial_failures_count);
+    console.log('🔍 unified_failures length:', window.currentJobFailedFiles.unified_failures?.length);
+
+    // Filter and log initial_processing files
+    const initialFiles = window.currentJobFailedFiles.unified_failures?.filter(f => f.failure_source === 'initial_processing') || [];
+    console.log('🎯 Initial processing files:', initialFiles);
+
     // Close the modal first
     if (reprocessModal) {
         reprocessModal.hide();
