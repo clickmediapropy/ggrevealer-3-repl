@@ -1598,6 +1598,42 @@ if (retryBtn) {
     retryBtn.addEventListener('click', resetToWelcome);
 }
 
+const cancelErrorJobBtn = document.getElementById('cancel-error-job-btn');
+if (cancelErrorJobBtn) {
+    cancelErrorJobBtn.addEventListener('click', async () => {
+        if (!currentJobId) {
+            console.warn('[CANCEL] No job ID to cancel');
+            showWelcomeSection();
+            updateSidebarActiveState('nav-new-job');
+            return;
+        }
+
+        const confirmCancel = confirm('¿Eliminar este job y volver al inicio?');
+        if (!confirmCancel) return;
+
+        const jobIdToDelete = currentJobId;
+        currentJobId = null;
+
+        cancelErrorJobBtn.disabled = true;
+        cancelErrorJobBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Eliminando...';
+
+        try {
+            await fetch(`${API_BASE}/api/job/${jobIdToDelete}`, { method: 'DELETE' });
+            console.log(`[CANCEL] Deleted failed job ${jobIdToDelete}`);
+
+            showWelcomeSection();
+            updateSidebarActiveState('nav-new-job');
+            loadJobs();
+            loadRecentJobs();
+        } catch (error) {
+            console.error('[CANCEL] Error deleting job:', error);
+            alert('Error al eliminar el job. Volviendo al inicio de todos modos.');
+            showWelcomeSection();
+            updateSidebarActiveState('nav-new-job');
+        }
+    });
+}
+
 async function downloadResult(jobId) {
     window.location.href = `${API_BASE}/api/download/${jobId}`;
 }
